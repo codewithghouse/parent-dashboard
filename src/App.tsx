@@ -14,6 +14,7 @@ import BehaviourPage from "./pages/BehaviourPage";
 import TeacherNotesPage from "./pages/TeacherNotesPage";
 import MessagesPage from "./pages/MessagesPage";
 import AlertsPage from "./pages/AlertsPage";
+import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
