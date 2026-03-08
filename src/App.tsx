@@ -14,6 +14,7 @@ import BehaviourPage from "./pages/BehaviourPage";
 import TeacherNotesPage from "./pages/TeacherNotesPage";
 import MessagesPage from "./pages/MessagesPage";
 import AlertsPage from "./pages/AlertsPage";
+import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const App = () => (
           <Route path="/teacher-notes" element={<TeacherNotesPage />} />
           <Route path="/messages" element={<MessagesPage />} />
           <Route path="/alerts" element={<AlertsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
