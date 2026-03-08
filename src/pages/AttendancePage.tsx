@@ -4,11 +4,26 @@ import { CheckCircle, XCircle, Clock, CheckSquare } from "lucide-react";
 type DayStatus = "present" | "absent" | "late" | "weekend" | "empty";
 
 const calendarDays: { day: number | null; status: DayStatus }[][] = [
-  [null, null, null, { day: 1, status: "present" }, { day: 2, status: "present" }, { day: 3, status: "present" }, { day: 4, status: "weekend" }].map((d, i) => d ? { day: d.day, status: d.status } : { day: [29, 30, 31][i] || null, status: "empty" as DayStatus }),
-  [{ day: 5, status: "weekend" }, { day: 6, status: "present" }, { day: 7, status: "present" }, { day: 8, status: "present" }, { day: 9, status: "present" }, { day: 10, status: "present" }, { day: 11, status: "weekend" }],
-  [{ day: 12, status: "weekend" }, { day: 13, status: "present" }, { day: 14, status: "present" }, { day: 15, status: "present" }, { day: 16, status: "absent" }, { day: 17, status: "present" }, { day: 18, status: "weekend" }],
-  [{ day: 19, status: "weekend" }, { day: 20, status: "late" }, { day: 21, status: "present" }, { day: 22, status: "present" }, { day: 23, status: "present" }, { day: 24, status: "present" }, { day: 25, status: "weekend" }],
-  [{ day: 26, status: "weekend" }, { day: 27, status: "late" }, { day: 28, status: "present" }, { day: 29, status: "present" }, { day: 30, status: "present" }, { day: 31, status: "present" }, null].map((d) => d || { day: null, status: "empty" as DayStatus }),
+  [
+    { day: 29, status: "empty" }, { day: 30, status: "empty" }, { day: 31, status: "empty" },
+    { day: 1, status: "present" }, { day: 2, status: "present" }, { day: 3, status: "present" }, { day: 4, status: "weekend" },
+  ],
+  [
+    { day: 5, status: "weekend" }, { day: 6, status: "present" }, { day: 7, status: "present" },
+    { day: 8, status: "present" }, { day: 9, status: "present" }, { day: 10, status: "present" }, { day: 11, status: "weekend" },
+  ],
+  [
+    { day: 12, status: "weekend" }, { day: 13, status: "present" }, { day: 14, status: "present" },
+    { day: 15, status: "present" }, { day: 16, status: "absent" }, { day: 17, status: "present" }, { day: 18, status: "weekend" },
+  ],
+  [
+    { day: 19, status: "weekend" }, { day: 20, status: "late" }, { day: 21, status: "present" },
+    { day: 22, status: "present" }, { day: 23, status: "present" }, { day: 24, status: "present" }, { day: 25, status: "weekend" },
+  ],
+  [
+    { day: 26, status: "weekend" }, { day: 27, status: "late" }, { day: 28, status: "present" },
+    { day: 29, status: "present" }, { day: 30, status: "present" }, { day: 31, status: "present" }, { day: null, status: "empty" },
+  ],
 ];
 
 const absences = [
