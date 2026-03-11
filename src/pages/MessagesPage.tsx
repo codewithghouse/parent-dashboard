@@ -55,17 +55,19 @@ const MessagesPage = () => {
         {/* Chat Area */}
         <div className="col-span-3 flex flex-col">
           {/* Chat Header */}
-          <div className="p-4 border-b border-border flex items-center justify-between">
+          <div className="p-4 border-b border-border flex items-center justify-between bg-card">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold">PP</div>
+              <div className={`w-10 h-10 rounded-full ${conversations[activeChat].color} flex items-center justify-center text-primary-foreground text-sm font-bold shadow-sm`}>
+                {conversations[activeChat].initials}
+              </div>
               <div>
-                <p className="text-sm font-bold text-foreground">Mrs. Priya Patel</p>
-                <p className="text-xs text-muted-foreground">Mathematics Teacher • Class 8B</p>
+                <p className="text-sm font-bold text-foreground">{conversations[activeChat].name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {conversations[activeChat].initials === "AD" ? "Administrative Support" : "Subject Teacher • Class 8B"}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button className="p-2 rounded-lg hover:bg-muted"><Phone className="w-4 h-4 text-muted-foreground" /></button>
-              <button className="p-2 rounded-lg hover:bg-muted"><Video className="w-4 h-4 text-muted-foreground" /></button>
               <button className="p-2 rounded-lg hover:bg-muted"><MoreVertical className="w-4 h-4 text-muted-foreground" /></button>
             </div>
           </div>
@@ -91,14 +93,25 @@ const MessagesPage = () => {
             ))}
           </div>
 
-          {/* Input */}
-          <div className="p-4 border-t border-border flex items-center gap-3">
-            <button className="p-2 rounded-lg hover:bg-muted"><Paperclip className="w-4 h-4 text-muted-foreground" /></button>
-            <input type="text" placeholder="Type a message..." className="flex-1 bg-muted rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring" />
-            <button className="p-2 rounded-lg hover:bg-muted"><Smile className="w-4 h-4 text-muted-foreground" /></button>
-            <button className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium flex items-center gap-2">
-              <Send className="w-4 h-4" /> Send
-            </button>
+          {/* Message Input Area */}
+          <div className="p-4 border-t border-border bg-card">
+            <div className="flex items-center gap-3 bg-muted/50 rounded-xl p-2 border border-border">
+              <button className="p-2 rounded-lg hover:bg-muted transition-colors">
+                <Paperclip className="w-5 h-5 text-muted-foreground" />
+              </button>
+              <input 
+                type="text" 
+                placeholder="Write your message here..." 
+                className="flex-1 bg-transparent border-none px-2 py-2 text-sm outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground" 
+              />
+              <button className="p-2 rounded-lg hover:bg-muted transition-colors">
+                <Smile className="w-5 h-5 text-muted-foreground" />
+              </button>
+              <button className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all shadow-sm active:scale-95">
+                <Send className="w-4 h-4" /> 
+                <span>Send</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
