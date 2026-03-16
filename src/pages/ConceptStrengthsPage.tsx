@@ -1,4 +1,3 @@
-import { ParentLayout } from "@/components/layout/ParentLayout";
 import { useState } from "react";
 import { CheckCircle, AlertCircle, XCircle, Lightbulb } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
@@ -41,7 +40,6 @@ const ConceptStrengthsPage = () => {
   };
 
   return (
-    <ParentLayout>
       <div className="space-y-6">
         {/* Subject Tabs */}
         <div className="flex gap-3">
@@ -134,7 +132,6 @@ const ConceptStrengthsPage = () => {
           </ResponsiveContainer>
         </div>
       </div>
-    </ParentLayout>
   );
 };
 

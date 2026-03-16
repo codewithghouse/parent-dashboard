@@ -1,4 +1,3 @@
-import { ParentLayout } from "@/components/layout/ParentLayout";
 import { ArrowUp, ArrowDown, Minus, ChevronRight } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { useState } from "react";
@@ -92,7 +91,7 @@ const PerformancePage = () => {
     const subjectInfo = subjects.find(s => s.name === selectedSubject);
 
     return (
-      <ParentLayout>
+      <>
         <SubjectPerformanceDetail
           subject={selectedSubject}
           teacher={details.teacher}
@@ -103,12 +102,11 @@ const PerformancePage = () => {
           feedback={details.feedback}
           onBack={() => setSelectedSubject(null)}
         />
-      </ParentLayout>
+      </>
     );
   }
 
   return (
-    <ParentLayout>
       <div className="space-y-6">
         {/* Overall Performance */}
         <div className="bg-card rounded-xl border border-border p-6 flex items-center justify-between">
@@ -198,7 +196,6 @@ const PerformancePage = () => {
           </ResponsiveContainer>
         </div>
       </div>
-    </ParentLayout>
   );
 };
 

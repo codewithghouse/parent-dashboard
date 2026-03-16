@@ -1,14 +1,15 @@
-import { ParentLayout } from "@/components/layout/ParentLayout";
+import { useAuth } from "@/lib/AuthContext";
 import { CheckCircle, AlertCircle, Calendar, Star, ArrowUp, Clock, CheckSquare } from "lucide-react";
 
 const DashboardPage = () => {
+  const { studentData, user } = useAuth();
+
   return (
-    <ParentLayout>
       <div className="space-y-6">
         {/* Greeting */}
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Good Morning, Rahul! 👋</h1>
-          <p className="text-muted-foreground">Here's how Aditya is doing today</p>
+          <h1 className="text-2xl font-bold text-foreground">Good Morning, {studentData?.name || user?.displayName?.split(' ')[0] || "Parent"}! 👋</h1>
+          <p className="text-muted-foreground">Here's how {studentData?.name || "Aditya"} is doing today</p>
         </div>
 
         {/* Academic Health Card */}
@@ -48,16 +49,18 @@ const DashboardPage = () => {
           {/* Student Info */}
           <div className="col-span-3 bg-card rounded-xl border border-border p-6">
             <div className="flex items-center gap-4 mb-4">
-              <div className="w-14 h-14 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">AS</div>
+              <div className="w-14 h-14 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
+                {studentData?.name?.[0] || studentData?.studentName?.[0] || "S"}
+              </div>
               <div>
-                <h3 className="text-lg font-bold text-foreground">Aditya Sharma</h3>
-                <p className="text-sm text-muted-foreground">Grade 8 • Section B • Roll 24</p>
+                <h3 className="text-lg font-bold text-foreground">{studentData?.name || studentData?.studentName || "Student Name"}</h3>
+                <p className="text-sm text-muted-foreground">Grade {studentData?.grade || studentData?.class} • Section {studentData?.section || "A"} • Roll {studentData?.rollNo || studentData?.roll || "--"}</p>
               </div>
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Class Teacher</span>
-                <span className="font-semibold text-foreground">Mrs. Priya Patel</span>
+                <span className="text-muted-foreground">Parent/Guardian</span>
+                <span className="font-semibold text-foreground">{user?.displayName || "Authorized Parent"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Academic Year</span>
@@ -88,7 +91,6 @@ const DashboardPage = () => {
           </div>
         </div>
       </div>
-    </ParentLayout>
   );
 };
 

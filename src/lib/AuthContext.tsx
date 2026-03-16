@@ -32,7 +32,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (currentUser && currentUser.email) {
         try {
           // Whitelist Check for Students/Parents
-          const q = query(collection(db, "students"), where("email", "==", currentUser.email));
+          const q = query(collection(db, "students"), where("email", "==", currentUser.email.toLowerCase()));
           const querySnapshot = await getDocs(q);
 
           if (!querySnapshot.empty) {

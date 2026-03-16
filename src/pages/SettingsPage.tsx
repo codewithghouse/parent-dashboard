@@ -1,4 +1,3 @@
-import { ParentLayout } from "@/components/layout/ParentLayout";
 import { useState } from "react";
 import { User, Bell, Shield, Globe, Mail, Phone, Camera } from "lucide-react";
 
@@ -16,7 +15,6 @@ const SettingsPage = () => {
   };
 
   return (
-    <ParentLayout>
       <div className="space-y-6 max-w-4xl">
         <h1 className="text-2xl font-bold text-foreground">Settings</h1>
 
@@ -150,7 +148,6 @@ const SettingsPage = () => {
           </div>
         </div>
       </div>
-    </ParentLayout>
   );
 };
 

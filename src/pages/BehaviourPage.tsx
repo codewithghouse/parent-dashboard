@@ -1,4 +1,3 @@
-import { ParentLayout } from "@/components/layout/ParentLayout";
 import { Star, Trophy, Leaf, MessageCircle, Clock, FileText, Info } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
@@ -24,7 +23,6 @@ const trendData = [
 
 const BehaviourPage = () => {
   return (
-    <ParentLayout>
       <div className="space-y-6">
         {/* Rating */}
         <div className="bg-card rounded-xl border border-border p-6 flex items-center justify-between">
@@ -105,7 +103,6 @@ const BehaviourPage = () => {
           </ResponsiveContainer>
         </div>
       </div>
-    </ParentLayout>
   );
 };
 

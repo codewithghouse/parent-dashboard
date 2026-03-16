@@ -1,4 +1,3 @@
-import { ParentLayout } from "@/components/layout/ParentLayout";
 import { Calendar } from "lucide-react";
 
 const upcoming = [
@@ -22,8 +21,7 @@ const grades = [
 
 const TestsPage = () => {
   return (
-    <ParentLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Featured Banner */}
         <div className="bg-gradient-to-r from-primary to-edu-blue rounded-xl p-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -95,8 +93,7 @@ const TestsPage = () => {
             ))}
           </div>
         </div>
-      </div>
-    </ParentLayout>
+    </div>
   );
 };
 

@@ -1,4 +1,3 @@
-import { ParentLayout } from "@/components/layout/ParentLayout";
 import { ThumbsUp, Info, Hand, User, BookOpen, Calendar } from "lucide-react";
 
 const notes = [
@@ -51,8 +50,7 @@ const notes = [
 
 const TeacherNotesPage = () => {
   return (
-    <ParentLayout>
-      <div className="space-y-6 pt-2 pb-10">
+    <div className="space-y-6 pt-2 pb-10">
         <div className="flex items-center justify-between mb-8">
             <h1 className="text-3xl font-bold text-[#1e293b] uppercase tracking-wider">Teacher Notes</h1>
             <div className="h-10 w-32 bg-white border border-border rounded-xl shadow-sm" />
@@ -98,8 +96,7 @@ const TeacherNotesPage = () => {
             </div>
           ))}
         </div>
-      </div>
-    </ParentLayout>
+    </div>
   );
 };
 

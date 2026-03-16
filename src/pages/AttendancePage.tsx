@@ -1,4 +1,3 @@
-import { ParentLayout } from "@/components/layout/ParentLayout";
 import { CheckCircle, XCircle, Clock, CheckSquare } from "lucide-react";
 
 type DayStatus = "present" | "absent" | "late" | "weekend" | "empty";
@@ -34,7 +33,6 @@ const absences = [
 
 const AttendancePage = () => {
   return (
-    <ParentLayout>
       <div className="space-y-6">
         {/* Stats */}
         <div className="grid grid-cols-4 gap-4">
@@ -108,7 +106,6 @@ const AttendancePage = () => {
           </div>
         </div>
       </div>
-    </ParentLayout>
   );
 };
 

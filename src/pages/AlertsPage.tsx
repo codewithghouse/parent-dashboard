@@ -1,4 +1,3 @@
-import { ParentLayout } from "@/components/layout/ParentLayout";
 import { useState } from "react";
 import { AlertCircle, Clock, Trophy, Calendar, CheckCircle, User } from "lucide-react";
 
@@ -81,7 +80,6 @@ const AlertsPage = () => {
   const [activeTab, setActiveTab] = useState(0);
 
   return (
-    <ParentLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex gap-3">
@@ -129,7 +127,6 @@ const AlertsPage = () => {
           ))}
         </div>
       </div>
-    </ParentLayout>
   );
 };
 

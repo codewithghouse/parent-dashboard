@@ -1,4 +1,3 @@
-import { ParentLayout } from "@/components/layout/ParentLayout";
 import { useState } from "react";
 import { User, Clock } from "lucide-react";
 
@@ -29,7 +28,6 @@ const AssignmentsPage = () => {
   const [activeTab, setActiveTab] = useState(0);
 
   return (
-    <ParentLayout>
       <div className="space-y-6">
         {/* Tabs */}
         <div className="flex gap-3">
@@ -83,7 +81,6 @@ const AssignmentsPage = () => {
           ))}
         </div>
       </div>
-    </ParentLayout>
   );
 };
 

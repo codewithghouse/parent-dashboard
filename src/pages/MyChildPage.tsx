@@ -1,4 +1,3 @@
-import { ParentLayout } from "@/components/layout/ParentLayout";
 import { Mail, CheckSquare, FileText, Star, CalendarCheck } from "lucide-react";
 
 const MyChildPage = () => {
@@ -16,7 +15,6 @@ const MyChildPage = () => {
   ];
 
   return (
-    <ParentLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div />
@@ -94,7 +92,6 @@ const MyChildPage = () => {
           </div>
         </div>
       </div>
-    </ParentLayout>
   );
 };
 

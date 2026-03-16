@@ -1,4 +1,3 @@
-import { ParentLayout } from "@/components/layout/ParentLayout";
 import { useState } from "react";
 import { Phone, Video, MoreVertical, Paperclip, Smile, Send } from "lucide-react";
 
@@ -21,7 +20,7 @@ const MessagesPage = () => {
   const [activeChat, setActiveChat] = useState(0);
 
   return (
-    <ParentLayout>
+    <>
       <div className="flex items-center justify-between mb-6">
         <div />
         <button className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium">+ New Message</button>
@@ -115,7 +114,7 @@ const MessagesPage = () => {
           </div>
         </div>
       </div>
-    </ParentLayout>
+    </>
   );
 };
 
