@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { User, Bell, Shield, Globe, Mail, Phone, Camera, Loader2, Check } from "lucide-react";
+import { User, Bell, Shield, Globe, Mail, Phone, Camera, Loader2, Check, Settings, ShieldCheck, Lock, Smartphone } from "lucide-react";
 import { useAuth } from "../lib/AuthContext";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
@@ -62,192 +62,196 @@ const SettingsPage = () => {
   };
 
   return (
-      <div className="space-y-6 max-w-4xl animate-in fade-in duration-500">
-        <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-
-        {/* Profile Settings */}
-        <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
-          <div className="flex items-center gap-2 mb-6">
-            <User className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-bold text-foreground">Profile Settings</h2>
-          </div>
-
-          <div className="flex items-center gap-6 mb-6">
-            <div className="relative">
-              <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold text-2xl shadow-lg">
-                {profileForm.name ? profileForm.name[0] : (user?.displayName?.[0] || 'P')}
-              </div>
-              <button className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-edu-blue border-2 border-card flex items-center justify-center text-white shadow-md hover:scale-110 transition-transform">
-                <Camera className="w-4 h-4" />
-              </button>
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-foreground">{profileForm.name || "Set your name"}</h3>
-              <p className="text-sm font-medium text-muted-foreground uppercase tracking-widest">Authorized Parent</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Full Name</label>
-              <div className="flex items-center gap-2 bg-muted/30 rounded-lg px-4 py-2.5 border border-border focus-within:ring-2 focus-within:ring-primary/20 transition-all">
-                <User className="w-4 h-4 text-muted-foreground" />
-                <input 
-                  type="text"
-                  value={profileForm.name}
-                  onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
-                  placeholder="Enter your name"
-                  className="bg-transparent border-none outline-none text-sm w-full text-foreground font-medium"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Email Address</label>
-              <div className="flex items-center gap-2 bg-muted/10 rounded-lg px-4 py-2.5 border border-border opacity-70">
-                <Mail className="w-4 h-4 text-muted-foreground" />
-                <input 
-                  type="email"
-                  value={profileForm.email}
-                  disabled
-                  className="bg-transparent border-none outline-none text-sm w-full text-foreground font-medium cursor-not-allowed"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Phone Number</label>
-              <div className="flex items-center gap-2 bg-muted/30 rounded-lg px-4 py-2.5 border border-border focus-within:ring-2 focus-within:ring-primary/20 transition-all">
-                <Phone className="w-4 h-4 text-muted-foreground" />
-                <input 
-                  type="text"
-                  value={profileForm.phone}
-                  onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
-                  placeholder="+91 00000 00000"
-                  className="bg-transparent border-none outline-none text-sm w-full text-foreground font-medium"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Language</label>
-              <div className="flex items-center gap-2 bg-muted/30 rounded-lg px-4 py-2.5 border border-border focus-within:ring-2 focus-within:ring-primary/20 transition-all">
-                <Globe className="w-4 h-4 text-muted-foreground" />
-                <select 
-                  value={profileForm.language}
-                  onChange={(e) => setProfileForm({ ...profileForm, language: e.target.value })}
-                  className="bg-transparent border-none outline-none text-sm w-full text-foreground font-medium appearance-none"
-                >
-                  <option value="English">English</option>
-                  <option value="Hindi">Hindi</option>
-                  <option value="Urdu">Urdu</option>
-                  <option value="Spanish">Spanish</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <button 
-            onClick={handleUpdateProfile}
-            disabled={isUpdating}
-            className="mt-8 px-8 py-3 bg-primary text-primary-foreground rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:opacity-90 transition-all flex items-center gap-2"
-          >
-            {isUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-            {isUpdating ? "Updating..." : "Save Changes"}
-          </button>
+      <div className="space-y-10 max-w-5xl animate-in fade-in duration-700 pb-12">
+        
+        <div className="space-y-1">
+            <h1 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
+                System Preferences <Settings className="w-8 h-8 text-indigo-600" />
+            </h1>
+            <p className="text-slate-400 font-bold uppercase tracking-widest text-[11px]">Manage your portal settings & security protocols</p>
         </div>
 
-        {/* Notification Preferences */}
-        <div className="bg-card rounded-xl border border-border p-6">
-          <div className="flex items-center gap-2 mb-6">
-            <Bell className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-bold text-foreground">Notification Preferences</h2>
-          </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+            
+            {/* Left: Main Settings */}
+            <div className="lg:col-span-8 space-y-10">
+                {/* Profile Settings */}
+                <div className="bg-white rounded-[2.5rem] border-2 border-slate-50 p-10 shadow-sm relative overflow-hidden group">
+                  <div className="flex items-center gap-4 mb-10 pb-6 border-b border-slate-50">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100">
+                      <User className="w-5 h-5" />
+                    </div>
+                    <h2 className="text-xl font-black text-slate-800 tracking-tight">Parental Record Settings</h2>
+                  </div>
 
-          <div className="space-y-4">
-            {[
-              { key: "assignments" as const, label: "Assignment Reminders", desc: "Get notified about upcoming and overdue assignments" },
-              { key: "attendance" as const, label: "Attendance Alerts", desc: "Receive alerts for absences and late arrivals" },
-              { key: "grades" as const, label: "Grade Updates", desc: "Get notified when new grades are posted" },
-              { key: "messages" as const, label: "Teacher Messages", desc: "Receive notifications for new messages from teachers" },
-              { key: "meetings" as const, label: "Meeting Reminders", desc: "Get reminders for parent-teacher meetings" },
-            ].map((item) => (
-              <div key={item.key} className="flex items-center justify-between py-3 border-b border-border last:border-0">
-                <div>
-                  <p className="text-sm font-semibold text-foreground">{item.label}</p>
-                  <p className="text-xs text-muted-foreground">{item.desc}</p>
+                  <div className="flex flex-col md:flex-row items-center gap-8 mb-10">
+                    <div className="relative group">
+                      <div className="w-24 h-24 rounded-[2rem] bg-indigo-600 flex items-center justify-center text-white font-black text-3xl shadow-2xl ring-8 ring-indigo-50 group-hover:scale-105 transition-transform duration-500">
+                        {profileForm.name ? profileForm.name[0] : (user?.displayName?.[0] || 'P')}
+                      </div>
+                      <button className="absolute -bottom-2 -right-2 w-10 h-10 rounded-2xl bg-slate-900 border-4 border-white flex items-center justify-center text-white shadow-xl hover:bg-slate-800 transition-all">
+                        <Camera className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="text-center md:text-left">
+                      <h3 className="text-2xl font-black text-slate-800 tracking-tight leading-none mb-2">{profileForm.name || "Set Name"}</h3>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center justify-center md:justify-start gap-2">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> Authorized Parent Account
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <InputGroup 
+                        label="Full Legal Name" 
+                        value={profileForm.name} 
+                        onChange={(v) => setProfileForm({ ...profileForm, name: v })} 
+                        icon={<User className="w-4 h-4" />} 
+                    />
+                    <InputGroup 
+                        label="Primary Email (Locked)" 
+                        value={profileForm.email} 
+                        disabled 
+                        icon={<Mail className="w-4 h-4" />} 
+                    />
+                    <InputGroup 
+                        label="Contact Number" 
+                        value={profileForm.phone} 
+                        onChange={(v) => setProfileForm({ ...profileForm, phone: v })} 
+                        icon={<Phone className="w-4 h-4" />} 
+                        placeholder="+91 00000 00000"
+                    />
+                    <div className="space-y-4">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Interface Language</label>
+                        <div className="flex items-center gap-4 bg-slate-50 rounded-2xl px-5 py-4 border border-slate-100 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                            <Globe className="w-4 h-4 text-slate-400" />
+                            <select 
+                                value={profileForm.language}
+                                onChange={(e) => setProfileForm({ ...profileForm, language: e.target.value })}
+                                className="bg-transparent border-none outline-none text-sm font-black text-slate-800 w-full appearance-none"
+                            >
+                                <option value="English">English</option>
+                                <option value="Hindi">Hindi</option>
+                                <option value="Urdu">Urdu</option>
+                            </select>
+                        </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-10 pt-10 border-t border-slate-50 flex justify-end">
+                    <button 
+                        onClick={handleUpdateProfile}
+                        disabled={isUpdating}
+                        className="px-10 py-5 bg-indigo-600 text-white rounded-[1.5rem] text-xs font-black uppercase tracking-widest flex items-center gap-3 shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-1 active:scale-95 disabled:opacity-50 transition-all"
+                    >
+                        {isUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                        {isUpdating ? "Synchronizing..." : "Update Vault"}
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => toggleNotification(item.key)}
-                  className={`w-11 h-6 rounded-full transition-colors relative ${
-                    notifications[item.key] ? "bg-edu-green" : "bg-muted"
-                  }`}
-                >
-                  <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-card shadow transition-transform ${
-                    notifications[item.key] ? "translate-x-5" : "translate-x-0.5"
-                  }`} />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Security */}
-        <div className="bg-card rounded-xl border border-border p-6">
-          <div className="flex items-center gap-2 mb-6">
-            <Shield className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-bold text-foreground">Security</h2>
-          </div>
+                {/* Notifications Section */}
+                <div className="bg-white rounded-[2.5rem] border-2 border-slate-50 p-10 shadow-sm">
+                    <div className="flex items-center gap-4 mb-10 pb-6 border-b border-slate-50">
+                        <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 border border-amber-100">
+                            <Bell className="w-5 h-5" />
+                        </div>
+                        <h2 className="text-xl font-black text-slate-800 tracking-tight">Intelligence Notifications</h2>
+                    </div>
 
-          <div className="space-y-4">
-            <div className="flex items-center justify-between py-3 border-b border-border">
-              <div>
-                <p className="text-sm font-semibold text-foreground">Change Password</p>
-                <p className="text-xs text-muted-foreground">Last changed 30 days ago</p>
-              </div>
-              <button className="px-4 py-2 border border-border rounded-lg text-sm font-medium text-foreground hover:bg-muted">
-                Change
-              </button>
+                    <div className="space-y-6">
+                        {[
+                        { key: "assignments" as const, label: "Homework Reminders", desc: "AI-driven prompts for upcoming deadlines" },
+                        { key: "attendance" as const, label: "Presence Alerts", desc: "Real-time alerts for absences or late arrivals" },
+                        { key: "grades" as const, label: "Assessment Results", desc: "Immediate notification of new test scores" },
+                        { key: "messages" as const, label: "Educator Comms", desc: "Direct messages and broadcast from school faculty" },
+                        ].map((item) => (
+                        <div key={item.key} className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100 hover:bg-white transition-all group">
+                            <div className="max-w-md">
+                                <p className="text-sm font-black text-slate-800 leading-none mb-2">{item.label}</p>
+                                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{item.desc}</p>
+                            </div>
+                            <button
+                                onClick={() => toggleNotification(item.key)}
+                                className={`w-14 h-8 rounded-full transition-all relative ${
+                                    notifications[item.key] ? "bg-emerald-500 shadow-lg shadow-emerald-100" : "bg-slate-200"
+                                }`}
+                                >
+                                <span className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-sm transition-transform ${
+                                    notifications[item.key] ? "translate-x-7" : "translate-x-1"
+                                }`} />
+                            </button>
+                        </div>
+                        ))}
+                    </div>
+                </div>
             </div>
-            <div className="flex items-center justify-between py-3 border-b border-border">
-              <div>
-                <p className="text-sm font-semibold text-foreground">Two-Factor Authentication</p>
-                <p className="text-xs text-muted-foreground">Add extra security to your account</p>
-              </div>
-              <button className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium">
-                Enable
-              </button>
-            </div>
-            <div className="flex items-center justify-between py-3">
-              <div>
-                <p className="text-sm font-semibold text-foreground">Active Sessions</p>
-                <p className="text-xs text-muted-foreground">1 device currently logged in</p>
-              </div>
-              <button className="px-4 py-2 border border-border rounded-lg text-sm font-medium text-foreground hover:bg-muted">
-                Manage
-              </button>
-            </div>
-          </div>
-        </div>
 
-        {/* Connected Child */}
-        <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
-          <h2 className="text-lg font-bold text-foreground mb-4">Connected Child</h2>
-          <div className="flex items-center justify-between p-4 bg-muted/10 rounded-xl border border-border">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg shadow-sm">
-                {studentData?.name?.[0] || 'S'}
-              </div>
-              <div>
-                <p className="text-sm font-bold text-foreground">{studentData?.name || "No child connected"}</p>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-tight">Grade {studentData?.grade || "N/A"} • Roll {studentData?.rollNo || "N/A"}</p>
-              </div>
+            {/* Right Side: Security & Connected Child */}
+            <div className="lg:col-span-4 space-y-10">
+                {/* Connected Child Mini Card */}
+                <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white shadow-2xl relative overflow-hidden group">
+                    <Shield className="absolute -right-8 -bottom-8 w-40 h-40 text-white/5 group-hover:scale-110 transition-transform duration-700" />
+                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-8">Active Connection</h3>
+                    <div className="flex items-center gap-5 relative z-10">
+                        <div className="w-16 h-16 rounded-[1.5rem] bg-indigo-500 flex items-center justify-center text-white font-black text-xl shadow-xl">
+                            {studentData?.name?.[0] || 'S'}
+                        </div>
+                        <div>
+                            <p className="text-lg font-black tracking-tight">{studentData?.name || "Student Name"}</p>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-indigo-300">Grade {studentData?.grade} • Roll {studentData?.rollNo}</p>
+                        </div>
+                    </div>
+                    <div className="mt-8 pt-8 border-t border-white/10 relative z-10">
+                        <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400">Identity Verified</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Security Protocols */}
+                <div className="bg-white rounded-[2.5rem] border-2 border-slate-50 p-10 shadow-sm space-y-8">
+                    <div className="flex items-center gap-3">
+                        <Lock className="w-5 h-5 text-indigo-600" />
+                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Security Protocols</h3>
+                    </div>
+                    <SecurityAction icon={<Lock className="w-4 h-4"/>} label="Change Password" desc="Last updated 30d ago" action="Update" />
+                    <SecurityAction icon={<Smartphone className="w-4 h-4"/>} label="App Key (2FA)" desc="Not currently active" action="Enable" />
+                </div>
             </div>
-            <span className="px-3 py-1 bg-edu-green/10 text-edu-green border border-edu-green/20 rounded-full text-[10px] font-bold uppercase tracking-widest">Active</span>
-          </div>
         </div>
       </div>
   );
 };
+
+const InputGroup = ({ label, value, onChange, disabled, icon, placeholder }: any) => (
+    <div className="space-y-4">
+        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">{label}</label>
+        <div className={`flex items-center gap-4 bg-slate-50 rounded-2xl px-5 py-4 border border-slate-100 transition-all ${disabled ? 'opacity-50' : 'focus-within:ring-2 focus-within:ring-indigo-100'}`}>
+            <div className="text-slate-400">{icon}</div>
+            <input 
+                type="text" 
+                value={value} 
+                onChange={(e) => onChange?.(e.target.value)}
+                disabled={disabled}
+                placeholder={placeholder}
+                className="bg-transparent border-none outline-none text-sm font-black text-slate-800 w-full placeholder:text-slate-300"
+            />
+        </div>
+    </div>
+);
+
+const SecurityAction = ({ icon, label, desc, action }: any) => (
+    <div className="flex items-center justify-between p-5 bg-slate-50 rounded-3xl border border-slate-100">
+        <div>
+            <p className="text-xs font-black text-slate-800 leading-none mb-1">{label}</p>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{desc}</p>
+        </div>
+        <button className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-900 hover:text-white transition-all">
+            {action}
+        </button>
+    </div>
+);
 
 export default SettingsPage;

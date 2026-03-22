@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Mail, CheckSquare, FileText, Star, CalendarCheck, Loader2, User } from "lucide-react";
+import { Mail, CheckSquare, FileText, Star, CalendarCheck, Loader2, User, Phone, MapPin, Award, ShieldCheck, HeartPulse, GraduationCap, ArrowRight } from "lucide-react";
 import { useAuth } from "../lib/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { db } from "../lib/firebase";
@@ -17,7 +17,6 @@ const MyChildPage = () => {
       return;
     }
 
-    // Fetch teachers who teach this student's grade/class in the same school
     const q = query(
       collection(db, "teachers"),
       where("schoolId", "==", studentData.schoolId),
@@ -25,10 +24,9 @@ const MyChildPage = () => {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const colors = ["bg-primary", "bg-edu-green", "bg-edu-orange", "bg-edu-blue", "bg-edu-purple"];
+      const colors = ["bg-indigo-600", "bg-emerald-600", "bg-amber-600", "bg-rose-600", "bg-indigo-800"];
       const data = snapshot.docs.map((doc, idx) => {
         const t = doc.data();
-        // Determine if this is the primary teacher assigned to the student
         const isClassTeacher = studentData.teacherId === doc.id;
         
         return {
@@ -41,9 +39,7 @@ const MyChildPage = () => {
         };
       });
 
-      // Sort to put Class Teacher first
       data.sort((a, b) => (b.isClassTeacher ? 1 : 0) - (a.isClassTeacher ? 1 : 0));
-      
       setTeachers(data);
       setLoadingTeachers(false);
     }, (error) => {
@@ -54,111 +50,136 @@ const MyChildPage = () => {
     return () => unsubscribe();
   }, [studentData?.schoolId, studentData?.grade, studentData?.teacherId]);
 
-  const overview = [
-    { icon: <CalendarCheck className="w-5 h-5 text-edu-green" />, bg: "bg-edu-green-light", label: "Attendance", value: "94%" },
-    { icon: <FileText className="w-5 h-5 text-edu-blue" />, bg: "bg-edu-blue-light", label: "Assignments", value: "28/30" },
-    { icon: <FileText className="w-5 h-5 text-edu-orange" />, bg: "bg-edu-orange-light", label: "Tests Taken", value: "12" },
-    { icon: <Star className="w-5 h-5 text-edu-yellow" />, bg: "bg-edu-yellow-light", label: "Average Grade", value: "B+" },
-  ];
-
   return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div />
-          <button 
-            onClick={() => navigate('/settings')}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium flex items-center gap-2 hover:opacity-90 transition-opacity"
-          >
-            ✏️ Edit Profile
-          </button>
+      <div className="space-y-8 animate-in fade-in duration-700 pb-12">
+        
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+           <div className="space-y-1">
+              <h1 className="text-3xl font-black text-slate-800 tracking-tight">Student Identity</h1>
+              <p className="text-slate-400 font-bold uppercase tracking-widest text-[11px]">Authorized Academic Profile Profile • 2025-26 Session</p>
+           </div>
+           <button 
+             onClick={() => navigate('/settings')}
+             className="px-8 py-3 bg-white border-2 border-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-600 hover:border-slate-200 hover:bg-slate-50 transition-all shadow-sm"
+           >
+             Manage Profile
+           </button>
         </div>
 
-        {/* Profile Card */}
-        <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-5">
-              <div className="w-20 h-20 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground font-bold text-2xl shadow-lg">
-                {studentData?.name?.[0] || user?.displayName?.[0] || "S"}
+        {/* Hero Profile Card */}
+        <div className="bg-white rounded-[2.5rem] border-2 border-slate-50 p-10 shadow-sm relative overflow-hidden group">
+           <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+              <ShieldCheck className="w-64 h-64 text-indigo-600" />
+           </div>
+           
+           <div className="flex flex-col lg:flex-row items-center lg:items-start gap-10 relative z-10 text-center lg:text-left">
+              <div className="relative">
+                 <div className="w-32 h-32 rounded-[2.5rem] bg-indigo-600 flex items-center justify-center text-white font-black text-4xl shadow-2xl ring-8 ring-indigo-50">
+                    {studentData?.name?.[0] || user?.displayName?.[0] || "S"}
+                 </div>
+                 <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-emerald-500 rounded-2xl border-4 border-white flex items-center justify-center text-white shadow-lg">
+                    <CheckSquare className="w-4 h-4" />
+                 </div>
               </div>
-              <div>
-                <h2 className="text-2xl font-bold text-foreground">{studentData?.name || user?.displayName || "Student Name"}</h2>
-                <p className="text-muted-foreground font-medium uppercase tracking-tight text-sm">
-                  {studentData?.grade || "N/A"} • Roll Number {studentData?.rollNo || "N/A"}
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <span className="px-3 py-1 bg-edu-green/10 text-edu-green border border-edu-green/20 rounded-full text-xs font-bold uppercase tracking-widest">Active</span>
-              <span className="px-3 py-1 bg-edu-blue/10 text-edu-blue border border-edu-blue/20 rounded-full text-xs font-bold tracking-widest uppercase">2025-26</span>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { label: "Email Address", value: studentData?.email || user?.email },
-              { label: "Blood Group", value: studentData?.bloodGroup || "O+" },
-              { label: "Phone Number", value: studentData?.phone || "N/A" },
-              { label: "Branch", value: studentData?.branch || "N/A" },
-            ].map((item) => (
-              <div key={item.label} className="bg-muted/30 rounded-xl p-4 border border-border/50">
-                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">{item.label}</p>
-                <p className="text-sm font-bold text-foreground mt-1 truncate">{item.value}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Teachers & Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-card rounded-xl border border-border p-6">
-            <h3 className="text-lg font-bold text-foreground mb-4">Teachers</h3>
-            <div className="space-y-4">
-              {loadingTeachers ? (
-                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                  <Loader2 className="w-8 h-8 animate-spin mb-2" />
-                  <p className="text-xs font-medium uppercase tracking-widest">Loading Faculty...</p>
-                </div>
-              ) : teachers.length > 0 ? (
-                teachers.map((t) => (
-                  <div key={t.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-full ${t.color} flex items-center justify-center text-primary-foreground text-sm font-bold`}>{t.initials}</div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{t.name}</p>
-                        <p className="text-xs text-muted-foreground">{t.subject}</p>
-                      </div>
+              <div className="flex-1 space-y-6">
+                 <div>
+                    <h2 className="text-4xl font-black text-slate-800 tracking-tight mb-2">{studentData?.name || "Student Name"}</h2>
+                    <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3">
+                       <span className="px-4 py-1.5 bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-[0.2em] rounded-full border border-indigo-100 uppercase">Grade {studentData?.grade || "N/A"}</span>
+                       <span className="px-4 py-1.5 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-[0.2em] rounded-full border border-emerald-100 uppercase tracking-widest">Roll: {studentData?.rollNo || "N/A"}</span>
+                       <span className="px-4 py-1.5 bg-amber-50 text-amber-600 text-[10px] font-black uppercase tracking-[0.2em] rounded-full border border-amber-100 uppercase tracking-widest">Active Enrollment</span>
                     </div>
-                    <button className="p-2 rounded-lg hover:bg-muted transition-colors">
-                      <Mail className="w-4 h-4 text-muted-foreground" />
-                    </button>
-                  </div>
-                ))
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground bg-muted/20 rounded-xl border border-dashed border-border">
-                  <User className="w-8 h-8 mb-2 opacity-20" />
-                  <p className="text-xs font-bold uppercase tracking-widest">No teachers assigned</p>
-                </div>
-              )}
-            </div>
-          </div>
+                 </div>
 
-          <div className="bg-card rounded-xl border border-border p-6">
-            <h3 className="text-lg font-bold text-foreground mb-4">This Term Overview</h3>
-            <div className="space-y-4">
-              {overview.map((item) => (
-                <div key={item.label} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-lg ${item.bg} flex items-center justify-center`}>{item.icon}</div>
-                    <span className="text-sm text-foreground">{item.label}</span>
-                  </div>
-                  <span className="text-lg font-bold text-edu-green">{item.value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-6 border-t border-slate-50">
+                    <InfoBox label="Email Address" value={studentData?.email || user?.email} icon={<Mail className="w-4 h-4" />} />
+                    <InfoBox label="Phone Contact" value={studentData?.phone || "N/A"} icon={<Phone className="w-4 h-4" />} />
+                    <InfoBox label="Blood Group" value={studentData?.bloodGroup || "O+"} icon={<HeartPulse className="w-4 h-4" />} />
+                    <InfoBox label="School Branch" value={studentData?.branch || "Main Campus"} icon={<MapPin className="w-4 h-4" />} />
+                 </div>
+              </div>
+           </div>
+        </div>
+
+        {/* Teachers & Faculty */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+           <div className="lg:col-span-12">
+              <div className="bg-white rounded-[2.5rem] border-2 border-slate-50 p-10 shadow-sm">
+                 <div className="flex items-center justify-between mb-8 pb-6 border-b border-slate-50">
+                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-widest flex items-center gap-3">
+                       <GraduationCap className="w-6 h-6 text-indigo-600" /> Assigned Educators
+                    </h3>
+                    <div className="flex items-center gap-2">
+                       <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Authorized Faculty</span>
+                    </div>
+                 </div>
+                 
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {loadingTeachers ? (
+                       <div className="col-span-full py-20 flex flex-col items-center justify-center">
+                          <Loader2 className="w-10 h-10 animate-spin text-indigo-600 mb-4" />
+                          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Verifying Faculty Database...</p>
+                       </div>
+                    ) : teachers.length > 0 ? (
+                       teachers.map((t) => (
+                          <div key={t.id} className="p-6 bg-slate-50 rounded-[2rem] border-2 border-transparent hover:border-indigo-100 hover:bg-white transition-all group hover:shadow-xl hover:shadow-indigo-50">
+                             <div className="flex items-center justify-between mb-4">
+                                <div className={`w-14 h-14 rounded-2xl ${t.color} flex items-center justify-center text-white text-xl font-black shadow-lg shadow-black/10`}>{t.initials}</div>
+                                <button className="p-3 bg-white rounded-xl border border-slate-100 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all">
+                                   <Mail className="w-5 h-5" />
+                                </button>
+                             </div>
+                             <div>
+                                <h4 className="text-lg font-black text-slate-800 leading-none mb-1 group-hover:text-indigo-600 transition-colors">{t.name}</h4>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t.subject}</p>
+                             </div>
+                          </div>
+                       ))
+                    ) : (
+                       <div className="col-span-full py-20 text-center opacity-30">
+                          <User className="w-16 h-16 mx-auto mb-4" />
+                          <p className="text-[11px] font-black uppercase tracking-widest">No assigned faculty records found.</p>
+                       </div>
+                    )}
+                 </div>
+              </div>
+           </div>
+        </div>
+
+        {/* Career & Recognition Connection */}
+        <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white flex flex-col md:flex-row items-center justify-between gap-10 overflow-hidden relative shadow-2xl">
+           <Award className="absolute -left-12 -bottom-12 w-64 h-64 text-white/5 pointer-events-none" />
+           <div className="relative z-10 max-w-2xl">
+              <h3 className="text-2xl font-black tracking-tight mb-4">Scholastic Milestone Verification</h3>
+              <p className="text-sm font-bold text-slate-400 leading-relaxed mb-6">
+                 {studentData?.name}'s profile is verified for the academic term. All grades and behavior records are automatically synced with the teacher portal for peak transparency.
+              </p>
+              <div className="flex gap-4">
+                 <div className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-[10px] font-black uppercase tracking-widest text-emerald-400">Identity Secure</div>
+                 <div className="px-4 py-2 bg-indigo-500/10 border border-indigo-500/30 rounded-xl text-[10px] font-black uppercase tracking-widest text-indigo-400">Record Synced</div>
+              </div>
+           </div>
+           <button 
+             onClick={() => navigate('/performance')}
+             className="relative z-10 px-10 py-5 bg-white text-slate-900 rounded-[1.5rem] text-xs font-black uppercase tracking-widest flex items-center gap-3 hover:scale-105 transition-all shadow-xl"
+           >
+              Performance Vault <ArrowRight className="w-5 h-5" />
+           </button>
         </div>
       </div>
   );
 };
+
+const InfoBox = ({ label, value, icon }: any) => (
+   <div className="p-5 bg-slate-50/50 rounded-2xl border border-slate-100">
+      <div className="flex items-center gap-2 mb-2 text-slate-400">
+         {icon}
+         <p className="text-[10px] uppercase font-black tracking-[0.2em] leading-none">{label}</p>
+      </div>
+      <p className="text-sm font-black text-slate-800 truncate">{value || 'N/A'}</p>
+   </div>
+);
 
 export default MyChildPage;
