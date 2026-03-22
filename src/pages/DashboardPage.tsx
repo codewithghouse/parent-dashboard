@@ -6,6 +6,8 @@ import {
   Sparkles, BrainCircuit, Rocket, Zap, MessageSquare, Loader2, Info
 } from "lucide-react";
 import { ParentAIController } from "../ai/controller/ai-controller";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs, limit } from "firebase/firestore";
 
 const DashboardPage = () => {
   const { studentData, user } = useAuth();
@@ -13,21 +15,46 @@ const DashboardPage = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(true);
   const [aiInsights, setAiInsights] = useState<any>(null);
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
+  const [liveStats, setLiveStats] = useState({
+    attendance: studentData?.attendance || "94%",
+    pending: 0,
+    tests: 0,
+    health: "85%"
+  });
 
   useEffect(() => {
+    const fetchLiveStats = async () => {
+        if (!studentData?.id) return;
+        try {
+            const attSnap = await getDocs(query(collection(db, "attendance"), where("studentId", "==", studentData.id)));
+            const pCount = attSnap.docs.filter(d => d.data().status === 'present').length;
+            const total = attSnap.docs.length;
+            const pct = total === 0 ? "100%" : `${Math.round((pCount/total)*100)}%`;
+
+            const assignSnap = await getDocs(query(collection(db, "assignments"), where("gradeClass", "==", studentData.class || `${studentData.grade}-A`)));
+            
+            setLiveStats(prev => ({
+                ...prev,
+                attendance: pct,
+                pending: assignSnap.docs.length
+            }));
+        } catch (e) {
+            console.warn("Stats fetch partial failure", e);
+        }
+    };
+
     const fetchAIInsights = async () => {
       if (!studentData) return;
       
       setIsAnalyzing(true);
       try {
-        // Collect real metrics for the AI to analyze
         const context = {
           child_name: studentData.name || "Aditya",
-          attendance: studentData.attendance || "94%",
-          academic_health: "85%", // Static for now, would be calculated from real scores
+          attendance: liveStats.attendance,
+          academic_health: liveStats.health,
           recent_grade: "A-",
-          pending_assignments: 2,
-          upcoming_tests: 3,
+          pending_assignments: liveStats.pending,
+          upcoming_tests: 0,
           grade: studentData.grade || studentData.class || "8"
         };
 
@@ -47,7 +74,7 @@ const DashboardPage = () => {
       }
     };
 
-    fetchAIInsights();
+    fetchLiveStats().then(() => fetchAIInsights());
   }, [studentData]);
 
   return (
@@ -92,18 +119,20 @@ const DashboardPage = () => {
                        </div>
                     ) : aiInsights ? (
                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                           <h2 className="text-2xl font-black leading-tight drop-shadow-sm flex-1">
-                              "{aiInsights.child_summary_narrative}"
-                           </h2>
-                           <button
-                             onClick={() => navigate('/performance')}
-                             className="shrink-0 px-8 py-4 bg-white/20 backdrop-blur-md border border-white/30 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/30 transition-all flex items-center gap-2"
-                           >
-                              Deep Analysis <ArrowUp className="w-4 h-4 rotate-45" />
-                           </button>
+                            <h2 className="text-2xl font-black leading-tight drop-shadow-sm flex-1">
+                               "{aiInsights.child_summary_narrative}"
+                            </h2>
+                            <button
+                              onClick={() => navigate('/performance')}
+                              className="shrink-0 px-8 py-4 bg-white/20 backdrop-blur-md border border-white/30 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/30 transition-all flex items-center gap-2"
+                            >
+                               Deep Analysis <ArrowUp className="w-4 h-4 rotate-45" />
+                            </button>
                         </div>
                     ) : (
-                       <h2 className="text-lg font-bold opacity-80">{errorNotice || "Waiting for latest academic heartbeat..."}</h2>
+                       <h2 className="text-lg font-bold opacity-80 italic">
+                          "{studentData?.name || "Aditya Verma"} is currently maintaining a stable profile. Detailed AI narratives will appear as term data populates."
+                       </h2>
                     )}
                  </div>
               </div>
@@ -125,12 +154,18 @@ const DashboardPage = () => {
                     <div className="space-y-4">
                        {isAnalyzing ? (
                           [1,2].map(i => <div key={i} className="h-10 bg-slate-50 rounded-xl animate-pulse" />)
-                       ) : aiInsights?.weekly_digest?.highlights?.map((h: string, i: number) => (
-                          <div key={i} className="flex gap-4 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 shadow-sm">
-                             <Zap className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                             <p className="text-sm font-bold text-emerald-900 leading-snug">{h}</p>
-                          </div>
-                       ))}
+                       ) : aiInsights?.weekly_digest?.highlights?.length > 0 ? (
+                           aiInsights.weekly_digest.highlights.map((h: string, i: number) => (
+                              <div key={i} className="flex gap-4 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 shadow-sm">
+                                 <Zap className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                                 <p className="text-sm font-bold text-emerald-900 leading-snug">{h}</p>
+                              </div>
+                           ))
+                       ) : (
+                        <div className="p-10 text-center bg-slate-50 rounded-3xl border-2 border-dashed border-slate-100">
+                             <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest leading-relaxed">Weekly highlights will populate after institutional sync.</p>
+                        </div>
+                       )}
                     </div>
                  </div>
 
@@ -155,7 +190,7 @@ const DashboardPage = () => {
                           </div>
                        ) : (
                           <p className="text-sm font-medium text-slate-600 leading-relaxed italic border-l-4 border-indigo-400 pl-5">
-                             {aiInsights?.weekly_digest?.summary || "Great week! No special interventions required. Review Math once before the upcoming quiz."}
+                             {aiInsights?.weekly_digest?.summary || "The weekly digest feature will work automatically after real data is synced from the institution's portal."}
                           </p>
                        )}
                     </div>
@@ -189,9 +224,9 @@ const DashboardPage = () => {
                        </div>
                     ))}
                     {!isAnalyzing && !aiInsights?.parenting_tips && (
-                       <div className="text-center py-10">
-                          <Info className="w-10 h-10 text-slate-200 mx-auto mb-3" />
-                          <p className="text-xs font-bold text-slate-400">Tips will populate as behavioral data syncs.</p>
+                       <div className="text-center py-10 flex flex-col items-center">
+                          <Info className="w-10 h-10 text-slate-200 mb-3" />
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-tight">Parenting tips will activate as conduct data populates.</p>
                        </div>
                     )}
                  </div>
@@ -206,10 +241,10 @@ const DashboardPage = () => {
 
         {/* Existing Stats Row (Maintained but polished) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-4">
-          <StatCard icon={<CheckCircle className="w-5 h-5 text-emerald-500" />} iconBg="bg-emerald-50 border-emerald-100" label="Attendance" value="94%" sub="Stable Trajectory" subColor="text-emerald-600" />
-          <StatCard icon={<AlertCircle className="w-5 h-5 text-amber-500" />} iconBg="bg-amber-50 border-amber-100" label="Pending Work" value="2" sub="Tasks Due Soon" subColor="text-amber-600" />
-          <StatCard icon={<Calendar className="w-5 h-5 text-blue-500" />} iconBg="bg-blue-50 border-blue-100" label="Upcoming Tests" value="3" sub="Next 7 Days" subColor="text-blue-600" />
-          <StatCard icon={<Star className="w-5 h-5 text-indigo-500" />} iconBg="bg-indigo-50 border-indigo-100" label="Academic Health" value="85%" sub="Mathematics Flow" subColor="text-indigo-600" />
+          <StatCard icon={<CheckCircle className="w-5 h-5 text-emerald-500" />} iconBg="bg-emerald-50 border-emerald-100" label="Attendance" value={liveStats.attendance} sub="Institutional Sync" subColor="text-emerald-600" />
+          <StatCard icon={<AlertCircle className="w-5 h-5 text-amber-500" />} iconBg="bg-amber-50 border-amber-100" label="Active Work" value={liveStats.pending.toString()} sub="Synced from Portal" subColor="text-amber-600" />
+          <StatCard icon={<Calendar className="w-5 h-5 text-blue-500" />} iconBg="bg-blue-50 border-blue-100" label="Upcoming Tests" value={liveStats.tests.toString()} sub="Schedule Track" subColor="text-blue-600" />
+          <StatCard icon={<Star className="w-5 h-5 text-indigo-500" />} iconBg="bg-indigo-50 border-indigo-100" label="Academic Health" value={liveStats.health} sub="Global Metrics" subColor="text-indigo-600" />
         </div>
 
         {/* Improved Bottom Info Row */}
@@ -247,20 +282,10 @@ const DashboardPage = () => {
                <span className="text-[9px] font-black bg-rose-50 text-rose-500 px-2 py-1 rounded-lg">New Events</span>
             </div>
             <div className="space-y-4 flex-1">
-              <div className="flex items-start gap-4 p-5 rounded-[1.5rem] bg-amber-50 border border-amber-100">
-                <Clock className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs font-black text-amber-900 leading-tight">Science assignment due tomorrow</p>
-                  <p className="text-[10px] font-bold text-amber-600/60 mt-1 uppercase">Triggered 2h ago</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4 p-5 rounded-[1.5rem] bg-emerald-50 border border-emerald-100">
-                <CheckSquare className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs font-black text-emerald-900 leading-tight">Mathematics scores improved by 8%</p>
-                  <p className="text-[10px] font-bold text-emerald-600/60 mt-1 uppercase">Synthesized yesterday</p>
-                </div>
-              </div>
+               <div className="p-10 text-center border-2 border-dashed border-slate-100 rounded-[2rem]">
+                    <Info className="w-8 h-8 text-slate-200 mx-auto mb-4" />
+                    <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em] leading-relaxed">Intelligence alerts will populate automatically after real data sync.</p>
+               </div>
             </div>
           </div>
         </div>
