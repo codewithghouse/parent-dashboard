@@ -7,7 +7,7 @@ import {
   User
 } from 'firebase/auth';
 import { auth, db } from './firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -37,8 +37,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           if (!querySnapshot.empty) {
             // Authorized Student/Parent
-            const doc = querySnapshot.docs[0];
-            setStudentData({ id: doc.id, ...doc.data() });
+            const docSnap = querySnapshot.docs[0];
+            const data = docSnap.data();
+            
+            // Auto-activate if Invited
+            if (data.status === "Invited") {
+               updateDoc(doc(db, "students", docSnap.id), { status: "Active" });
+            }
+
+            setStudentData({ id: docSnap.id, ...data, status: "Active" });
             setUser(currentUser);
             setError(null);
           } else {
