@@ -4,12 +4,14 @@ import {
   Sparkles, BrainCircuit, MessageCircle, Reply, Info, Loader2,
   Calendar, User
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
 
 const TeacherNotesPage = () => {
   const { studentData } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [notes, setNotes] = useState<any[]>([]);
   const [search, setSearch] = useState("");
@@ -22,17 +24,28 @@ const TeacherNotesPage = () => {
     // Fetching from a generic 'communications' or 'teacher_notes' collection
     // We'll look for notes specifically for this student
     const q = query(
-      collection(db, "communications"),
-      where("student", "==", studentData.name), // In teacher dashboard it's student name
-      orderBy("time", "desc")
+      collection(db, "parent_notes"),
+      where("studentName", "==", studentData.name)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const data = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return { 
+          id: doc.id, 
+          ...d,
+          time: d.createdAt?.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        };
+      });
+      data.sort((a: any, b: any) => {
+        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+        return timeB - timeA;
+      });
       setNotes(data);
       setLoading(false);
     }, (error) => {
-      console.error("Teacher Notes Sync Error:", error);
+      console.error("Parent Registry Sync Error:", error);
       setLoading(false);
     });
 
@@ -134,7 +147,7 @@ const TeacherNotesPage = () => {
                         <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8 pb-6 border-b border-slate-50">
                            <div className="flex items-center gap-4">
                               <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-black text-xl shadow-sm">
-                                 {note.teacher?.substring(0, 2).toUpperCase() || "T"}
+                                 {note.teacherName?.substring(0, 2).toUpperCase() || "T"}
                               </div>
                               <div>
                                  <div className="flex items-center gap-3 mb-1">
@@ -142,7 +155,7 @@ const TeacherNotesPage = () => {
                                     {note.pinned && <Pin className="w-4 h-4 text-indigo-500 rotate-45" />}
                                  </div>
                                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-3">
-                                    <User className="w-3 h-3"/> {note.teacher || "Instructing Faculty"} • <Calendar className="w-3 h-3"/> {note.time || "Recent"}
+                                    <User className="w-3 h-3"/> {note.teacherName || "Instructing Faculty"} • <Calendar className="w-3 h-3"/> {note.time || "Recent"}
                                  </p>
                               </div>
                            </div>
@@ -162,10 +175,16 @@ const TeacherNotesPage = () => {
                            </div>
 
                            <div className="flex items-center gap-3 pt-4">
-                              <button className="flex-1 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-slate-800 transition-all shadow-lg shadow-slate-200">
-                                 <Reply className="w-3 h-3" /> Connect with {note.teacher?.split(' ')[0] || "Faculty"}
+                              <button 
+                                 onClick={() => navigate('/messages')}
+                                 className="flex-1 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
+                              >
+                                 <Reply className="w-3 h-3" /> Connect with {note.teacherName?.split(' ')[0] || "Faculty"}
                               </button>
-                              <button className="px-6 py-4 bg-white border-2 border-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-600 hover:border-slate-200 transition-all flex items-center gap-2">
+                              <button 
+                                 onClick={() => navigate('/messages')}
+                                 className="px-6 py-4 bg-white border-2 border-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-600 hover:border-slate-200 transition-all flex items-center gap-2"
+                              >
                                  <MessageCircle className="w-4 h-4" /> Direct Portal Chat
                               </button>
                            </div>

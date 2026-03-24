@@ -23,14 +23,24 @@ const MessagesPage = () => {
     // In a real app, we'd have a 'conversations' collection. 
     // Here we'll group from 'communications' or assume a simple structure.
     const q = query(
-      collection(db, "communications"),
-      where("student", "==", studentData.name),
-      orderBy("time", "desc"),
-      limit(50)
+      collection(db, "parent_notes"),
+      where("studentName", "==", studentData.name)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const data = snapshot.docs.map(doc => {
+        const d = doc.data();
+        let timeLabel = "Recent";
+        try {
+          if (d.createdAt) timeLabel = d.createdAt.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        } catch(e) {}
+        return { id: doc.id, ...d, time: timeLabel };
+      });
+      data.sort((a: any, b: any) => {
+        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+        return timeB - timeA;
+      });
       setConversations(data);
       setLoading(false);
     }, (error) => {
@@ -71,15 +81,18 @@ const MessagesPage = () => {
     
     // In a real app, send to 'communications' or 'messages'
     try {
-        await addDoc(collection(db, "communications"), {
-            student: studentData.name,
-            parent: "Parent", // Real name from auth if available
-            subject: "Parent Reply",
+        await addDoc(collection(db, "parent_notes"), {
+            teacherId: activeChat?.teacherId || "unknown", // Reply to the specific teacher
+            teacherName: activeChat?.teacherName || "Institution",
+            studentId: studentData.id || "unknown",
+            studentName: studentData.name,
+            parentName: studentData.parentName || `Parent of ${studentData.name}`,
+            subject: `Reply: ${activeChat?.subject || "Update"}`,
             content: message,
-            type: "Message",
-            time: "Just now",
-            unread: true,
-            from: "parent"
+            status: "Pending Reply", // the teacher now needs to reply
+            type: "Received", // teacher will see this as "Received"
+            from: "parent",
+            createdAt: serverTimestamp()
         });
         setMessage("");
     } catch (e) {
@@ -118,7 +131,7 @@ const MessagesPage = () => {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
-                          <p className="text-sm font-black text-slate-800 truncate">{c.teacher || c.parent || "Faculty"}</p>
+                          <p className="text-sm font-black text-slate-800 truncate">{c.teacherName || c.parentName || "Faculty"}</p>
                           <span className="text-[10px] font-bold text-slate-400">{c.time}</span>
                         </div>
                         <p className="text-xs font-bold text-slate-400 truncate">{c.content || c.subject}</p>
@@ -148,10 +161,10 @@ const MessagesPage = () => {
                 <div className="px-8 py-6 border-b-2 border-slate-50 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <div className={`w-12 h-12 rounded-[1rem] bg-indigo-600 flex items-center justify-center text-white text-sm font-black shadow-xl`}>
-                            {activeChat.teacher?.substring(0, 2).toUpperCase() || "T"}
+                            {activeChat.teacherName?.substring(0, 2).toUpperCase() || "T"}
                         </div>
                         <div>
-                            <p className="text-base font-black text-slate-800 leading-tight">{activeChat.teacher || "Faculty"}</p>
+                            <p className="text-base font-black text-slate-800 leading-tight">{activeChat.teacherName || "Faculty"}</p>
                             <div className="flex items-center gap-2 mt-1">
                                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Institution Online</p>
@@ -170,7 +183,7 @@ const MessagesPage = () => {
                         <div className={`flex items-end gap-3 max-w-[80%] ${activeChat.from === "parent" ? "flex-row-reverse" : ""}`}>
                             {activeChat.from !== "parent" && (
                                 <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 mb-1">
-                                    {activeChat.teacher?.substring(0, 2).toUpperCase() || "T"}
+                                    {activeChat.teacherName?.substring(0, 2).toUpperCase() || "T"}
                                 </div>
                             )}
                             <div className="space-y-1">
