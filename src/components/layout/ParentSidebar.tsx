@@ -16,6 +16,7 @@ const navItems = [
   { title: "Concept Strengths", path: "/concepts", icon: Brain },
   { title: "Behaviour", path: "/behaviour", icon: SmilePlus },
   { title: "Teacher Notes", path: "/teacher-notes", icon: StickyNote },
+  { title: "Reports", path: "/reports", icon: FileText },
   { title: "Messages", path: "/messages", icon: MessageSquare, badge: 2 },
   { title: "Alerts", path: "/alerts", icon: Bell, badge: 3 },
   { title: "Settings", path: "/settings", icon: Settings },

@@ -1,7 +1,10 @@
-import { useState, useEffect } from "react";
-import { User, Bell, Shield, Globe, Mail, Phone, Camera, Loader2, Check, Settings, ShieldCheck, Lock, Smartphone } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { 
+  User, Bell, Shield, Globe, Mail, Phone, Camera, Loader2, Check, Settings, 
+  ShieldCheck, Lock, Smartphone, Heart, Zap, ShieldAlert, Sparkles, ChevronRight
+} from "lucide-react";
 import { useAuth } from "../lib/AuthContext";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { toast } from "sonner";
 
@@ -15,243 +18,282 @@ const SettingsPage = () => {
     language: "English"
   });
 
-  useEffect(() => {
-    if (studentData) {
-      setProfileForm({
-        name: studentData.name || "",
-        email: studentData.email || "",
-        phone: studentData.phone || "",
-        language: studentData.language || "English"
-      });
-    }
-  }, [studentData]);
-
   const [notifications, setNotifications] = useState({
     assignments: true,
     attendance: true,
     grades: true,
     messages: true,
-    meetings: false,
   });
 
-  const toggleNotification = (key: keyof typeof notifications) => {
-    setNotifications((prev) => ({ ...prev, [key]: !prev[key] }));
+  // ─── DATA SYNCHRONIZATION ───
+  useEffect(() => {
+    if (!studentData?.id) return;
+
+    // Listen to real-time changes in the student/parent profile
+    const unsub = onSnapshot(doc(db, "students", studentData.id), (doc) => {
+        if (doc.exists()) {
+            const data = doc.data();
+            setProfileForm({
+                name: data.name || "",
+                email: data.email || "",
+                phone: data.phone || "",
+                language: data.language || "English"
+            });
+            if (data.notifications) setNotifications(data.notifications);
+        }
+    });
+
+    return () => unsub();
+  }, [studentData?.id]);
+
+  const toggleNotification = async (key: keyof typeof notifications) => {
+    const updated = { ...notifications, [key]: !notifications[key] };
+    setNotifications(updated);
+    
+    // Auto-save to vault
+    try {
+        const docRef = doc(db, "students", studentData.id);
+        await updateDoc(docRef, { notifications: updated });
+    } catch (e) {
+        console.error("Auto-sync failed", e);
+    }
   };
 
   const handleUpdateProfile = async () => {
-    if (!profileForm.name) {
-      toast.error("Name cannot be empty");
-      return;
-    }
+    if (!profileForm.name.trim()) return toast.error("Institutional Name Required");
 
     setIsUpdating(true);
     try {
-      const studentDocRef = doc(db, "students", studentData.id || user?.uid);
-      await updateDoc(studentDocRef, {
+      const docRef = doc(db, "students", studentData.id);
+      await updateDoc(docRef, {
         name: profileForm.name,
         phone: profileForm.phone,
         language: profileForm.language
       });
-      toast.success("Profile updated successfully!");
+      toast.success("Profile Authenticated & Synchronized");
     } catch (error: any) {
-      console.error("Update Profile Error:", error);
-      toast.error("Failed to update profile");
+      toast.error("Synchronization Interrupted");
     } finally {
       setIsUpdating(false);
     }
   };
 
   return (
-      <div className="space-y-10 max-w-5xl animate-in fade-in duration-700 pb-12">
-        
-        <div className="space-y-1">
-            <h1 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-                System Preferences <Settings className="w-8 h-8 text-indigo-600" />
-            </h1>
-            <p className="text-slate-400 font-bold uppercase tracking-widest text-[11px]">Manage your portal settings & security protocols</p>
+    <div className="animate-in fade-in slide-in-from-bottom-10 duration-1000 pb-24 text-left font-sans">
+      
+      {/* ─── HEADER ─── */}
+      <div className="flex flex-col md:flex-row items-center justify-between gap-10 mb-20 px-4">
+        <div className="text-left w-full md:w-auto">
+           <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 rounded-[1.5rem] bg-[#1e3a8a] flex items-center justify-center text-white shadow-xl shadow-blue-200">
+                 <Settings size={26} />
+              </div>
+              <div>
+                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-1">Institutional Portal Registry</p>
+                 <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse border-2 border-white shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+                    <p className="text-xs font-black text-slate-500 uppercase tracking-widest leading-none">Settings Sync Active</p>
+                 </div>
+              </div>
+           </div>
+           <h1 className="text-6xl font-black text-slate-900 tracking-tighter leading-none mb-4">Portal Preferences</h1>
+           <p className="text-xl font-bold text-slate-400 italic">Manage your parental profile and predictive intelligence alerts.</p>
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-            
-            {/* Left: Main Settings */}
-            <div className="lg:col-span-8 space-y-10">
-                {/* Profile Settings */}
-                <div className="bg-white rounded-[2.5rem] border-2 border-slate-50 p-10 shadow-sm relative overflow-hidden group">
-                  <div className="flex items-center gap-4 mb-10 pb-6 border-b border-slate-50">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100">
-                      <User className="w-5 h-5" />
-                    </div>
-                    <h2 className="text-xl font-black text-slate-800 tracking-tight">Parental Record Settings</h2>
-                  </div>
-
-                  <div className="flex flex-col md:flex-row items-center gap-8 mb-10">
-                    <div className="relative group">
-                      <div className="w-24 h-24 rounded-[2rem] bg-indigo-600 flex items-center justify-center text-white font-black text-3xl shadow-2xl ring-8 ring-indigo-50 group-hover:scale-105 transition-transform duration-500">
-                        {profileForm.name ? profileForm.name[0] : (user?.displayName?.[0] || 'P')}
-                      </div>
-                      <button className="absolute -bottom-2 -right-2 w-10 h-10 rounded-2xl bg-slate-900 border-4 border-white flex items-center justify-center text-white shadow-xl hover:bg-slate-800 transition-all">
-                        <Camera className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <div className="text-center md:text-left">
-                      <h3 className="text-2xl font-black text-slate-800 tracking-tight leading-none mb-2">{profileForm.name || "Set Name"}</h3>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center justify-center md:justify-start gap-2">
-                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> Authorized Parent Account
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <InputGroup 
-                        label="Full Legal Name" 
-                        value={profileForm.name} 
-                        onChange={(v) => setProfileForm({ ...profileForm, name: v })} 
-                        icon={<User className="w-4 h-4" />} 
-                    />
-                    <InputGroup 
-                        label="Primary Email (Locked)" 
-                        value={profileForm.email} 
-                        disabled 
-                        icon={<Mail className="w-4 h-4" />} 
-                    />
-                    <InputGroup 
-                        label="Contact Number" 
-                        value={profileForm.phone} 
-                        onChange={(v) => setProfileForm({ ...profileForm, phone: v })} 
-                        icon={<Phone className="w-4 h-4" />} 
-                        placeholder="+91 00000 00000"
-                    />
-                    <div className="space-y-4">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Interface Language</label>
-                        <div className="flex items-center gap-4 bg-slate-50 rounded-2xl px-5 py-4 border border-slate-100 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
-                            <Globe className="w-4 h-4 text-slate-400" />
-                            <select 
-                                value={profileForm.language}
-                                onChange={(e) => setProfileForm({ ...profileForm, language: e.target.value })}
-                                className="bg-transparent border-none outline-none text-sm font-black text-slate-800 w-full appearance-none"
-                            >
-                                <option value="English">English</option>
-                                <option value="Hindi">Hindi</option>
-                                <option value="Urdu">Urdu</option>
-                            </select>
-                        </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-10 pt-10 border-t border-slate-50 flex justify-end">
-                    <button 
-                        onClick={handleUpdateProfile}
-                        disabled={isUpdating}
-                        className="px-10 py-5 bg-indigo-600 text-white rounded-[1.5rem] text-xs font-black uppercase tracking-widest flex items-center gap-3 shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-1 active:scale-95 disabled:opacity-50 transition-all"
-                    >
-                        {isUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                        {isUpdating ? "Synchronizing..." : "Update Vault"}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Notifications Section */}
-                <div className="bg-white rounded-[2.5rem] border-2 border-slate-50 p-10 shadow-sm">
-                    <div className="flex items-center gap-4 mb-10 pb-6 border-b border-slate-50">
-                        <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 border border-amber-100">
-                            <Bell className="w-5 h-5" />
-                        </div>
-                        <h2 className="text-xl font-black text-slate-800 tracking-tight">Intelligence Notifications</h2>
-                    </div>
-
-                    <div className="space-y-6">
-                        {[
-                        { key: "assignments" as const, label: "Homework Reminders", desc: "AI-driven prompts for upcoming deadlines" },
-                        { key: "attendance" as const, label: "Presence Alerts", desc: "Real-time alerts for absences or late arrivals" },
-                        { key: "grades" as const, label: "Assessment Results", desc: "Immediate notification of new test scores" },
-                        { key: "messages" as const, label: "Educator Comms", desc: "Direct messages and broadcast from school faculty" },
-                        ].map((item) => (
-                        <div key={item.key} className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100 hover:bg-white transition-all group">
-                            <div className="max-w-md">
-                                <p className="text-sm font-black text-slate-800 leading-none mb-2">{item.label}</p>
-                                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{item.desc}</p>
-                            </div>
-                            <button
-                                onClick={() => toggleNotification(item.key)}
-                                className={`w-14 h-8 rounded-full transition-all relative ${
-                                    notifications[item.key] ? "bg-emerald-500 shadow-lg shadow-emerald-100" : "bg-slate-200"
-                                }`}
-                                >
-                                <span className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-sm transition-transform ${
-                                    notifications[item.key] ? "translate-x-7" : "translate-x-1"
-                                }`} />
-                            </button>
-                        </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            {/* Right Side: Security & Connected Child */}
-            <div className="lg:col-span-4 space-y-10">
-                {/* Connected Child Mini Card */}
-                <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white shadow-2xl relative overflow-hidden group">
-                    <Shield className="absolute -right-8 -bottom-8 w-40 h-40 text-white/5 group-hover:scale-110 transition-transform duration-700" />
-                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-8">Active Connection</h3>
-                    <div className="flex items-center gap-5 relative z-10">
-                        <div className="w-16 h-16 rounded-[1.5rem] bg-indigo-500 flex items-center justify-center text-white font-black text-xl shadow-xl">
-                            {studentData?.name?.[0] || 'S'}
-                        </div>
-                        <div>
-                            <p className="text-lg font-black tracking-tight">{studentData?.name || "Student Name"}</p>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-indigo-300">Grade {studentData?.grade} • Roll {studentData?.rollNo}</p>
-                        </div>
-                    </div>
-                    <div className="mt-8 pt-8 border-t border-white/10 relative z-10">
-                        <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                            <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400">Identity Verified</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Security Protocols */}
-                <div className="bg-white rounded-[2.5rem] border-2 border-slate-50 p-10 shadow-sm space-y-8">
-                    <div className="flex items-center gap-3">
-                        <Lock className="w-5 h-5 text-indigo-600" />
-                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Security Protocols</h3>
-                    </div>
-                    <SecurityAction icon={<Lock className="w-4 h-4"/>} label="Change Password" desc="Last updated 30d ago" action="Update" />
-                    <SecurityAction icon={<Smartphone className="w-4 h-4"/>} label="App Key (2FA)" desc="Not currently active" action="Enable" />
-                </div>
-            </div>
+        
+        <div className="flex bg-white border border-slate-100 p-4 rounded-[2.5rem] shadow-sm items-center gap-6 group hover:shadow-2xl transition-all">
+           <div className="w-16 h-16 rounded-[1.8rem] bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-inner group-hover:rotate-12 transition-transform">
+              <ShieldCheck size={30} />
+           </div>
+           <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Identity Status</p>
+              <p className="text-xl font-black text-[#1e3a8a] uppercase tracking-tighter">Verified Guardian</p>
+           </div>
         </div>
       </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 px-2">
+         
+         {/* LEFT: CORE PROFILE */}
+         <div className="lg:col-span-8 flex flex-col gap-12">
+            <div className="bg-white border border-slate-100 rounded-[4.5rem] p-12 shadow-sm relative overflow-hidden group hover:shadow-2xl transition-all">
+               <div className="absolute top-0 right-0 p-12 opacity-5 scale-150 group-hover:-rotate-12 transition-transform duration-1000">
+                  <User className="w-48 h-48 text-[#1e3a8a]" />
+               </div>
+
+               <div className="relative z-10">
+                  <div className="flex items-center gap-4 mb-12">
+                     <div className="w-14 h-14 rounded-[2rem] bg-indigo-50 flex items-center justify-center text-[#1e3a8a] shadow-inner">
+                        <Heart size={28} />
+                     </div>
+                     <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none">Account Identity Matrix</h3>
+                  </div>
+
+                  <div className="flex flex-col md:flex-row items-center gap-10 mb-16">
+                     <div className="relative">
+                        <div className="w-32 h-32 rounded-[3.5rem] bg-gradient-to-br from-[#1e3a8a] to-blue-900 border-8 border-white shadow-2xl flex items-center justify-center text-white font-black text-4xl italic overflow-hidden group/avatar">
+                           <div className="absolute inset-0 bg-black/20 translate-y-full group-hover/avatar:translate-y-0 transition-transform duration-500" />
+                           <span className="relative z-10">{profileForm.name?.[0] || 'G'}</span>
+                        </div>
+                        <button className="absolute -bottom-2 -right-2 w-12 h-12 rounded-[1.5rem] bg-white border-4 border-white shadow-xl flex items-center justify-center text-indigo-600 hover:scale-110 transition-all active:scale-95">
+                           <Camera size={20} />
+                        </button>
+                     </div>
+                     <div className="text-center md:text-left">
+                        <h2 className="text-4xl font-black text-slate-900 tracking-tighter mb-2">{profileForm.name}</h2>
+                        <div className="flex flex-wrap justify-center md:justify-start gap-3">
+                           <span className="px-4 py-1.5 bg-indigo-50 text-indigo-500 text-[10px] font-black uppercase tracking-widest rounded-full border border-indigo-100 italic">Parent Guardian</span>
+                           <span className="px-4 py-1.5 bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest rounded-full italic">ID: {studentData?.id?.substring(0,8).toUpperCase()}</span>
+                        </div>
+                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                     <SettingsInput label="Authorized Name" value={profileForm.name} onChange={(v) => setProfileForm({...profileForm, name: v})} icon={User} />
+                     <SettingsInput label="Primary Email" value={profileForm.email} disabled icon={Mail} />
+                     <SettingsInput label="Contact Line" value={profileForm.phone} onChange={(v) => setProfileForm({...profileForm, phone: v})} placeholder="+00 000 000 00" icon={Phone} />
+                     <div className="space-y-4">
+                        <label className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] pl-2 leading-none">Interface Locality</label>
+                        <div className="flex items-center gap-4 bg-slate-50/50 rounded-[2rem] px-8 py-5 border border-slate-100 focus-within:ring-4 focus-within:ring-indigo-100/50 transition-all">
+                           <Globe className="w-5 h-5 text-slate-400" />
+                           <select 
+                              value={profileForm.language}
+                              onChange={(e) => setProfileForm({...profileForm, language: e.target.value})}
+                              className="bg-transparent border-none outline-none text-base font-black text-slate-800 w-full appearance-none cursor-pointer"
+                           >
+                              <option value="English">ENG: Institutional English</option>
+                              <option value="Hindi">HIN: Northern Dialect</option>
+                              <option value="Urdu">URD: Standard Urdu</option>
+                           </select>
+                        </div>
+                     </div>
+                  </div>
+
+                  <div className="mt-16 pt-12 border-t border-slate-50 flex justify-end">
+                     <button 
+                        onClick={handleUpdateProfile}
+                        disabled={isUpdating}
+                        className="h-20 px-12 bg-[#1e3a8a] text-white rounded-[2.5rem] text-[11px] font-black uppercase tracking-[0.3em] flex items-center gap-4 shadow-2xl shadow-blue-900/20 hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition-all"
+                     >
+                        {isUpdating ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20} className="text-amber-400" />}
+                        {isUpdating ? "Synchronizing Vault..." : "Commit Changes"}
+                     </button>
+                  </div>
+               </div>
+            </div>
+
+            {/* NOTIFICATIONS MATRIX */}
+            <div className="bg-white border border-slate-100 rounded-[4.5rem] p-12 shadow-sm text-left">
+               <div className="flex items-center gap-4 mb-12">
+                  <div className="w-14 h-14 rounded-[2rem] bg-amber-50 flex items-center justify-center text-amber-500 shadow-inner">
+                     <Bell size={28} />
+                  </div>
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none">Intelligence Alerts Matrix</h3>
+               </div>
+
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <NotificationToggle label="Scholastic Deadlines" desc="AI reminders for upcoming assignments" active={notifications.assignments} onToggle={() => toggleNotification('assignments')} />
+                  <NotificationToggle label="Real-time Presence" desc="Immediate alerts for attendance logs" active={notifications.attendance} onToggle={() => toggleNotification('attendance')} />
+                  <NotificationToggle label="Scholastic Results" desc="Notification upon new grade entry" active={notifications.grades} onToggle={() => toggleNotification('grades')} />
+                  <NotificationToggle label="Faculty Direct" desc="Secure messages from teaching staff" active={notifications.messages} onToggle={() => toggleNotification('messages')} />
+               </div>
+            </div>
+         </div>
+
+         {/* RIGHT SIDE: SECURITY & STUDENT CARD */}
+         <div className="lg:col-span-4 flex flex-col gap-12">
+            <div className="bg-slate-900 rounded-[4.5rem] p-12 text-white shadow-2xl relative overflow-hidden group">
+               <ShieldAlert className="absolute -right-8 -bottom-8 w-48 h-48 text-white/5 group-hover:scale-110 transition-transform duration-700" />
+               <div className="flex items-center gap-4 mb-12 relative z-10">
+                  <Sparkles className="w-6 h-6 text-amber-400 animate-pulse" />
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Institutional Link</h3>
+               </div>
+               
+               <div className="flex flex-col items-center text-center relative z-10">
+                  <div className="w-24 h-24 rounded-[2.5rem] bg-white text-[#1e3a8a] flex items-center justify-center font-black text-3xl shadow-2xl mb-6">
+                     {studentData?.name?.[0] || 'S'}
+                  </div>
+                  <h4 className="text-2xl font-black tracking-tighter mb-2">{studentData?.name}</h4>
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400 italic">Grade {studentData?.grade} Subdivision Matrix</p>
+                  
+                  <div className="w-full mt-10 pt-10 border-t border-white/5 space-y-4">
+                     <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-500">
+                        <span>Roll No</span>
+                        <span className="text-white">{studentData?.rollNo || '001'}</span>
+                     </div>
+                     <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-500">
+                        <span>Sync ID</span>
+                        <span className="text-white">{studentData?.id?.substring(0,8)}</span>
+                     </div>
+                  </div>
+               </div>
+            </div>
+
+            <div className="bg-white border border-slate-100 rounded-[4.5rem] p-10 shadow-sm relative overflow-hidden group text-left">
+               <div className="flex items-center gap-4 mb-10">
+                  <Lock className="w-6 h-6 text-[#1e3a8a]" />
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none">Security Ops</h3>
+               </div>
+               
+               <p className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-relaxed mb-10">
+                  Encryption and access controls are managed by the institutional administrator.
+               </p>
+
+               <div className="space-y-6">
+                  <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 flex items-center justify-between group/cell hover:bg-white hover:shadow-xl transition-all">
+                     <div>
+                        <p className="text-sm font-black text-slate-800 uppercase tracking-tight">Biometric Key</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Authorized Device</p>
+                     </div>
+                     <ChevronRight className="w-5 h-5 text-slate-200 group-hover/cell:translate-x-2 transition-transform" />
+                  </div>
+                  <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 flex items-center justify-between opacity-40">
+                     <div>
+                        <p className="text-sm font-black text-slate-800 uppercase tracking-tight">Quantum Shield</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Monitoring</p>
+                     </div>
+                     <Smartphone className="w-5 h-5 text-slate-200" />
+                  </div>
+               </div>
+            </div>
+         </div>
+
+      </div>
+    </div>
   );
 };
 
-const InputGroup = ({ label, value, onChange, disabled, icon, placeholder }: any) => (
-    <div className="space-y-4">
-        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">{label}</label>
-        <div className={`flex items-center gap-4 bg-slate-50 rounded-2xl px-5 py-4 border border-slate-100 transition-all ${disabled ? 'opacity-50' : 'focus-within:ring-2 focus-within:ring-indigo-100'}`}>
-            <div className="text-slate-400">{icon}</div>
-            <input 
-                type="text" 
-                value={value} 
-                onChange={(e) => onChange?.(e.target.value)}
-                disabled={disabled}
-                placeholder={placeholder}
-                className="bg-transparent border-none outline-none text-sm font-black text-slate-800 w-full placeholder:text-slate-300"
-            />
-        </div>
+const SettingsInput = ({ label, value, onChange, disabled, icon: Icon, placeholder }: any) => (
+  <div className="space-y-4 text-left">
+    <label className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] pl-2 leading-none">{label}</label>
+    <div className={`flex items-center gap-5 bg-slate-50/50 rounded-[2rem] px-8 py-5 border border-slate-100 transition-all ${disabled ? 'opacity-50' : 'focus-within:ring-4 focus-within:ring-indigo-100/50'}`}>
+      <Icon className="w-5 h-5 text-slate-400" />
+      <input 
+        type="text" 
+        value={value} 
+        onChange={(e) => onChange?.(e.target.value)}
+        disabled={disabled}
+        placeholder={placeholder}
+        className="bg-transparent border-none outline-none text-base font-black text-slate-800 w-full placeholder:text-slate-200"
+      />
     </div>
+  </div>
 );
 
-const SecurityAction = ({ icon, label, desc, action }: any) => (
-    <div className="flex items-center justify-between p-5 bg-slate-50 rounded-3xl border border-slate-100">
-        <div>
-            <p className="text-xs font-black text-slate-800 leading-none mb-1">{label}</p>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{desc}</p>
-        </div>
-        <button className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-900 hover:text-white transition-all">
-            {action}
-        </button>
+const NotificationToggle = ({ label, desc, active, onToggle }: any) => (
+  <button onClick={onToggle} className={`p-8 rounded-[3rem] border transition-all text-left flex flex-col justify-between h-48 group ${active ? 'bg-indigo-50 border-indigo-100 shadow-indigo-100/50' : 'bg-slate-50 border-slate-100'}`}>
+    <div className="flex justify-between items-start w-full">
+       <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${active ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-300'}`}>
+          <Zap size={22} className={active ? 'animate-pulse' : ''} />
+       </div>
+       <div className={`w-12 h-6 rounded-full transition-all relative ${active ? 'bg-emerald-500' : 'bg-slate-200'}`}>
+          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${active ? 'translate-x-7' : 'translate-x-1'}`} />
+       </div>
     </div>
+    <div className="mt-4">
+       <p className={`text-base font-black uppercase tracking-tight leading-none mb-1 ${active ? 'text-[#1e3a8a]' : 'text-slate-400'}`}>{label}</p>
+       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{desc}</p>
+    </div>
+  </button>
 );
 
 export default SettingsPage;

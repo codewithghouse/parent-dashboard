@@ -1,201 +1,228 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { 
-  MessageSquare, Pin, Search, Filter, Mic, ChevronDown, 
-  Sparkles, BrainCircuit, MessageCircle, Reply, Info, Loader2,
-  Calendar, User
+  Loader2, MessageSquare, Search, CheckCircle2, MoreVertical, X, Sparkles, Send, User, Trash2, Paperclip, Smile, Bot, ChevronLeft, Clock, Phone, Video, Check, CheckCheck, GraduationCap, Mic
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/lib/AuthContext";
-import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
+import { db } from "../lib/firebase";
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, writeBatch } from "firebase/firestore";
+import { useAuth } from "../lib/AuthContext";
+import { toast } from "sonner";
+import { ParentAIController } from "../ai/controller/ai-controller";
 
-const TeacherNotesPage = () => {
+const ParentTeacherNotes = () => {
   const { studentData } = useAuth();
-  const navigate = useNavigate();
+  const [selectedTeacher, setSelectedTeacher] = useState<any>(null);
+  const [allNotes, setAllNotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [notes, setNotes] = useState<any[]>([]);
-  const [search, setSearch] = useState("");
-  const [activeFilter, setActiveFilter] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [messageContent, setMessageContent] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!studentData?.id) return;
-
-    setLoading(true);
-    // Fetching from a generic 'communications' or 'teacher_notes' collection
-    // We'll look for notes specifically for this student
-    const q = query(
-      collection(db, "parent_notes"),
-      where("studentName", "==", studentData.name)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => {
-        const d = doc.data();
-        return { 
-          id: doc.id, 
-          ...d,
-          time: d.createdAt?.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-        };
-      });
-      data.sort((a: any, b: any) => {
-        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
-        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
-        return timeB - timeA;
-      });
-      setNotes(data);
-      setLoading(false);
-    }, (error) => {
-      console.error("Parent Registry Sync Error:", error);
+    if (!studentData?.name) return;
+    const q = query(collection(db, "parent_notes"), where("studentName", "==", studentData.name));
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      data.sort((a:any, b:any) => (a.createdAt?.toMillis?.() || 0) - (b.createdAt?.toMillis?.() || 0));
+      setAllNotes(data);
       setLoading(false);
     });
+    return unsubscribe;
+  }, [studentData?.name]);
 
-    return () => unsubscribe();
-  }, [studentData]);
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [allNotes, selectedTeacher]);
 
-  const filteredNotes = notes.filter(n => {
-    const matchesSearch = n.subject?.toLowerCase().includes(search.toLowerCase()) || 
-                          n.content?.toLowerCase().includes(search.toLowerCase());
-    const matchesFilter = activeFilter === "All" || n.type === activeFilter;
-    return matchesSearch && matchesFilter;
-  });
+  const teacherConversations = useMemo(() => {
+    const map = new Map();
+    [...allNotes].reverse().forEach(n => {
+      if (!map.has(n.teacherId)) {
+        map.set(n.teacherId, {
+          teacherId: n.teacherId,
+          teacherName: n.teacherName,
+          subject: n.subject || "Faculty Member",
+          lastMessage: n
+        });
+      }
+    });
+    return Array.from(map.values()).filter(t => 
+      t.teacherName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      t.subject?.toLowerCase().includes(searchQuery.toLowerCase())
+    ).sort((a, b) => (b.lastMessage.createdAt?.toMillis?.() || 0) - (a.lastMessage.createdAt?.toMillis?.() || 0));
+  }, [allNotes, searchQuery]);
+
+  const chatMessages = useMemo(() => 
+    selectedTeacher ? allNotes.filter(n => n.teacherId === selectedTeacher.teacherId) : []
+  , [allNotes, selectedTeacher]);
+
+  const handleSendMessage = async () => {
+    if (!selectedTeacher || !messageContent.trim()) return;
+    const content = messageContent.trim();
+    setMessageContent("");
+    try {
+      await addDoc(collection(db, "parent_notes"), {
+        teacherId: selectedTeacher.teacherId,
+        teacherName: selectedTeacher.teacherName,
+        studentId: studentData.id,
+        studentName: studentData.name,
+        parentName: `Parent of ${studentData.name}`,
+        subject: selectedTeacher.subject,
+        content,
+        status: "Sent",
+        from: "parent",
+        createdAt: serverTimestamp()
+      });
+    } catch (e) { toast.error("Sync failure."); setMessageContent(content); }
+  };
+
+  const generateAI = async () => {
+    if (!selectedTeacher) return;
+    setIsGenerating(true);
+    try {
+      const result = await ParentAIController.getMessageIntelligence({ content: messageContent || "Inquiry about progress" });
+      if (result.status === "success" && result.data?.reply_suggestions) {
+         setMessageContent(result.data.reply_suggestions[0]);
+      }
+    } catch (e) { toast.error("AI Busy."); } finally { setIsGenerating(false); }
+  };
+
+  const stats = useMemo(() => {
+    const total = allNotes.length;
+    const teacherThreads = new Map();
+    allNotes.forEach(n => {
+      teacherThreads.set(n.teacherId, n.from);
+    });
+    let pending = 0;
+    let resolved = 0;
+    teacherThreads.forEach((lastFrom) => {
+      if (lastFrom === 'teacher') pending++;
+      else resolved++;
+    });
+    return { total, pending, resolved };
+  }, [allNotes]);
 
   return (
-      <div className="space-y-8 animate-in fade-in duration-700 pb-12">
-        
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2">
-          <div className="space-y-1">
-            <h1 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-              Teacher Records <Pin className="w-8 h-8 text-indigo-600" />
-            </h1>
-            <p className="text-slate-400 font-bold uppercase tracking-widest text-[11px]">Direct logs from the instructional team for {studentData?.name || "Student"}</p>
-          </div>
-          
-          <div className="flex items-center gap-3">
-             <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-                <input 
-                  type="text" 
-                  placeholder="Search logs..." 
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-12 pr-6 py-3.5 bg-white border-2 border-slate-50 rounded-2xl text-[10px] font-black uppercase tracking-widest outline-none focus:border-indigo-100 transition-all w-64 shadow-sm"
-                />
-             </div>
-             <button className="p-3.5 bg-white border-2 border-slate-50 rounded-2xl hover:bg-slate-50 transition-all shadow-sm">
-                <Filter className="w-4 h-4 text-slate-400" />
-             </button>
-          </div>
+    <div className="h-[calc(100vh-120px)] flex flex-col font-sans -mt-4">
+      <div className="flex justify-between items-center mb-6 px-4">
+        <div>
+          <h1 className="text-3xl font-black text-slate-800 tracking-tight leading-none mb-1 italic">Teacher Notes</h1>
+          <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Secure Communication Hub
+          </p>
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-           {/* Filters Sidebar */}
-           <div className="lg:col-span-3 space-y-6">
-              <div className="bg-white rounded-[2rem] border-2 border-slate-50 p-6 shadow-sm">
-                 <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-6">Categorization</h3>
-                 <div className="space-y-2">
-                    {["All", "Academic", "Behavior", "Attendance"].map((f) => (
-                       <button 
-                         key={f}
-                         onClick={() => setActiveFilter(f)}
-                         className={`w-full flex items-center justify-between px-5 py-4 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${
-                            activeFilter === f ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100" : "bg-slate-50 text-slate-500 hover:bg-white hover:border-indigo-100 border border-transparent"
-                         }`}
-                       >
-                          {f} {f === "All" && `(${notes.length})`}
-                       </button>
-                    ))}
-                 </div>
-              </div>
-
-              <div className="bg-indigo-600 rounded-[2rem] p-8 text-white relative overflow-hidden shadow-xl shadow-indigo-100 group">
-                 <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:rotate-12 transition-transform">
-                    <Mic className="w-20 h-20" />
-                 </div>
-                 <h4 className="text-[9px] font-black uppercase tracking-widest text-indigo-200 mb-4">Transcription Engine</h4>
-                 <h3 className="text-base font-black leading-tight mb-8 italic">"Direct audio-to-text notes from the classroom."</h3>
-                 <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="text-[9px] font-black uppercase tracking-widest text-emerald-100">AI Synced Log</span>
-                 </div>
-              </div>
-           </div>
-
-           {/* Notes List */}
-           <div className="lg:col-span-9 space-y-6">
-              {loading ? (
-                  <div className="py-24 text-center bg-white border-2 border-slate-50 rounded-[2.5rem]">
-                      <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mx-auto mb-4" />
-                      <p className="text-sm font-black text-indigo-600 uppercase tracking-widest">Fetching scholarly documentation...</p>
-                  </div>
-              ) : filteredNotes.length === 0 ? (
-                  <div className="py-24 text-center bg-white border-2 border-slate-50 rounded-[2.5rem] flex flex-col items-center">
-                      <div className="w-20 h-20 bg-slate-50 border-2 border-slate-100 rounded-[2rem] flex items-center justify-center mb-6 shadow-sm">
-                          <MessageSquare className="w-9 h-9 text-slate-200" />
-                      </div>
-                      <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-2">Academic Silence</h3>
-                      <p className="text-sm font-bold text-slate-400 max-w-sm leading-relaxed px-10">
-                          The feature will work automatically after the subject instructors send official PTM or progress notes for {studentData?.name || "the student"}.
-                      </p>
-                  </div>
-              ) : (
-                  filteredNotes.map((note) => (
-                     <div key={note.id} className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-10 shadow-sm hover:shadow-xl transition-all relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-10 opacity-0 group-hover:opacity-5 transition-all">
-                           <Sparkles className="w-24 h-24 text-indigo-600" />
-                        </div>
-                        
-                        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8 pb-6 border-b border-slate-50">
-                           <div className="flex items-center gap-4">
-                              <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-black text-xl shadow-sm">
-                                 {note.teacherName?.substring(0, 2).toUpperCase() || "T"}
-                              </div>
-                              <div>
-                                 <div className="flex items-center gap-3 mb-1">
-                                    <h3 className="text-xl font-black text-slate-800 tracking-tight">{note.subject || "Academic Record"}</h3>
-                                    {note.pinned && <Pin className="w-4 h-4 text-indigo-500 rotate-45" />}
-                                 </div>
-                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-3">
-                                    <User className="w-3 h-3"/> {note.teacherName || "Instructing Faculty"} • <Calendar className="w-3 h-3"/> {note.time || "Recent"}
-                                 </p>
-                              </div>
-                           </div>
-                           <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border self-start ${
-                              note.type === "Urgent" ? "bg-rose-50 text-rose-600 border-rose-100" : "bg-emerald-50 text-emerald-600 border-emerald-100"
-                           }`}>
-                              {note.type || "Formal Log"}
-                           </span>
-                        </div>
-
-                        <div className="space-y-6 relative z-10">
-                           <div className="bg-slate-50/80 border border-slate-100 p-8 rounded-3xl relative">
-                              <BrainCircuit className="absolute -top-3 -right-3 w-8 h-8 text-indigo-200" />
-                              <p className="text-base font-bold text-slate-700 leading-relaxed italic">
-                                 "{note.subject}: {note.content || "Institutional records currently syncing. Details will appear shortly."}"
-                              </p>
-                           </div>
-
-                           <div className="flex items-center gap-3 pt-4">
-                              <button 
-                                 onClick={() => navigate('/messages')}
-                                 className="flex-1 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
-                              >
-                                 <Reply className="w-3 h-3" /> Connect with {note.teacherName?.split(' ')[0] || "Faculty"}
-                              </button>
-                              <button 
-                                 onClick={() => navigate('/messages')}
-                                 className="px-6 py-4 bg-white border-2 border-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-600 hover:border-slate-200 transition-all flex items-center gap-2"
-                              >
-                                 <MessageCircle className="w-4 h-4" /> Direct Portal Chat
-                              </button>
-                           </div>
-                        </div>
-                     </div>
-                  ))
-              )}
-           </div>
+        <div className="flex gap-4">
+          {[
+            { label: "Total Logs", key: "total", icon: MessageSquare, color: "bg-blue-50 text-blue-500" },
+            { label: "Pending", key: "pending", icon: Clock, color: "bg-amber-50 text-amber-500" },
+            { label: "Resolved", key: "resolved", icon: CheckCircle2, color: "bg-emerald-50 text-emerald-500" },
+          ].map(s => (
+            <div key={s.key} className="bg-white px-5 py-3 rounded-2xl flex items-center gap-3 border border-slate-100 shadow-sm transition-all hover:shadow-md">
+                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${s.color}`}><s.icon className="w-4 h-4" /></div>
+                 <div><p className="text-[9px] font-black text-slate-400 uppercase leading-none mb-1">{s.label}</p><p className="text-sm font-black text-slate-900 leading-none">{stats[s.key as keyof typeof stats]}</p></div>
+            </div>
+          ))}
         </div>
       </div>
+
+      <div className="flex-1 flex bg-white border border-slate-200 rounded-[2.5rem] shadow-2xl overflow-hidden mb-4">
+        <div className={`w-full md:w-[380px] border-r border-slate-100 flex flex-col bg-slate-50/10 ${selectedTeacher ? 'hidden md:flex' : 'flex'}`}>
+          <div className="p-6">
+             <div className="relative group">
+                <input type="text" placeholder="Search educators..." value={searchQuery} onChange={(e)=>setSearchQuery(e.target.value)} className="w-full pl-12 pr-4 h-14 bg-white border border-slate-100 rounded-2xl text-xs font-bold focus:ring-4 focus:ring-emerald-50 transition-all uppercase tracking-widest placeholder:text-slate-200" />
+                <Search className="w-5 h-5 text-slate-300 absolute left-4 top-1/2 -translate-y-1/2" />
+             </div>
+          </div>
+          <div className="flex-1 overflow-y-auto no-scrollbar">
+             {loading ? <div className="p-10 text-center animate-pulse font-black text-slate-300 uppercase text-xs">Syncing Registry...</div> :
+                teacherConversations.map(t => {
+                  const active = selectedTeacher?.teacherId === t.teacherId;
+                  return (
+                    <button key={t.teacherId} onClick={()=>setSelectedTeacher(t)} className={`w-full p-6 flex items-center gap-4 border-b border-slate-50 transition-all ${active ? 'bg-white shadow-xl z-20 translate-x-1' : 'hover:bg-white'}`}>
+                       <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-sm font-black shadow-inner transition-all ${active ? 'bg-[#00a884] text-white rotate-3' : 'bg-slate-50 text-slate-200'}`}>{t.teacherName?.substring(0,2).toUpperCase()}</div>
+                       <div className="flex-1 text-left truncate">
+                          <div className="flex justify-between items-center mb-0.5">
+                            <h4 className="text-sm font-black text-slate-900 truncate uppercase tracking-tight">{t.teacherName}</h4>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase">{new Date(t.lastMessage.createdAt?.toDate?.() || Date.now()).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>
+                          </div>
+                          <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest mb-1">{t.subject}</p>
+                          <p className={`text-[11px] truncate ${active ? 'text-[#00a884] font-bold' : 'text-slate-400 font-semibold'}`}>{t.lastMessage.from === 'parent' ? '✓ ' : ''}{t.lastMessage.content}</p>
+                       </div>
+                    </button>
+                  );
+                })}
+          </div>
+        </div>
+
+        <div className={`flex-1 flex flex-col ${!selectedTeacher ? 'hidden md:flex' : 'flex'} relative bg-[#efeae2]`}>
+          {selectedTeacher ? (
+            <>
+              <div className="chat-doodle absolute inset-0 opacity-[0.05] pointer-events-none z-0" />
+              <div className="px-8 py-3 bg-[#f0f2f5] border-b border-slate-200 flex justify-between items-center z-20 shadow-sm">
+                 <div className="flex items-center gap-4">
+                    <button onClick={()=>setSelectedTeacher(null)} className="md:hidden p-2 hover:bg-slate-200 rounded-full"><ChevronLeft/></button>
+                    <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center p-0.5 border border-white shadow-sm overflow-hidden"><User className="text-slate-400"/></div>
+                    <div>
+                       <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight leading-none mb-1">{selectedTeacher.teacherName}</h3>
+                       <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest flex items-center gap-2 animate-pulse"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {selectedTeacher.subject}</p>
+                    </div>
+                 </div>
+                 <div className="flex items-center gap-1">
+                    <button className="p-2.5 text-slate-500 hover:bg-slate-200 rounded-full transition-all"><Video size={20}/></button>
+                    <button className="p-2.5 text-slate-500 hover:bg-slate-200 rounded-full transition-all"><Phone size={18}/></button>
+                    <div className="w-px h-6 bg-slate-300 mx-1" />
+                    <button className="p-2.5 text-slate-500 hover:bg-slate-200 rounded-full transition-all"><MoreVertical size={20}/></button>
+                 </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-4 custom-scrollbar flex flex-col z-10">
+                 {chatMessages.map((n, i) => {
+                    const isM = n.from === "parent";
+                    return (
+                      <div key={n.id} className={`flex flex-col ${isM ? 'items-end' : 'items-start'} animate-in slide-in-from-bottom-2 duration-300`}>
+                         <div className={`relative px-4 py-2 rounded-2xl text-[14px] shadow-sm font-medium ${isM ? 'bg-[#d9fdd3] text-slate-800 rounded-tr-none' : 'bg-white text-slate-800 rounded-tl-none'}`}>
+                            {isM && <div className="absolute top-0 -right-2 w-0 h-0 border-[8px] border-transparent border-l-[#d9fdd3] border-t-[#d9fdd3]" />}
+                            {!isM && <div className="absolute top-0 -left-2 w-0 h-0 border-[8px] border-transparent border-r-white border-t-white" />}
+                            <p className="whitespace-pre-wrap leading-relaxed">{n.content}</p>
+                            <div className="mt-1 flex items-center justify-end gap-1 opacity-40 text-[9px] font-black uppercase">
+                               {new Date(n.createdAt?.toDate?.() || Date.now()).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}
+                               {isM && <CheckCheck className="w-3.5 h-3.5 text-blue-500 ml-1" />}
+                            </div>
+                         </div>
+                      </div>
+                    );
+                 })}
+                 <div ref={chatEndRef} />
+              </div>
+
+              <div className="p-4 bg-[#f0f2f5] border-t border-slate-200 z-20">
+                 <div className="flex items-center gap-3">
+                    <button className="p-2 text-slate-500 hover:bg-slate-300 rounded-full"><Smile size={24}/></button>
+                    <button className="p-2 text-slate-500 hover:bg-slate-300 rounded-full"><Paperclip size={20}/></button>
+                    <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-100 flex items-center pr-2">
+                       <textarea rows={1} value={messageContent} onChange={(e)=>setMessageContent(e.target.value)} onKeyDown={(e)=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleSendMessage();}}} placeholder="Type a response to educator..." className="flex-1 bg-transparent border-none focus:ring-0 p-3 text-sm font-medium resize-none no-scrollbar" />
+                       <button onClick={generateAI} disabled={isGenerating} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg group transition-all">{isGenerating ? <Loader2 className="animate-spin" size={16}/> : <Sparkles className="group-hover:scale-110 transition-transform" size={18}/>}</button>
+                    </div>
+                    <button onClick={handleSendMessage} disabled={!messageContent.trim()} className={`w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-lg ${messageContent.trim() ? 'bg-[#00a884] text-white shadow-[#00a884]/20' : 'bg-slate-300 text-slate-500'}`}><Send size={20}/></button>
+                 </div>
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center p-10 text-center relative z-10">
+               <div className="w-32 h-32 bg-white rounded-full shadow-2xl flex items-center justify-center mb-10 border-4 border-slate-50 group transition-all hover:scale-105 hover:rotate-3"><GraduationCap className="w-12 h-12 text-slate-100 group-hover:text-[#00a884] transition-colors" /></div>
+               <h2 className="text-3xl font-black text-slate-800 mb-2 uppercase tracking-tight italic">Educator Communications</h2>
+               <p className="text-xs font-bold text-slate-400 max-w-xs uppercase tracking-[0.2em] leading-relaxed">Select a faculty member to view historical academic records and initiate secure discourse.</p>
+               <div className="mt-12 flex gap-8 opacity-20 grayscale"><Mic size={32}/><Clock size={32}/><CheckCheck size={32}/></div>
+               <div className="absolute bottom-10 text-[9px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-2"><div className="w-3 h-3 bg-emerald-500 rounded-full opacity-50"/> End-to-End Secure Channel</div>
+            </div>
+          )}
+        </div>
+      </div>
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .chat-doodle { background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); background-repeat: repeat; filter: contrast(0.5); }
+      `}</style>
+    </div>
   );
 };
-
-export default TeacherNotesPage;
+export default ParentTeacherNotes;

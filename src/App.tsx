@@ -15,6 +15,7 @@ import TeacherNotesPage from "./pages/TeacherNotesPage";
 import MessagesPage from "./pages/MessagesPage";
 import AlertsPage from "./pages/AlertsPage";
 import SettingsPage from "./pages/SettingsPage";
+import ReportsPage from "./pages/ReportsPage";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import { AuthProvider, useAuth } from "./lib/AuthContext";
@@ -56,6 +57,7 @@ const AppRoutes = () => {
         <Route path="/concepts" element={<ConceptStrengthsPage />} />
         <Route path="/behaviour" element={<BehaviourPage />} />
         <Route path="/teacher-notes" element={<TeacherNotesPage />} />
+        <Route path="/reports" element={<ReportsPage />} />
         <Route path="/messages" element={<MessagesPage />} />
         <Route path="/alerts" element={<AlertsPage />} />
         <Route path="/settings" element={<SettingsPage />} />

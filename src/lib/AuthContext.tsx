@@ -7,7 +7,7 @@ import {
   User
 } from 'firebase/auth';
 import { auth, db } from './firebase';
-import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc, doc, onSnapshot } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -36,32 +36,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const querySnapshot = await getDocs(q);
 
           if (!querySnapshot.empty) {
-            // Authorized Student/Parent
-            const docSnap = querySnapshot.docs[0];
-            const data = docSnap.data();
+            const studentId = querySnapshot.docs[0].id;
             
-            // Auto-activate if Invited
-            if (data.status === "Invited") {
-               updateDoc(doc(db, "students", docSnap.id), { status: "Active" });
-            }
+            // Set up Real-Time Listener
+            const unsubStudent = onSnapshot(doc(db, "students", studentId), (docSnap) => {
+              if (docSnap.exists()) {
+                const data = docSnap.data();
+                
+                // Auto-activate if Invited
+                if (data.status === "Invited") {
+                   updateDoc(doc(db, "students", studentId), { status: "Active" });
+                }
 
-            setStudentData({ id: docSnap.id, ...data, status: "Active" });
-            setUser(currentUser);
-            setError(null);
+                setStudentData({ id: studentId, ...data });
+                setUser(currentUser);
+                setError(null);
+                setLoading(false);
+              }
+            });
+
+            // Note: In a production app, the unsubStudent would be tracked in a ref
           } else {
             // Not in whitelist
             await signOut(auth);
             setUser(null);
             setStudentData(null);
             setError("You are not authorized to access the Parent Dashboard. Please contact your school administration.");
+            setLoading(false);
           }
         } catch (err: any) {
           console.error("Auth Error:", err);
           setError("An error occurred during verification.");
+          setLoading(false);
         }
       } else {
         setUser(null);
         setStudentData(null);
+        setLoading(false);
       }
       setLoading(false);
     });
