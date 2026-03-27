@@ -1,11 +1,15 @@
 import { useState, useEffect, useRef } from "react";
-import { User, Clock, Lightbulb, CheckCircle2, AlertCircle, Loader2, Sparkles, Send, Brain, Info, Download, Upload, FileCheck, X, FileText, Layout } from "lucide-react";
+import { User, Clock, Lightbulb, CheckCircle2, AlertCircle, Loader2, Sparkles, Send, Brain, Info, Download, Upload, FileCheck, X, FileText, Layout, MessageCircle, Bot, ChevronRight, Wand2 } from "lucide-react";
 import { ParentAIController } from "../ai/controller/ai-controller";
 import { useAuth } from "@/lib/AuthContext";
 import { db, storage } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, setDoc, getDocs, Unsubscribe, or } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { toast } from "sonner";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 
 const tabs = ["Active", "Completed", "Overdue"];
 
@@ -16,6 +20,13 @@ const AssignmentsPage = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiResponse, setAiResponse] = useState<any>(null);
   const [submittingFile, setSubmittingFile] = useState<string | null>(null);
+  
+  // AI Tutor States
+  const [isTutorOpen, setIsTutorOpen] = useState(false);
+  const [currentAssignment, setCurrentAssignment] = useState<any>(null);
+  const [tutorMessages, setTutorMessages] = useState<any[]>([]);
+  const [userQuery, setUserQuery] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
   
   const [loading, setLoading] = useState(true);
   const [assignments, setAssignments] = useState<any[]>([]);
@@ -97,22 +108,91 @@ const AssignmentsPage = () => {
     };
   }, [studentData?.id, studentData?.grade, studentData?.class]);
 
-  const fetchAIHints = async (assignment: any) => {
-    setIsAnalyzing(true);
-    setShowAIHint(assignment.id);
-    setAiResponse(null);
+  const extractTextFromPDF = async (url: string): Promise<string> => {
     try {
+      const pdf = await (window as any).pdfjsLib.getDocument(url).promise;
+      let text = "";
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        text += content.items.map((item: any) => item.str).join(" ") + "\n";
+      }
+      return text;
+    } catch (e) {
+      console.error("PDF Extraction failed:", e);
+      return "";
+    }
+  };
+
+  const openAITutor = async (assignment: any) => {
+    setCurrentAssignment(assignment);
+    setIsTutorOpen(true);
+    setTutorMessages([]);
+    setIsTyping(true);
+
+    try {
+      let fileContent = "";
+      if (assignment.pdfUrl) {
+        toast.info("AI is analyzing file content...");
+        console.log("Analyzing PDF:", assignment.pdfUrl);
+        fileContent = await extractTextFromPDF(assignment.pdfUrl);
+        console.log("Extracted Content Length:", fileContent.length);
+        if (fileContent.length === 0) {
+           console.warn("No text extracted from PDF. Check CORS or file readability.");
+        }
+      }
+
       const result = await ParentAIController.getAssignmentIntelligence({
         title: assignment.title,
         description: assignment.description,
-        type: "hints"
+        fileContent: fileContent,
+        type: "tutor_init"
       });
-      if (result.status === "success") setAiResponse(result.data);
+      console.log("AI result:", result);
+
+      if (result.status === "success") {
+        setTutorMessages([{
+          role: "assistant",
+          content: result.data.tutor_analysis,
+          plan: result.data.action_plan,
+          hints: result.data.assignment_hints,
+          points: result.data.discussion_points
+        }]);
+      }
     } catch (e) {
-      console.error(e);
-      toast.error("Quantum Link disrupted.");
+      toast.error("Tutor connection failed.");
     } finally {
-      setIsAnalyzing(false);
+      setIsTyping(false);
+    }
+  };
+
+  const handleTutorSubmit = async () => {
+    if (!userQuery.trim() || isTyping) return;
+    
+    const userMsg = userQuery;
+    setUserQuery("");
+    setTutorMessages(prev => [...prev, { role: "user", content: userMsg }]);
+    setIsTyping(true);
+
+    try {
+      const result = await ParentAIController.getAssignmentIntelligence({
+        title: currentAssignment.title,
+        description: currentAssignment.description,
+        question: userMsg,
+        type: "chat"
+      });
+
+      if (result.status === "success") {
+        setTutorMessages(prev => [...prev, { 
+          role: "assistant", 
+          content: result.data.response || result.data.tutor_analysis,
+          hints: result.data.assignment_hints
+        }]);
+      }
+    } catch (e) {
+      toast.error("AI is busy right now.");
+    } finally {
+      setIsTyping(false);
     }
   };
 
@@ -250,11 +330,12 @@ const AssignmentsPage = () => {
                       ) : (
                         <>
                            <button 
-                             onClick={() => fetchAIHints(a)}
-                             className="w-full px-8 py-4 bg-white border border-slate-100 text-[#1e3a8a] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-3 shadow-sm"
+                             onClick={() => openAITutor(a)}
+                             className="w-full px-8 py-4 bg-white border border-slate-100 text-[#1e3a8a] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-3 shadow-sm group-hover:border-indigo-200"
                            >
-                             <Lightbulb className="w-4 h-4 text-amber-500" /> AI Guidance
+                             <Bot className="w-4 h-4 text-indigo-500 animate-pulse" /> AI Tutor Guidance
                            </button>
+
                            <label className={`w-full px-8 py-5 bg-slate-900 text-white rounded-[2.5rem] text-[10px] font-black uppercase tracking-[0.2em] hover:bg-slate-800 shadow-2xl shadow-slate-200 transition-all flex items-center justify-center gap-3 cursor-pointer ${submittingFile === a.id ? "opacity-50 pointer-events-none" : ""}`}>
                              {submittingFile === a.id ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Upload className="w-5 h-5" /> Submit Homework</>}
                              <input 
@@ -268,44 +349,96 @@ const AssignmentsPage = () => {
                       )}
                     </div>
                   </div>
-
-                  {showAIHint === a.id && (
-                     <div className="mt-10 pt-10 border-t border-slate-50 animate-in slide-in-from-top-6 duration-500">
-                        <div className="bg-[#1e3a8a] rounded-[3.5rem] p-10 text-white relative overflow-hidden lg:max-w-4xl shadow-2xl">
-                           <Sparkles className="absolute top-8 right-8 w-16 h-16 text-white/10" />
-                           <div className="flex items-center gap-4 mb-8">
-                              <Brain className="w-8 h-8 text-indigo-300" />
-                              <h4 className="text-[11px] font-black uppercase tracking-[0.4em] text-indigo-200 leading-none">Cognitive Guidance Engine</h4>
-                           </div>
-                           
-                           {isAnalyzing ? (
-                              <div className="flex items-center gap-6 py-8">
-                                 <Loader2 className="w-10 h-10 animate-spin text-indigo-300" />
-                                 <p className="text-lg font-bold animate-pulse">Scanning academic context for strategic hints...</p>
-                              </div>
-                           ) : (
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                 {aiResponse?.assignment_hints?.map((h: any, i: number) => (
-                                    <div key={i} className="flex gap-6 p-6 bg-white/10 border border-white/5 rounded-3xl hover:bg-white/15 transition-all">
-                                       <div className="w-10 h-10 rounded-2xl bg-indigo-400/20 flex items-center justify-center font-black text-indigo-200 shrink-0 border border-white/10">{i+1}</div>
-                                       <div className="text-left">
-                                          <p className="text-sm font-black leading-relaxed">{h.hint}</p>
-                                          <p className="text-[10px] font-black text-indigo-300/50 mt-3 uppercase tracking-widest border-t border-white/10 pt-3">🎯 Focus: {h.clue}</p>
-                                       </div>
-                                    </div>
-                                 ))}
-                              </div>
-                           )}
-                        </div>
-                     </div>
-                  )}
                 </div>
-              );
+              )
             })
           )}
         </div>
+
+        {/* AI TUTOR SHEET */}
+        <Sheet open={isTutorOpen} onOpenChange={setIsTutorOpen}>
+          <SheetContent side="right" className="w-full sm:max-w-xl p-0 border-l border-slate-100 bg-white">
+            <div className="h-full flex flex-col">
+               <div className="bg-[#1e3a8a] p-8 text-white relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-10 opacity-10">
+                    <Brain className="w-40 h-40" />
+                  </div>
+                  <SheetHeader className="text-left relative z-10">
+                    <SheetTitle className="text-white text-3xl font-black italic tracking-tighter uppercase mb-2">EduIntellect AI Tutor</SheetTitle>
+                    <SheetDescription className="text-blue-100 font-bold uppercase tracking-widest text-[10px]">Active Academic Coaching Mode • Real-time Sync</SheetDescription>
+                  </SheetHeader>
+               </div>
+
+               <ScrollArea className="flex-1 p-8">
+                  <div className="space-y-12 pb-20">
+                    {tutorMessages.map((msg, i) => (
+                      <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                        <div className={`max-w-[85%] rounded-[2.5rem] p-8 ${msg.role === 'user' ? 'bg-indigo-600 text-white shadow-xl' : 'bg-slate-50 border border-slate-100'}`}>
+                          <p className={`text-base font-bold leading-relaxed ${msg.role === 'user' ? 'text-white' : 'text-slate-700'}`}>{msg.content}</p>
+                          
+                          {msg.plan && (
+                            <div className="mt-8 space-y-4">
+                              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4 border-l-4 border-indigo-400 pl-4">Suggested Action Plan</p>
+                              {msg.plan.map((p: any, j: number) => (
+                                <div key={j} className="flex gap-4 p-4 bg-white rounded-2xl border border-slate-100">
+                                  <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center font-black text-xs text-indigo-600 border border-indigo-100 shrink-0">{j+1}</div>
+                                  <div>
+                                    <p className="text-sm font-black text-slate-800">{p.task}</p>
+                                    <p className="text-[11px] font-bold text-slate-400 italic mt-1">{p.motivation}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {msg.hints && (
+                            <div className="mt-8 space-y-4">
+                              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-600 mb-4 border-l-4 border-amber-400 pl-4">Strategic Hints</p>
+                              {msg.hints.map((h: any, j: number) => (
+                                <div key={j} className="p-5 bg-amber-50/50 rounded-2xl border border-amber-100">
+                                  <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest leading-none mb-3">{h.step}</p>
+                                  <p className="text-sm font-black text-slate-700 leading-relaxed mb-3">"{h.hint}"</p>
+                                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">🎯 Focus: {h.clue}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {isTyping && (
+                      <div className="flex items-center gap-4 bg-slate-50 w-fit p-6 rounded-[2rem] border border-slate-100">
+                        <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+                        <span className="text-sm font-black text-slate-400 uppercase tracking-widest animate-pulse">Neural engine thinking...</span>
+                      </div>
+                    )}
+                  </div>
+               </ScrollArea>
+
+               <div className="p-8 border-t border-slate-100 bg-slate-50/50">
+                  <div className="flex items-center gap-4 bg-white p-2 rounded-[2.5rem] border border-slate-200 shadow-sm focus-within:ring-4 focus-within:ring-indigo-100 transition-all">
+                    <Textarea 
+                      placeholder="Ask the Tutor anything about this assignment..." 
+                      className="flex-1 min-h-[50px] max-h-[150px] border-none focus-visible:ring-0 text-sm font-bold bg-transparent px-6 py-4"
+                      value={userQuery}
+                      onChange={(e) => setUserQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleTutorSubmit())}
+                    />
+                    <Button 
+                      onClick={handleTutorSubmit}
+                      disabled={isTyping}
+                      className="w-14 h-14 rounded-full bg-[#1e3a8a] text-white hover:bg-slate-900 shadow-xl"
+                    >
+                      <Send className="w-6 h-6" />
+                    </Button>
+                  </div>
+               </div>
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
   );
 };
+
 
 export default AssignmentsPage;
