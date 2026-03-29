@@ -2,237 +2,261 @@ import React, { useState, useEffect } from "react";
 import { 
   Calendar, CheckCircle, Clock, ChevronRight, Filter, 
   Sparkles, BrainCircuit, Rocket, Zap, Info, Loader2,
-  Award, BarChart3, TrendingUp, Star, ShieldCheck, ArrowUpRight, GraduationCap
+  Award, BarChart3, TrendingUp, Star, ShieldCheck, ArrowUpRight, GraduationCap,
+  FlaskConical, Calculator, Book, History, Trophy, Layout, Target
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
-import { ParentAIController } from "../ai/controller/ai-controller";
+import { collection, query, where, onSnapshot, orderBy, limit } from "firebase/firestore";
 
 const TestsPage = () => {
   const { studentData } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [testResults, setTestResults] = useState<any[]>([]);
-  const [analyzingAi, setAnalyzingAi] = useState(false);
-  const [aiNarrative, setAiNarrative] = useState<string>("");
+  const [upcomingTests, setUpcomingTests] = useState<any[]>([]);
+  const [recentResults, setRecentResults] = useState<any[]>([]);
+  
+  // Performance Stats
+  const [stats, setStats] = useState({
+     aGrade: 0,
+     bGrade: 0,
+     cGrade: 0,
+     belowC: 0,
+     totalTaken: 0
+  });
 
   useEffect(() => {
     if (!studentData?.id) return;
-
     setLoading(true);
-    const q = query(
-      collection(db, "test_scores"),
-      where("studentId", "==", studentData.id),
-      orderBy("timestamp", "desc")
-    );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const results = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
-      setTestResults(results);
-      setLoading(false);
-    }, (error) => {
-      console.error("Grades Sync Error:", error);
-      setLoading(false);
+    // 1. Fetch Class Enrollments to get relevant tests
+    const qEnroll = query(collection(db, "enrollments"), where("studentId", "==", studentData.id));
+    const unsubEnroll = onSnapshot(qEnroll, (enrollSnap) => {
+        const classIds = enrollSnap.docs.map(d => d.data().classId).filter(id => !!id);
+        const searchIds = classIds.length > 0 ? classIds : [studentData.classId || "General"];
+
+        // 2. Fetch Tests for these classes
+        const qTests = query(
+          collection(db, "tests"),
+          where("classId", "in", searchIds.slice(0, 10)) // Firestore limit
+        );
+
+        const unsubTests = onSnapshot(qTests, (snap) => {
+            const now = new Date();
+            const allTests = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+            const filtered = allTests
+                .filter((t: any) => {
+                   const d = t.date || t.testDate;
+                   return d && new Date(d) >= now;
+                })
+                .sort((a: any, b: any) => new Date(a.date || a.testDate).getTime() - new Date(b.date || b.testDate).getTime());
+            
+            setUpcomingTests(filtered);
+        });
+
+        return () => unsubTests();
     });
 
-    return () => unsubscribe();
-  }, [studentData?.id]);
+    // 3. Fetch Student Test Scores
+    const qScores = query(
+        collection(db, "test_scores"), 
+        where("studentId", "==", studentData.id),
+        orderBy("timestamp", "desc"),
+        limit(20)
+    );
 
-  useEffect(() => {
-    if (loading || testResults.length === 0) return;
-    const fetchAi = async () => {
-       setAnalyzingAi(true);
-       const res = await ParentAIController.getPerformanceInsights({
-          student_name: studentData.name,
-          subjects: testResults.slice(0, 3).map(t => ({ name: t.testName, score: t.score })),
-          recent_trend: "Stable Achievement Index"
-       });
-       if (res.status === "success") setAiNarrative(res.data.narrative_analysis);
-       setAnalyzingAi(false);
-    };
-    fetchAi();
-  }, [loading, testResults.length]);
+    const unsubScores = onSnapshot(qScores, (snap) => {
+        const scores = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+        setRecentResults(scores);
 
-  const totalPoints = testResults.reduce((sum, t) => sum + (t.score || 0), 0);
-  const maxPointsPossible = testResults.reduce((sum, t) => sum + (t.maxScore || 0), 0);
-  const globalPct = maxPointsPossible > 0 ? Math.round((totalPoints / maxPointsPossible) * 100) : 0;
+        let a=0, b=0, c=0, d=0;
+        scores.forEach((s: any) => {
+           const pct = s.percentage || (s.score / s.maxScore * 100);
+           if (pct >= 85) a++;
+           else if (pct >= 70) b++;
+           else if (pct >= 50) c++;
+           else d++;
+        });
+        setStats({ aGrade: a, bGrade: b, cGrade: c, belowC: d, totalTaken: scores.length });
+        setLoading(false);
+    }, (err) => {
+        console.error("Scores Sync Error:", err);
+        setLoading(false);
+    });
+
+    return () => { unsubEnroll(); unsubScores(); };
+  }, [studentData?.id, studentData?.classId]);
+
+  const getSubjectIcon = (title: string = "") => {
+     const t = title.toLowerCase();
+     if (t.includes('sci')) return <FlaskConical className="w-5 h-5 text-amber-500" />;
+     if (t.includes('math')) return <Calculator className="w-5 h-5 text-blue-500" />;
+     if (t.includes('history')) return <History className="w-5 h-5 text-rose-500" />;
+     if (t.includes('english') || t.includes('lang')) return <Book className="w-5 h-5 text-indigo-500" />;
+     return <GraduationCap className="w-5 h-5 text-slate-500" />;
+  };
+
+  const getDayDiff = (dateStr: string) => {
+     if (!dateStr) return 0;
+     const diff = new Date(dateStr).getTime() - new Date().getTime();
+     const days = Math.ceil(diff / (1000 * 3600 * 24));
+     return days < 0 ? 0 : days;
+  };
+
+  const formatDate = (date: any) => {
+     if (!date) return "--";
+     const d = date.toDate ? date.toDate() : new Date(date);
+     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const nextTest = upcomingTests[0];
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-10 duration-1000 pb-24 text-left font-sans">
+    <div className="animate-in fade-in duration-700 pb-24 text-left font-sans">
       
-      {/* ─── HEADER ─── */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-10 mb-20 px-4">
-        <div className="text-left w-full md:w-auto">
-           <div className="flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 rounded-[1.5rem] bg-[#1e3a8a] flex items-center justify-center text-white shadow-xl shadow-blue-200">
-                 <Award size={26} />
-              </div>
-              <div>
-                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-1">Scholastic Registry Matrix</p>
-                 <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse border-2 border-white" />
-                    <p className="text-xs font-black text-slate-500 uppercase tracking-widest leading-none">Scores Synchronized</p>
-                 </div>
-              </div>
-           </div>
-           <h1 className="text-6xl font-black text-slate-900 tracking-tighter leading-none mb-4">Assessment Roster</h1>
-           <p className="text-xl font-bold text-slate-400 italic">Historical audit of tests, quizzes and institutional grade records.</p>
-        </div>
-        
-        <div className="flex bg-white border border-slate-100 p-6 rounded-[2.5rem] shadow-sm items-center gap-6 group hover:shadow-2xl transition-all">
-           <div className="w-16 h-16 rounded-[1.8rem] bg-indigo-50 border border-indigo-100 flex items-center justify-center text-[#1e3a8a] shadow-inner group-hover:rotate-12 transition-transform">
-              <TrendingUp size={30} />
-           </div>
-           <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Mastery Index</p>
-              <p className="text-4xl font-black text-[#1e3a8a] tracking-tighter italic">{globalPct}%</p>
-           </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 px-2">
-         
-         {/* LEFT: RESULTS FEED */}
-         <div className="lg:col-span-8 flex flex-col gap-12">
-            
-            {/* AI HERO CARD */}
-            <div className="bg-gradient-to-br from-[#1e3a8a] to-blue-900 rounded-[4.5rem] p-12 text-white shadow-2xl relative overflow-hidden group">
-               <div className="absolute top-0 right-0 p-12 opacity-5 scale-150 group-hover:rotate-12 transition-transform duration-1000">
-                  <Star className="w-48 h-48" />
+      {/* ── MASTER BANNER (UPCOMING HIGHLIGHT) ── */}
+      <div className="bg-gradient-to-br from-[#1e3a8a] via-blue-700 to-indigo-900 rounded-[3.5rem] p-12 mb-12 text-white relative overflow-hidden shadow-2xl group">
+         <div className="absolute top-0 right-0 p-12 opacity-10 group-hover:scale-110 transition-transform duration-1000">
+            <Trophy className="w-60 h-60" />
+         </div>
+         <div className="flex flex-col md:flex-row items-center justify-between gap-10 relative z-10">
+            <div className="flex items-center gap-10 text-center md:text-left flex-col md:flex-row">
+               <div className="w-24 h-24 rounded-[2.5rem] bg-white/10 backdrop-blur-xl flex items-center justify-center border border-white/20 shadow-inner">
+                  <Calendar className="w-10 h-10 text-blue-200" />
                </div>
-               <div className="relative z-10">
-                  <div className="flex items-center gap-3 mb-10">
-                     <span className="px-6 py-2 bg-white/10 backdrop-blur-md rounded-full text-[10px] font-black uppercase tracking-[0.3em] border border-white/20 italic">
-                        Achievement Sweep: Active
-                     </span>
-                  </div>
-                  <h2 className="text-5xl font-black tracking-tighter leading-[1.1] mb-8 max-w-2xl italic">
-                     {analyzingAi ? "Synthesizing scholastic growth metrics..." : (aiNarrative || `Academically, ${studentData?.name} is maintaining a robust engagement rhythm across all scholastic subdivisions.`)}
+               <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.4em] mb-3 text-blue-200/60">Next Institutional Milestone</p>
+                  <h2 className="text-4xl md:text-5xl font-black italic tracking-tighter mb-2 leading-none">
+                     {nextTest?.testName || "No active milestones"}
                   </h2>
-                  <div className="flex flex-wrap gap-6 border-t border-white/10 pt-10">
-                     <div className="bg-white/5 border border-white/10 p-6 rounded-[2rem]">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-indigo-300 mb-2">Authenticated Points</p>
-                        <p className="text-3xl font-black">{totalPoints} <span className="text-lg opacity-40">/ {maxPointsPossible}</span></p>
-                     </div>
-                     <div className="bg-white/5 border border-white/10 p-6 rounded-[2rem]">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-indigo-300 mb-2">Registry Logs</p>
-                        <p className="text-3xl font-black">{testResults.length} <span className="text-lg opacity-40">Milestones</span></p>
-                     </div>
-                  </div>
+                  <p className="text-xl font-bold text-blue-100/80">
+                     {nextTest?.date ? formatDate(nextTest.date) : "Academic Registry Clear"} • 09:00 AM
+                  </p>
                </div>
             </div>
-
-            {/* RESULTS LIST */}
-            <div className="space-y-6">
-               <div className="flex items-center justify-between px-6 mb-4">
-                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-[0.3em] flex items-center gap-4">
-                     <BarChart3 className="w-6 h-6 text-[#1e3a8a]" /> Registry Log
-                  </h3>
-                  <button className="h-14 px-8 bg-white border border-slate-100 rounded-2xl text-[10px] font-black text-[#1e3a8a] uppercase tracking-widest shadow-sm hover:shadow-xl transition-all flex items-center gap-3">
-                     Export Transcript <ArrowUpRight size={14} />
-                  </button>
+            <div className="text-center md:text-right flex flex-col items-center md:items-end">
+               <div className="flex items-baseline gap-1">
+                  <span className="text-7xl font-black italic tracking-tighter leading-none mb-1 text-white">
+                     {nextTest ? getDayDiff(nextTest.date) : "0"}
+                  </span>
+                  <span className="text-xl font-black italic text-blue-300">D</span>
                </div>
+               <p className="text-[10px] font-black uppercase tracking-widest text-blue-200/40 italic">Countdown Active</p>
+            </div>
+         </div>
+      </div>
 
-               {loading ? (
-                  <div className="py-40 flex flex-col items-center justify-center bg-white border border-slate-100 rounded-[4rem]">
-                     <Loader2 className="w-16 h-16 text-indigo-200 animate-spin mb-8" />
-                     <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Compiling Records...</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-12">
+         
+         {/* ── UPCOMING TESTS LIST ── */}
+         <div className="bg-white rounded-[4rem] p-10 border border-slate-100 shadow-sm flex flex-col">
+            <div className="flex items-center justify-between mb-10">
+               <h3 className="text-2xl font-black text-slate-800 tracking-tight italic">Examination Queue</h3>
+               <div className="w-10 h-10 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-100"><Filter size={18} /></div>
+            </div>
+            <div className="space-y-4 flex-1">
+               {loading ? <div className="py-20 flex justify-center"><Loader2 className="w-10 h-10 animate-spin text-indigo-500" /></div> : 
+                upcomingTests.length === 0 ? (
+                  <div className="py-20 text-center flex flex-col items-center">
+                     <ShieldCheck className="w-16 h-16 text-slate-100 mb-4" />
+                     <p className="text-sm font-bold text-slate-300 italic uppercase">All targets currently neutralized.</p>
                   </div>
-               ) : testResults.length === 0 ? (
-                  <div className="py-40 flex flex-col items-center justify-center text-center bg-white border border-slate-100 rounded-[4rem] px-12">
-                     <div className="w-24 h-24 bg-slate-50 border-2 border-slate-100 rounded-[2.5rem] flex items-center justify-center mb-8 shadow-inner">
-                        <GraduationCap className="text-slate-100 w-12 h-12" />
+                ) :
+                upcomingTests.map((t, i) => (
+                  <div key={i} className="flex items-center justify-between p-6 bg-slate-50/40 rounded-[2.5rem] border border-slate-50 hover:bg-white hover:shadow-2xl hover:scale-[1.02] transition-all cursor-pointer group">
+                     <div className="flex items-center gap-6">
+                        <div className="w-14 h-14 rounded-3xl bg-white shadow-sm flex items-center justify-center group-hover:bg-[#1e3a8a] group-hover:text-white transition-all transform group-hover:rotate-6">
+                           {getSubjectIcon(t.testName || t.subject)}
+                        </div>
+                        <div>
+                           <p className="text-lg font-black text-slate-800 tracking-tight leading-none mb-1">{t.testName}</p>
+                           <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{formatDate(t.date)}</span>
+                              <div className="w-1 h-1 rounded-full bg-slate-200" />
+                              <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">{t.subject || "General"}</span>
+                           </div>
+                        </div>
                      </div>
-                     <h4 className="text-2xl font-black text-slate-900 tracking-tighter mb-4">Clean Academic Slate</h4>
-                     <p className="text-sm font-bold text-slate-400 max-w-sm uppercase tracking-widest leading-relaxed">The roster will populate automatically after subdivision milestones are reached.</p>
+                     <div className="bg-white px-4 py-2 rounded-2xl shadow-sm border border-slate-50 text-[10px] font-black text-[#1e3a8a] uppercase tracking-widest">
+                        T-{getDayDiff(t.date)} Days
+                     </div>
                   </div>
-               ) : (
-                  <div className="grid grid-cols-1 gap-6">
-                  {testResults.map((test) => (
-                    <div key={test.id} className="bg-white rounded-[3.5rem] border border-slate-100 p-10 flex flex-col md:flex-row md:items-center justify-between gap-10 hover:shadow-2xl hover:translate-y-[-4px] transition-all group">
-                       <div className="flex items-center gap-8">
-                          <div className="w-20 h-20 rounded-[2.2rem] bg-slate-50 border border-slate-100 flex items-center justify-center text-[#1e3a8a] shadow-inner group-hover:bg-[#1e3a8a] group-hover:text-white transition-all">
-                             <CheckCircle size={32} />
+                ))
+               }
+            </div>
+         </div>
+
+         {/* ── RECENT RESULTS LIST ── */}
+         <div className="bg-white rounded-[4rem] p-10 border border-slate-100 shadow-sm flex flex-col">
+            <div className="flex items-center justify-between mb-10">
+               <h3 className="text-2xl font-black text-slate-800 tracking-tight italic">Scholastic Records</h3>
+               <div className="w-10 h-10 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-100"><BarChart3 size={18} /></div>
+            </div>
+            <div className="space-y-4 flex-1">
+               {loading ? <div className="py-20 flex justify-center"><Loader2 className="w-10 h-10 animate-spin text-indigo-500" /></div> :
+                recentResults.length === 0 ? (
+                  <div className="py-20 text-center flex flex-col items-center">
+                     <Target className="w-16 h-16 text-slate-100 mb-4" />
+                     <p className="text-sm font-bold text-slate-300 italic uppercase">Awaiting graded assessments.</p>
+                  </div>
+                ) :
+                recentResults.map((r, i) => {
+                  const pct = r.percentage || (r.score / r.maxScore * 100);
+                  const isHigh = pct >= 80;
+                  return (
+                    <div key={i} className="flex items-center justify-between p-6 bg-slate-50/40 rounded-[2.5rem] border border-slate-50 hover:bg-white hover:shadow-2xl hover:scale-[1.02] transition-all group">
+                       <div className="flex items-center gap-6">
+                          <div className={`w-14 h-14 rounded-3xl bg-white shadow-sm flex items-center justify-center transition-all transform group-hover:-rotate-6 ${isHigh ? 'text-emerald-500' : 'text-amber-500'}`}>
+                             {getSubjectIcon(r.testName || r.subject)}
                           </div>
                           <div>
-                             <h4 className="text-2xl font-black text-slate-900 tracking-tighter mb-2 italic uppercase">{test.testName}</h4>
-                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2 italic">
-                                {test.timestamp?.toDate().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) || "Recent Sync"} <div className="w-1 h-1 rounded-full bg-slate-300" /> Grade {test.grade || 'N/A'}
+                             <p className="text-lg font-black text-slate-800 tracking-tight leading-none mb-1">{r.testName}</p>
+                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                Grade Decided • {formatDate(r.timestamp)}
                              </p>
                           </div>
                        </div>
-                       <div className="flex items-center gap-12 bg-slate-50/50 p-8 rounded-[2.5rem] border border-slate-50 group-hover:bg-white transition-all">
-                          <div className="text-right">
-                             <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1 leading-none">Scored</p>
-                             <p className="text-3xl font-black text-slate-900 tracking-tighter">{test.isAbsent ? "ABSENT" : `${test.score}/${test.maxScore}`}</p>
-                          </div>
-                          {!test.isAbsent && (
-                             <div className="h-16 w-px bg-slate-100" />
-                          )}
-                          {!test.isAbsent && (
-                             <div className="text-center">
-                                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1 leading-none">Index</p>
-                                <p className="text-3xl font-black text-emerald-500 tracking-tighter">{test.percentage?.toFixed(0)}%</p>
-                             </div>
-                          )}
+                       <div className="text-right">
+                          <p className={`text-2xl font-black italic tracking-tighter leading-none ${isHigh ? 'text-emerald-500' : 'text-slate-800'}`}>
+                             {r.score}/{r.maxScore}
+                          </p>
+                          <p className={`text-[9px] font-black uppercase tracking-widest mt-1 ${isHigh ? 'text-emerald-500/60' : 'text-slate-400'}`}>
+                             {Math.round(pct)}% Mastery
+                          </p>
                        </div>
                     </div>
-                  ))}
-                  </div>
-               )}
+                  );
+                })
+               }
             </div>
          </div>
+      </div>
 
-         {/* RIGHT SIDE: MASTERY RADAR & AI PROMPTS */}
-         <div className="lg:col-span-4 flex flex-col gap-12 text-left">
-            <div className="bg-white border border-slate-100 rounded-[4.5rem] p-12 shadow-sm relative overflow-hidden group flex flex-col min-h-[500px]">
-               <div className="absolute -top-10 -right-10 w-48 h-48 bg-indigo-50 rounded-full blur-3xl opacity-50" />
-               <div className="flex items-center gap-4 mb-12 relative z-10">
-                  <div className="w-12 h-12 rounded-[1.5rem] bg-indigo-50 flex items-center justify-center text-[#1e3a8a] shadow-inner">
-                     <BrainCircuit size={24} />
-                  </div>
-                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none">Topic Mastery Radar</h3>
-               </div>
-
-               <div className="space-y-10 flex-1 relative z-10">
-                  {testResults.length === 0 ? (
-                     <div className="h-full flex flex-col items-center justify-center text-center opacity-30 py-20 px-8">
-                        <Info className="w-16 h-16 mb-8" />
-                        <p className="text-[11px] font-black uppercase tracking-[0.3em] leading-relaxed">Neural processing remains dormant until subdivision roster data is available.</p>
-                     </div>
-                  ) : (
-                     testResults.slice(0, 4).map((t, idx) => (
-                        <div key={idx} className="space-y-4">
-                           <div className="flex items-center justify-between">
-                              <p className="text-[11px] font-black text-slate-800 uppercase tracking-tighter truncate mr-4 italic">{t.testName}</p>
-                              <span className="text-lg font-black text-[#1e3a8a] tracking-tighter">{t.percentage?.toFixed(0)}%</span>
-                           </div>
-                           <div className="w-full h-3 bg-slate-50 border border-slate-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-gradient-to-r from-indigo-500 to-[#1e3a8a] transition-all duration-1000 shadow-[0_0_10px_rgba(30,58,138,0.2)]" style={{ width: `${t.percentage || 0}%` }} />
-                           </div>
-                        </div>
-                     ))
-                  )}
-               </div>
-
-               <button className="h-20 w-full mt-12 bg-[#1e3a8a] text-white rounded-[2.5rem] text-[11px] font-black uppercase tracking-[0.3em] shadow-2xl shadow-blue-900/40 hover:scale-[1.02] transition-all relative z-10 group/btn">
-                  Generate Full Analytics <ArrowUpRight className="inline-block ml-2 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" size={16} />
-               </button>
+      {/* ── PERFORMANCE SUMMARY GRID ── */}
+      <div className="bg-slate-950 rounded-[4.5rem] p-12 text-white relative overflow-hidden shadow-2xl">
+         <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,rgba(30,58,138,0.2),transparent)] pointer-events-none" />
+         <div className="flex flex-col md:flex-row items-center justify-between mb-12 relative z-10 gap-6">
+            <div>
+               <h3 className="text-3xl font-black tracking-tighter italic mb-2">Term Aggregate Metrics</h3>
+               <p className="text-slate-500 text-xs font-bold uppercase tracking-[0.2em]">Analyzing cognitive distribution across {stats.totalTaken} graded units</p>
             </div>
-
-            <div className="bg-slate-900 rounded-[4.5rem] p-12 text-white shadow-2xl relative overflow-hidden group">
-               <div className="absolute -bottom-10 -right-10 w-48 h-48 bg-white/5 rounded-full blur-3xl group-hover:scale-150 transition-all duration-1000" />
-               <div className="flex items-center gap-4 mb-10 relative z-10">
-                  <Sparkles className="w-6 h-6 text-amber-400 animate-pulse" />
-                  <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400">Preparation Engine</h3>
-               </div>
-               <h3 className="text-3xl font-black leading-[1.1] tracking-tighter mb-8 italic relative z-10">Neural study loops can be generated for upcoming assessments.</h3>
-               <button className="w-full h-16 bg-white/10 hover:bg-white text-white hover:text-slate-900 border border-white/20 rounded-[1.8rem] text-[11px] font-black uppercase tracking-[0.3em] transition-all flex items-center justify-center gap-4 relative z-10 group/zap">
-                  <Zap size={20} className="text-amber-400 group-hover:text-amber-500 transition-colors" /> Start Revision Cycle
-               </button>
+            <div className="bg-white/5 border border-white/10 px-8 py-4 rounded-3xl flex items-center gap-4">
+               <TrendingUp className="text-emerald-500 w-5 h-5" />
+               <span className="text-sm font-black uppercase tracking-widest">Steady Growth Detected</span>
             </div>
          </div>
-
+         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 relative z-10">
+            {[
+               { val: stats.aGrade, label: 'Elite (A)', color: 'text-emerald-400', bg: 'bg-emerald-400/10', border: 'border-emerald-400/20' },
+               { val: stats.bGrade, label: 'Advancing (B)', color: 'text-blue-400', bg: 'bg-blue-400/10', border: 'border-blue-400/20' },
+               { val: stats.cGrade, label: 'Competent (C)', color: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-400/20' },
+               { val: stats.belowC, label: 'Requires Support', color: 'text-rose-400', bg: 'bg-rose-400/10', border: 'border-rose-400/20' },
+            ].map((g, i) => (
+              <div key={i} className={`p-10 rounded-[3rem] ${g.bg} text-center flex flex-col items-center justify-center border ${g.border} group transition-all hover:bg-white/5 cursor-default`}>
+                 <p className={`text-6xl font-black ${g.color} mb-4 italic tracking-tighter group-hover:scale-110 transition-transform`}>{g.val}</p>
+                 <p className="text-[11px] font-black text-white/50 uppercase tracking-[0.2em]">{g.label}</p>
+              </div>
+            ))}
+         </div>
       </div>
     </div>
   );

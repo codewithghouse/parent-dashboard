@@ -21,13 +21,17 @@ const ReportsPage = () => {
     // Fetch reports specifically for this student or their grade
     const q = query(
       collection(db, "reports"),
-      where("studentId", "in", [studentData.id, "all"]),
-      orderBy("createdAt", "desc")
+      where("studentId", "in", [studentData.id, "all"])
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setReports(data.filter(r => r.grade === studentData.grade || r.studentId === studentData.id || r.studentId === "all"));
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+      // Client-side filtering and sorting to bypass index requirement
+      const filtered = data
+        .filter(r => r.grade === studentData.grade || r.studentId === studentData.id || r.studentId === "all")
+        .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+
+      setReports(filtered);
       setLoading(false);
     }, (error) => {
       console.error("Reports Sync Error:", error);
@@ -109,7 +113,7 @@ const ReportsPage = () => {
 
                          <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 mb-8 flex-grow">
                             <p className="text-xs font-bold text-slate-600 leading-relaxed italic">
-                               "Institutional assessment data compiled by the academic department. This document contains verified academic standing and behavioral metrics."
+                               "{r.data?.ai_remark || r.data?.aiRemarks || "Institutional assessment data compiled by the academic department. This document contains verified academic standing and behavioral metrics."}"
                             </p>
                          </div>
 

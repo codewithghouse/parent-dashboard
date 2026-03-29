@@ -2,13 +2,14 @@ import { useLocation, Link } from "react-router-dom";
 import { useAuth } from "../../lib/AuthContext";
 import {
   Home, User, TrendingUp, CalendarCheck, ClipboardList,
-  FileText, Brain, SmilePlus, StickyNote, MessageSquare,
+  FileText, Brain, SmilePlus, StickyNote,
   Bell, Settings, GraduationCap, LogOut
 } from "lucide-react";
 
 const navItems = [
   { title: "Dashboard", path: "/", icon: Home },
   { title: "My Child", path: "/my-child", icon: User },
+  { title: "Classes", path: "/classes", icon: GraduationCap },
   { title: "Performance", path: "/performance", icon: TrendingUp },
   { title: "Attendance", path: "/attendance", icon: CalendarCheck },
   { title: "Assignments", path: "/assignments", icon: ClipboardList },
@@ -17,7 +18,6 @@ const navItems = [
   { title: "Behaviour", path: "/behaviour", icon: SmilePlus },
   { title: "Teacher Notes", path: "/teacher-notes", icon: StickyNote },
   { title: "Reports", path: "/reports", icon: FileText },
-  { title: "Messages", path: "/messages", icon: MessageSquare, badge: 2 },
   { title: "Alerts", path: "/alerts", icon: Bell, badge: 3 },
   { title: "Settings", path: "/settings", icon: Settings },
 ];
@@ -75,7 +75,9 @@ export const ParentSidebar = () => {
           </div>
           <div className="overflow-hidden">
             <p className="text-sm font-bold text-primary-foreground truncate">{studentData?.name || user?.displayName || "Parent"}</p>
-            <p className="text-[10px] font-medium text-primary-foreground/60 uppercase tracking-wider truncate">Roll No: {studentData?.rollNo || "N/A"}</p>
+            <p className="text-[10px] font-medium text-primary-foreground/60 uppercase tracking-wider truncate">
+              {studentData?.className || "General"} | ID: {studentData?.rollNo || studentData?.id?.slice(-5) || "PENDING"}
+            </p>
           </div>
         </div>
         <button 

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { 
   CheckCircle, AlertCircle, Calendar, Star, ArrowUp, Clock, CheckSquare, 
-  Sparkles, BrainCircuit, Rocket, Zap, MessageSquare, Loader2, Info, Layout, TrendingUp,
+  Sparkles, BrainCircuit, Rocket, Zap, Loader2, Info, Layout, TrendingUp,
   User, ShieldCheck, Activity, Bell, GraduationCap, ChevronRight, MoreVertical
 } from "lucide-react";
 import { ParentAIController } from "../ai/controller/ai-controller";
@@ -49,12 +49,10 @@ const DashboardPage = () => {
         setLiveStats(prev => ({ ...prev, attendance: total === 0 ? "100%" : `${Math.round((pCount/total)*100)}%` }));
     });
 
-    // 2. Pending Tasks (Assignments & Submissions comparison)
+    // 2. Pending Tasks & Tests
     const qEnroll = query(collection(db, "enrollments"), where("studentId", "==", studentData.id));
     const unsubTasks = onSnapshot(qEnroll, async (enrollSnap) => {
         const classIds = enrollSnap.docs.map(d => d.data().classId).filter(id => !!id);
-        
-        // Update Teacher & Student Meta while we are here
         if (enrollSnap.docs.length > 0) {
             const first = enrollSnap.docs[0].data();
             setTeacherInfo({ name: first.teacherName || "Institutional Faculty", id: first.teacherId || "" });
@@ -63,106 +61,49 @@ const DashboardPage = () => {
               rollNo: first.rollNo || studentData?.rollNo || "000" 
             });
         }
-
         if (classIds.length > 0) {
-            // Pending Assignments
             const qAssign = query(collection(db, "assignments"), where("classId", "in", classIds));
             const aSnap = await getDocs(qAssign);
-            const assignments = aSnap.docs.map(d => d.id);
-            
             const qSubs = query(collection(db, "submissions"), where("studentId", "==", studentData.id));
             const sSnap = await getDocs(qSubs);
             const submittedIds = new Set(sSnap.docs.map(d => d.data().assignmentId));
+            const pending = aSnap.docs.filter(d => !submittedIds.has(d.id)).length;
             
-            const pending = assignments.filter(id => !submittedIds.has(id)).length;
-            setLiveStats(prev => ({ ...prev, pending }));
-
-            // Upcoming Tests (Next 7 days)
-            const today = new Date().toISOString().split('T')[0];
-            const nextWeek = new Date();
-            nextWeek.setDate(nextWeek.getDate() + 7);
-            const nextWeekStr = nextWeek.toISOString().split('T')[0];
-
-            const qTests = query(
-              collection(db, "tests_registry"), 
-              where("classId", "in", classIds),
-              where("date", ">=", today),
-              where("date", "<=", nextWeekStr)
-            );
+            const qTests = query(collection(db, "tests"), where("classId", "in", classIds));
             const tSnap = await getDocs(qTests);
-            setLiveStats(prev => ({ ...prev, tests: tSnap.docs.length }));
+            const today = new Date().toISOString().split('T')[0];
+            const nextWeek = new Date(); nextWeek.setDate(nextWeek.getDate() + 7);
+            const nextWeekStr = nextWeek.toISOString().split('T')[0];
+            const tests = tSnap.docs.filter(d => d.data().date >= today && d.data().date <= nextWeekStr).length;
+            
+            setLiveStats(prev => ({ ...prev, pending, tests }));
         }
     });
 
-    // 3. Performance Aggregation
-    const qRes = query(collection(db, "results"), where("studentId", "==", studentData.id), orderBy("timestamp", "desc"));
+    // 3. Performance
+    const qRes = query(collection(db, "results"), where("studentId", "==", studentData.id));
     const unsubRes = onSnapshot(qRes, (snap) => {
-        const results = snap.docs.map(d => d.data());
+        const results = snap.docs.map(d => ({ id: d.id, ...d.data() as any }))
+            .sort((a,b) => (b.timestamp?.toDate() || 0) - (a.timestamp?.toDate() || 0));
+        
         if (results.length > 0) {
            const avg = results.reduce((acc, curr) => acc + (parseFloat(curr.score) || 0), 0) / results.length;
            const latest = results[0];
-           
            const getGrade = (s: number) => s >= 90 ? "A+" : s >= 80 ? "A" : s >= 70 ? "A-" : s >= 60 ? "B" : "C";
-           
-           setLiveStats(prev => ({ 
-             ...prev, 
-             avgScore: `${Math.round(avg)}%`,
-             recentGrade: getGrade(parseFloat(latest.score) || 0),
-             recentSubject: latest.className || latest.subject || "Mathematics"
-           }));
+           setLiveStats(prev => ({ ...prev, avgScore: `${Math.round(avg)}%`, recentGrade: getGrade(parseFloat(latest.score) || 0), recentSubject: latest.className || "Mathematics" }));
+           setRecentEvents(results.slice(0, 5).map(r => ({ id: r.id, type: 'result', title: `Performance Logged: ${r.assignmentTitle || 'Assessment'}`, value: `${r.score}%`, time: r.timestamp?.toDate() || new Date(), color: 'text-emerald-500' })));
         }
-        
-        // Populate Recent Events Log
-        const events = snap.docs.map(d => ({
-           id: d.id,
-           type: 'result',
-           title: `Performance Logged: ${d.data().assignmentTitle || 'Assessment'}`,
-           value: `${d.data().score}%`,
-           time: d.data()?.timestamp?.toDate() || new Date(),
-           color: 'text-emerald-500'
-        }));
-        setRecentEvents(events.slice(0, 5));
     });
 
-    // 4. Recent Alerts (Risks)
-    const qRisks = query(collection(db, "risks"), where("studentId", "==", studentData.id), orderBy("timestamp", "desc"), limit(2));
+    // 4. Risks/Alerts
+    const qRisks = query(collection(db, "risks"), where("studentId", "==", studentData.id));
     const unsubRisks = onSnapshot(qRisks, (snap) => {
-        let alerts = snap.docs.map(d => ({
-            id: d.id,
-            title: d.data().issue || "Standard Alert",
-            time: d.data().timestamp?.toDate() || new Date(),
-            type: d.data().severity === 'Critical' ? 'urgent' : 'normal'
-        }));
-
-        // ── Institutional Smart Diagnostics (Inject systemic alerts if triggers met) ──
-        const pAtt = parseInt(liveStats.attendance.replace('%', ''));
-        const pAvg = parseInt(liveStats.avgScore.replace('%', ''));
-
-        if (pAtt < 80 && !alerts.find(a => a.id === 'sys_att')) {
-           alerts = [{
-              id: 'sys_att',
-              title: `Critical Attendance Dropout: ${pAtt}%`,
-              time: new Date(),
-              type: 'urgent'
-           }, ...alerts];
-        } else if (pAvg < 60 && !alerts.find(a => a.id === 'sys_perf')) {
-           alerts = [{
-              id: 'sys_perf',
-              title: `Academic Mastery Deficit: ${pAvg}%`,
-              time: new Date(),
-              type: 'urgent'
-           }, ...alerts];
-        }
-
+        let alerts = snap.docs.map(d => ({ id: d.id, title: d.data().issue, time: d.data().timestamp?.toDate() || new Date(), type: d.data().severity === 'Critical' ? 'urgent' : 'normal' }))
+            .sort((a,b) => b.time - a.time);
         setRecentAlerts(alerts.slice(0, 2));
     });
 
-    return () => {
-      unsubAtt();
-      unsubTasks();
-      unsubRes();
-      unsubRisks();
-    };
+    return () => { unsubAtt(); unsubTasks(); unsubRes(); unsubRisks(); };
   }, [studentData?.id]);
 
   // ─── AI INSIGHTS ENGINE ───

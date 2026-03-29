@@ -39,16 +39,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const studentId = querySnapshot.docs[0].id;
             
             // Set up Real-Time Listener
-            const unsubStudent = onSnapshot(doc(db, "students", studentId), (docSnap) => {
+            const unsubStudent = onSnapshot(doc(db, "students", studentId), async (docSnap) => {
               if (docSnap.exists()) {
                 const data = docSnap.data();
                 
-                // Auto-activate if Invited
                 if (data.status === "Invited") {
                    updateDoc(doc(db, "students", studentId), { status: "Active" });
                 }
 
-                setStudentData({ id: studentId, ...data });
+                // Fetch Class Name
+                let className = "General";
+                if (data.classId) {
+                   const classSnap = await getDocs(query(collection(db, "classes"), where("__name__", "==", data.classId)));
+                   if (!classSnap.empty) className = classSnap.docs[0].data().name || "General";
+                }
+
+                setStudentData({ id: studentId, ...data, className });
                 setUser(currentUser);
                 setError(null);
                 setLoading(false);

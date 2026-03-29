@@ -12,10 +12,10 @@ import TestsPage from "./pages/TestsPage";
 import ConceptStrengthsPage from "./pages/ConceptStrengthsPage";
 import BehaviourPage from "./pages/BehaviourPage";
 import TeacherNotesPage from "./pages/TeacherNotesPage";
-import MessagesPage from "./pages/MessagesPage";
 import AlertsPage from "./pages/AlertsPage";
 import SettingsPage from "./pages/SettingsPage";
 import ReportsPage from "./pages/ReportsPage";
+import ClassesPage from "./pages/ClassesPage";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import { AuthProvider, useAuth } from "./lib/AuthContext";
@@ -50,6 +50,7 @@ const AppRoutes = () => {
       <Route element={<ParentLayout />}>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/my-child" element={<MyChildPage />} />
+        <Route path="/classes" element={<ClassesPage />} />
         <Route path="/performance" element={<PerformancePage />} />
         <Route path="/attendance" element={<AttendancePage />} />
         <Route path="/assignments" element={<AssignmentsPage />} />
@@ -58,7 +59,6 @@ const AppRoutes = () => {
         <Route path="/behaviour" element={<BehaviourPage />} />
         <Route path="/teacher-notes" element={<TeacherNotesPage />} />
         <Route path="/reports" element={<ReportsPage />} />
-        <Route path="/messages" element={<MessagesPage />} />
         <Route path="/alerts" element={<AlertsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>

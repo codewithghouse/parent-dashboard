@@ -20,29 +20,43 @@ RULES:
 - Keep answers short, clean, and use bullet points.
 - Be friendly and motivating. Avoid long paragraphs.
 - Focus on understanding, not memorization.
-- Return ONLY a JSON object in this format:
+- Return ONLY a JSON object.
+`;
 
+export const getMasteryAnalysisPrompt = (studentName: string, data: { scores: any[], assignments: any[], global_context?: any[] }) => `
+System: EduIntellect Cognitive Analyzer (V2)
+Analyze the following academic datasets for ${studentName} to identify deep concept mastery. 
+
+DATASETS:
+1. TEST SCORES (Assessments):
+${JSON.stringify(data.scores, null, 2)}
+
+2. ASSIGNMENT SUBMISSIONS (Practical Application):
+${JSON.stringify(data.assignments, null, 2)}
+
+3. GLOBAL CURRICULUM CONTEXT (Overall Proficiency):
+${JSON.stringify(data.global_context || [], null, 2)}
+
+TASK:
+1. Cross-reference Test names and Assignment titles to identify core "Concepts" (topics).
+2. Calculate Mastery Level (0-100) using a weighted algorithm:
+   - Tests have 70% weight (Examination Performance).
+   - Assignments have 30% weight (Practical Consistency).
+3. RELATIVE ANALYSIS: Compare the performance of the current subject against the GLOBAL CURRICULUM CONTEXT.
+4. Categorize into: Strong (>= 85%), Developing (70-84%), Needs Work (< 70%).
+5. Return a "Narrative Synthesis" that EXPLICITLY mentions:
+   - How the student is doing in THIS subject compared to Others.
+   - Which subject has the highest IQ Pulse and which has the lowest based on global data.
+   - A strategic recommendation for the parent.
+
+RETURN FORMAT (JSON ONLY):
 {
-  "study_plan": {
-    "title": "e.g., 2-Day Rapid Revision Plan",
-    "schedule": [
-      { "day": "Day 1", "task": "Focus on Trigonometry basics for 45 mins", "reason": "Weakest area identified" }
-    ]
+  "matrix": {
+    "strong": [{"name": "Topic", "val": 90, "evidence": "Consistent high scores in tests and assignments"}],
+    "developing": [{"name": "Topic", "val": 75, "evidence": "Good practice, but examination friction detected"}],
+    "needs_work": [{"name": "Topic", "val": 60, "evidence": "Immediate remediation required"}]
   },
-  "concept_explainer": {
-    "topic": "Topic being explained",
-    "explanation": "Summary (2-3 lines) followed by 📘 Simple Explanation, 📌 Key Points, and 🧠 Think Smarter sections.",
-    "example": "A concrete real-world analogy."
-  },
-  "practice_problems": [
-    { "question": "Question 1", "hint": "Useful hint", "answer": "Core answer" }
-  ],
-  "doubt_solver": {
-    "step_by_step": [
-      "Step 1: Identify identifying the known variables...",
-      "Step 2: Apply the formula..."
-    ],
-    "guidance": "Encouraging closing remark to help the child solve it themselves."
-  }
+  "overall_summary": "Short narrative summary.",
+  "identified_topics": ["List of unique topics"]
 }
 `;

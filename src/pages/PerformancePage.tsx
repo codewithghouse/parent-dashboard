@@ -82,15 +82,45 @@ const PerformancePage = () => {
             });
         }
 
-        const months = ["Jan", "Feb", "Mar", "Apr"];
-        const chartData = months.map((m, idx) => {
+        // Group by Month for Trend (Real Aggregation)
+        const monthsInOrder = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const scoresByMonth = new Map<string, Map<string, { total: number, count: number }>>();
+
+        scores.forEach(s => {
+            const date = s.timestamp?.toDate() || new Date();
+            const monthName = monthsInOrder[date.getMonth()];
+            const sub = s.subject || "General curriculum";
+
+            if (!scoresByMonth.has(monthName)) scoresByMonth.set(monthName, new Map());
+            const monthMap = scoresByMonth.get(monthName)!;
+
+            if (!monthMap.has(sub)) monthMap.set(sub, { total: 0, count: 0 });
+            const curr = monthMap.get(sub)!;
+            curr.total += (s.percentage || 0);
+            curr.count += 1;
+        });
+
+        // Determine which months to show (last 4 months that have data, or default last 4)
+        const currentMonthIdx = new Date().getMonth();
+        const displayMonths = monthsInOrder.slice(Math.max(0, currentMonthIdx - 3), currentMonthIdx + 1);
+
+        const chartData = displayMonths.map(m => {
             const entry: any = { month: m };
+            const monthMap = scoresByMonth.get(m);
             derivedSubjs.forEach(s => {
-                entry[s.name] = Math.max(40, s.progress - (15 - idx * 5)); 
+                const subData = monthMap?.get(s.name);
+                if (subData) {
+                    entry[s.name] = Math.round(subData.total / subData.count);
+                } else {
+                    // Search for most recent prior month value for continuity, or fallback
+                    entry[s.name] = null; // Graph will gap instead of liar
+                }
             });
             return entry;
         });
-        setTrendData(chartData);
+
+        // Clean up: if everything in a month is null, or if only 1 data point exists, handle UX
+        setTrendData(chartData.filter(d => Object.keys(d).length > 1));
     });
 
     // Fetch Formal Pedagogical Feedback (By ID or Email)

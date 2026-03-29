@@ -1,240 +1,335 @@
 import React, { useState, useEffect } from "react";
 import { 
-  TrendingUp, TrendingDown, Minus, Info, Calendar, 
-  Sparkles, BrainCircuit, ShieldAlert, Loader2, CheckCircle2,
-  AlertTriangle, MessageSquare, Heart, Activity, User, ArrowUp, Zap, Clock
+  Trophy, AlertTriangle, Star, StarHalf, Info, Clock, 
+  BookOpen, HandHeart, Lightbulb, Loader2
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useAuth } from "@/lib/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, limit, orderBy } from "firebase/firestore";
+import { collection, query, where, onSnapshot, limit } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 
-const BehaviourPage = () => {
+export default function BehaviourPage() {
   const { studentData } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [standing, setStanding] = useState<string>("Good Standing");
   const [teacherNotes, setTeacherNotes] = useState<any[]>([]);
-  const [stats, setStats] = useState({
-    attendanceRate: "0%",
-    avgScore: "0%",
-    standingColor: "text-emerald-500"
-  });
+  const [manualRating, setManualRating] = useState<number | null>(null);
 
   useEffect(() => {
     if (!studentData?.id) return;
-
-    // 1. Sync Standing from Enrollment
-    const qEnroll = query(collection(db, "enrollments"), where("studentId", "==", studentData.id));
+    
+    // 1. Fetch Manual Rating from Enrollment
+    const qEnroll = query(
+      collection(db, "enrollments"), 
+      where("studentId", "==", studentData.id)
+    );
     const unsubEnroll = onSnapshot(qEnroll, (snap) => {
-       if (!snap.empty) {
-          const data = snap.docs[0].data();
-          setStanding(data.manualStatus || "Good Standing");
-       }
+      if (!snap.empty) {
+        // We take the highest rating or just the first one if multiple
+        const ratings = snap.docs.map(d => d.data().manualBehaviourRating).filter(r => r !== undefined);
+        if (ratings.length > 0) {
+          setManualRating(Math.max(...ratings));
+        }
+      }
     });
 
-    // 2. Sync Recent Observations (Teacher Notes)
+    // 2. Fetch Notes
     const qNotes = query(
        collection(db, "parent_notes"), 
        where("studentId", "==", studentData.id),
-       orderBy("createdAt", "desc"),
-       limit(3)
+       limit(20) 
     );
     const unsubNotes = onSnapshot(qNotes, (snap) => {
-       setTeacherNotes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+       const notes = snap.docs.map(d => ({ id: d.id, ...d.data() as any }));
+       notes.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+       setTeacherNotes(notes);
        setLoading(false);
     });
 
-    // 3. Performance Stats
-    const qAtt = query(collection(db, "attendance"), where("studentId", "==", studentData.id));
-    const unsubAtt = onSnapshot(qAtt, (snap) => {
-       const records = snap.docs.map(d => d.data());
-       const presents = records.filter(r => r.status === 'present' || r.status === 'late').length;
-       setStats(prev => ({ ...prev, attendanceRate: records.length ? `${Math.round((presents/records.length)*100)}%` : "100%" }));
-    });
-
     return () => {
-       unsubEnroll();
-       unsubNotes();
-       unsubAtt();
+      unsubEnroll();
+      unsubNotes();
     };
   }, [studentData?.id]);
 
-  const getStandingStyles = (status: string) => {
-     switch(status) {
-        case "At Risk": return { color: "text-rose-500", bg: "bg-rose-50", icon: AlertTriangle, border: "border-rose-100" };
-        case "Needs Attention": return { color: "text-amber-500", bg: "bg-amber-50", icon: Info, border: "border-amber-100" };
-        default: return { color: "text-emerald-500", bg: "bg-emerald-50", icon: CheckCircle2, border: "border-emerald-100" };
-     }
+  // Determine positive vs improvement notes heuristics
+  const classifyNote = (note: any) => {
+    if (note.category) return note.category; // Trust structured category if exists
+    
+    const c = (note.content || "").toLowerCase();
+    if (c.includes("late") || c.includes("forgot") || c.includes("miss") || c.includes("issue") || c.includes("distract") || c.includes("warning") || c.includes("poor") || c.includes("failing") || c.includes("talkative")) {
+       return "improvement";
+    }
+    return "positive";
   };
 
-  const currentStyles = getStandingStyles(standing);
+  const positiveNotes = teacherNotes.filter(n => classifyNote(n) === "positive");
+  const improvementNotes = teacherNotes.filter(n => classifyNote(n) === "improvement");
+
+  const getIconForPositive = (index: number) => {
+    const icons = [Star, HandHeart, Lightbulb, Trophy];
+    return icons[index % icons.length];
+  };
+
+  const getIconForImprovement = (index: number) => {
+    const icons = [Clock, BookOpen, AlertTriangle];
+    return icons[index % icons.length];
+  };
+
+  const formatNoteDate = (note: any) => {
+     try {
+       if (note.createdAt && typeof note.createdAt.toDate === 'function') {
+         return note.createdAt.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+       } else if (note.createdAt?.toDate) {
+          return note.createdAt.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+       }
+     } catch (e) {}
+     return 'Recent';
+  };
+
+  const calculatedRating = teacherNotes.length === 0 ? 5.0 : 
+    Math.min(5.0, Math.max(1.0, 5.0 - (improvementNotes.length * 0.3) + (positiveNotes.length * 0.1)));
+
+  const rating = manualRating !== null ? manualRating.toFixed(1) : calculatedRating.toFixed(1);
+
+  // Generate dynamic chart data from joining date to now
+  const getTrendData = () => {
+    const months: any = {};
+    const now = new Date();
+    
+    // 1. Determine Start Date (Join Date)
+    let startDate = new Date(now.getFullYear(), now.getMonth() - 4, 1); // default 5 months
+    
+    const rawJoinDate = studentData?.enrolledAt || studentData?.createdAt;
+    if (rawJoinDate) {
+       const jDate = rawJoinDate.toDate ? rawJoinDate.toDate() : new Date(rawJoinDate);
+       startDate = new Date(jDate.getFullYear(), jDate.getMonth(), 1);
+    } else if (teacherNotes.length > 0) {
+       // Fallback to first note date
+       const firstNoteDate = teacherNotes.reduce((earliest, current) => {
+          const d = current.createdAt?.toDate ? current.createdAt.toDate() : new Date();
+          return d < earliest ? d : earliest;
+       }, new Date());
+       startDate = new Date(firstNoteDate.getFullYear(), firstNoteDate.getMonth(), 1);
+    }
+
+    // 2. Generate all months between start and now
+    let tempDate = new Date(startDate);
+    while (tempDate <= now) {
+       const mName = tempDate.toLocaleString('default', { month: 'short' });
+       const mYear = tempDate.getFullYear().toString().slice(-2);
+       const key = `${mName} ${mYear}`;
+       months[key] = { m: mName, key: key, pos: 0, improv: 0, count: 0, date: new Date(tempDate) };
+       tempDate.setMonth(tempDate.getMonth() + 1);
+    }
+
+    // 3. Populate Data
+    teacherNotes.forEach(n => {
+      const date = n.createdAt?.toDate ? n.createdAt.toDate() : new Date();
+      const mName = date.toLocaleString('default', { month: 'short' });
+      const mYear = date.getFullYear().toString().slice(-2);
+      const key = `${mName} ${mYear}`;
+      if (months[key]) {
+        if (classifyNote(n) === "positive") months[key].pos++;
+        else months[key].improv++;
+        months[key].count++;
+      }
+    });
+
+    return Object.values(months).map((data: any) => {
+       const isCurrentMonth = data.m === now.toLocaleString('default', { month: 'short' }) && 
+                             data.date?.getFullYear() === now.getFullYear();
+       
+       const calculatedScore = data.count === 0 ? 5.0 : 
+          Math.min(5.0, Math.max(1.0, 5.0 - (data.improv * 0.3) + (data.pos * 0.1)));
+
+       return {
+          m: data.m,
+          key: data.key,
+          score: isCurrentMonth && manualRating !== null ? manualRating : calculatedScore
+       };
+    });
+  };
+
+  const trendData = getTrendData();
+
+  const renderStars = (rate: number) => {
+    const stars = [];
+    const fullStars = Math.floor(rate);
+    const hasHalfStar = rate - fullStars >= 0.5;
+
+    for (let i = 0; i < fullStars; i++) {
+       stars.push(<Star key={`full-${i}`} className="w-8 h-8 text-amber-400 fill-amber-400" />);
+    }
+    if (hasHalfStar) {
+       stars.push(<StarHalf key="half" className="w-8 h-8 text-amber-400 fill-amber-400" />);
+    }
+    const emptyStars = 5 - stars.length;
+    for (let i = 0; i < emptyStars; i++) {
+       stars.push(<Star key={`empty-${i}`} className="w-8 h-8 text-slate-200" />);
+    }
+    return stars;
+  };
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-10 duration-1000 pb-24 text-left font-sans">
+    <div className="animate-in fade-in slide-in-from-bottom-5 duration-700 pb-24 text-left font-sans mx-auto px-4 lg:px-0 pt-8 max-w-6xl">
       
-      {/* ─── HEADER SECTION ─── */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-10 mb-20 px-4">
-        <div className="text-left w-full md:w-auto">
-           <div className="flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 rounded-[1.5rem] bg-[#1e3a8a] flex items-center justify-center text-white shadow-xl shadow-blue-200">
-                 <Heart size={26} />
-              </div>
-              <div>
-                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-1">Socio-Emotional Registry</p>
-                 <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse border-2 border-white shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
-                    <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Child Welfare Active</p>
-                 </div>
-              </div>
-           </div>
-           <h1 className="text-6xl font-black text-slate-900 tracking-tighter leading-none mb-4">Behaviour Audit</h1>
-           <p className="text-xl font-bold text-slate-400 italic">Faculty observations and engagement metrics for {studentData?.name}.</p>
+      {loading ? (
+        <div className="flex h-64 items-center justify-center">
+           <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
         </div>
-        
-        <div className={`px-10 h-20 grow md:grow-0 ${currentStyles.bg} border ${currentStyles.border} rounded-[2.5rem] flex items-center justify-center gap-5 shadow-sm`}>
-           <currentStyles.icon className={`w-8 h-8 ${currentStyles.color}`} />
-           <div className="text-left">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Current Standing</p>
-              <p className={`text-xl font-black uppercase tracking-tight ${currentStyles.color}`}>{standing}</p>
-           </div>
-        </div>
-      </div>
+      ) : (
+        <>
+          {/* HEADER SECTION */}
+          <div className="mb-6">
+             <h1 className="text-xl font-bold text-slate-800 uppercase tracking-widest leading-none">BEHAVIOUR & DISCIPLINE</h1>
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 px-2">
-         
-         {/* LEFT: AI ANALYSIS & TRENDS */}
-         <div className="lg:col-span-8 space-y-12">
-            <div className="bg-white border border-slate-100 rounded-[4.5rem] p-12 shadow-sm relative overflow-hidden group hover:shadow-2xl transition-all">
-               <div className="absolute top-0 right-0 p-12 opacity-5 scale-150 group-hover:rotate-12 transition-transform duration-1000">
-                  <BrainCircuit className="w-48 h-48 text-[#1e3a8a]" />
+          <div className="space-y-6">
+            
+            {/* OVERALL BEHAVIOR RATING */}
+            <div className="bg-white border border-slate-100 rounded-[1rem] p-8 shadow-[0px_2px_15px_rgba(0,0,0,0.02)] flex flex-col md:flex-row justify-between items-center gap-6">
+               <div>
+                  <h2 className="text-[19px] font-black text-slate-800 tracking-tight">Overall Behavior Rating</h2>
+                  <p className="text-[13px] font-medium text-slate-400 mt-1">Based on teacher observations this term</p>
                </div>
                
-               <div className="relative z-10">
-                  <div className="flex items-center gap-4 mb-10">
-                     <div className="w-14 h-14 rounded-[2rem] bg-indigo-50 flex items-center justify-center text-[#1e3a8a] shadow-inner">
-                        <Sparkles size={28} />
-                     </div>
-                     <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none">AI Engagement Narrative</h3>
+               <div className="flex items-center gap-6 md:border-l md:border-slate-100 md:pl-8 h-full">
+                  <div className="text-right">
+                     <p className="text-5xl font-black text-emerald-500 tracking-tighter leading-none">{rating}</p>
+                     <p className="text-[10px] font-black uppercase text-slate-400 mt-1.5 tracking-widest text-center">OUT OF 5</p>
                   </div>
-
-                  {loading ? (
-                     <div className="h-40 flex items-center justify-center"><Loader2 className="animate-spin text-slate-200" size={40} /></div>
-                  ) : (
-                     <div className="space-y-8">
-                        <h2 className="text-4xl font-black text-slate-900 leading-[1.1] tracking-tighter italic">
-                           "{standing === "Good Standing" 
-                              ? `${studentData?.name} is exhibiting high institutional alignment. Engagement levels across subdivisions are within normalized baseline thresholds.`
-                              : `${studentData?.name}'s current engagement logs suggest potential academic friction. Direct intervention is advised to recalibrate scholastic trajectory.`}"
-                        </h2>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-8 border-t border-slate-50">
-                           <BehaviourStat label="Socio-Emotional Hub" value="Stable" trend="neutral" />
-                           <BehaviourStat label="Peer Collaboration" value="High" trend="up" />
-                           <BehaviourStat label="Attendance Sync" value={stats.attendanceRate} trend="up" />
-                        </div>
-                     </div>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                     {renderStars(parseFloat(rating))}
+                  </div>
                </div>
             </div>
 
-            {/* TRAJECTORY CHART (SIMULATED FOR PREMIUM LOOK) */}
-            <div className="bg-white border border-slate-100 rounded-[4rem] p-12 shadow-sm">
-               <div className="flex items-center justify-between mb-12">
-                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none">Conduct Trajectory • Q1 Audit</h3>
-                  <div className="flex gap-6">
-                     <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-indigo-500" /><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Growth</span></div>
-                     <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-emerald-500" /><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Attendance</span></div>
+            {/* 2 COLUMNS: POSITIVE HIGHLIGHTS & AREAS FOR IMPROVEMENT */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+               
+               {/* POSITIVE HIGHLIGHTS */}
+               <div className="bg-white border border-slate-100 rounded-[1rem] p-8 shadow-[0px_2px_15px_rgba(0,0,0,0.02)] flex flex-col">
+                  <div className="flex items-center gap-3 mb-6">
+                     <Trophy className="w-6 h-6 text-emerald-500 fill-emerald-100" />
+                     <h2 className="text-lg font-black text-slate-800 tracking-tight">Positive Highlights</h2>
+                  </div>
+                  
+                  <div className="space-y-4 flex-1">
+                     {positiveNotes.length === 0 ? (
+                        <p className="text-[14px] font-medium text-[#94a3b8] italic">No positive highlights recorded yet.</p>
+                     ) : (
+                        positiveNotes.map((note, idx) => {
+                           const Icon = getIconForPositive(idx);
+                           return (
+                             <div key={note.id || idx} className="bg-white border border-emerald-200 rounded-lg p-5 flex gap-5 transition-all hover:bg-emerald-50/50 shadow-sm">
+                                <Icon className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5 fill-emerald-100" />
+                                <div>
+                                   <p className="text-[15px] font-semibold text-slate-700 leading-snug mb-2">{note.content}</p>
+                                   <div className="flex items-center gap-2 text-[12px] font-medium text-slate-400">
+                                      <span>{formatNoteDate(note)}</span>
+                                      {note.teacherName && (
+                                        <>
+                                          <span className="w-1 h-1 rounded-full bg-slate-300" />
+                                          <span>{typeof note.teacherName === 'string' ? note.teacherName : 'Teacher'}</span>
+                                        </>
+                                      )}
+                                   </div>
+                                </div>
+                             </div>
+                           )
+                        })
+                     )}
                   </div>
                </div>
-               <div className="h-[350px] w-full">
+
+               {/* AREAS FOR IMPROVEMENT */}
+               <div className="bg-white border border-slate-100 rounded-[1rem] p-8 shadow-[0px_2px_15px_rgba(0,0,0,0.02)] flex flex-col">
+                  <div className="flex items-center gap-3 mb-6">
+                     <AlertTriangle className="w-6 h-6 text-amber-500" />
+                     <h2 className="text-lg font-black text-slate-800 tracking-tight">Areas for Improvement</h2>
+                  </div>
+                  
+                  <div className="space-y-4 flex-1">
+                     {improvementNotes.length === 0 ? (
+                        <p className="text-[14px] font-medium text-[#94a3b8] italic">No areas for improvement recorded! Great job.</p>
+                     ) : (
+                        improvementNotes.map((note, idx) => {
+                           const Icon = getIconForImprovement(idx);
+                           return (
+                             <div key={note.id || idx} className="bg-amber-50/30 border border-amber-200 rounded-lg p-5 flex gap-5 transition-all hover:bg-amber-50/70 shadow-sm">
+                                <Icon className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                                <div>
+                                   <p className="text-[15px] font-semibold text-slate-700 leading-snug mb-2">{note.content}</p>
+                                   <div className="flex items-center gap-2 text-[12px] font-medium text-slate-400">
+                                      <span>{formatNoteDate(note)}</span>
+                                      {note.teacherName && (
+                                        <>
+                                          <span className="w-1 h-1 rounded-full bg-slate-300" />
+                                          <span>{typeof note.teacherName === 'string' ? note.teacherName : 'Teacher'}</span>
+                                        </>
+                                      )}
+                                   </div>
+                                </div>
+                             </div>
+                           )
+                        })
+                     )}
+                  </div>
+               </div>
+            </div>
+
+            {/* BEHAVIOR TREND CHART */}
+            <div className="bg-white border border-slate-100 rounded-[1rem] p-8 shadow-[0px_2px_15px_rgba(0,0,0,0.02)]">
+               <h2 className="text-[17px] font-black text-slate-800 tracking-tight mb-8">Behavior Trend</h2>
+               <div className="h-[280px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                     <AreaChart data={[
-                        { m: "AUG", p: 70, a: 85 },
-                        { m: "SEP", p: 85, a: 92 },
-                        { m: "OCT", p: 82, a: 95 },
-                        { m: "NOV", p: 90, a: 98 },
-                        { m: "DEC", p: 95, a: 97 },
-                     ]}>
+                     <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                         <defs>
-                           <linearGradient id="colorP" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#1e3a8a" stopOpacity={0.1}/><stop offset="95%" stopColor="#1e3a8a" stopOpacity={0}/></linearGradient>
-                           <linearGradient id="colorA" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/></linearGradient>
+                           <linearGradient id="colorScore" x1="0" y1="0" x2="1" y2="1">
+                              <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4}/>
+                              <stop offset="50%" stopColor="#8b5cf6" stopOpacity={0.2}/>
+                              <stop offset="95%" stopColor="#10b981" stopOpacity={0.4}/>
+                           </linearGradient>
+                           <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                              <feGaussianBlur stdDeviation="3" result="blur" />
+                              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                           </filter>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <XAxis dataKey="m" axisLine={false} tickLine={false} fontSize={10} fontWeight="black" stroke="#94a3b8" dy={10} />
-                        <YAxis axisLine={false} tickLine={false} fontSize={10} fontWeight="black" stroke="#94a3b8" />
-                        <Tooltip contentStyle={{ borderRadius: '2rem', border: 'none', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.1)', fontWeight: 'black' }} />
-                        <Area type="monotone" dataKey="p" stroke="#1e3a8a" fillOpacity={1} fill="url(#colorP)" strokeWidth={4} />
-                        <Area type="monotone" dataKey="a" stroke="#10b981" fillOpacity={1} fill="url(#colorA)" strokeWidth={4} />
+                        <XAxis dataKey="m" axisLine={false} tickLine={false} tick={{ fontSize: 13, fontWeight: 800, fill: '#cbd5e1' }} dy={10} />
+                        <YAxis domain={[1, 5]} axisLine={false} tickLine={false} tick={{ fontSize: 13, fontWeight: 800, fill: '#cbd5e1' }} dx={-10} />
+                        <Tooltip 
+                           contentStyle={{ borderRadius: '2rem', border: 'none', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)', fontWeight: '900', textTransform: 'uppercase', fontStyle: 'italic', fontSize: '10px', background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(10px)' }} 
+                           labelStyle={{ color: '#6366f1', marginBottom: '4px' }}
+                        />
+                        <Area 
+                           type="monotone" 
+                           dataKey="score" 
+                           stroke="url(#lineGradient)" 
+                           fillOpacity={1} 
+                           fill="url(#colorScore)" 
+                           strokeWidth={5} 
+                           dot={{ r: 6, fill: '#6366f1', strokeWidth: 3, stroke: '#fff' }}
+                           activeDot={{ r: 8, strokeWidth: 0, fill: '#10b981' }}
+                           filter="url(#glow)"
+                        />
+                        <defs>
+                           <linearGradient id="lineGradient" x1="0" y1="0" x2="1" y2="0">
+                              <stop offset="0%" stopColor="#6366f1" />
+                              <stop offset="50%" stopColor="#8b5cf6" />
+                              <stop offset="100%" stopColor="#10b981" />
+                           </linearGradient>
+                        </defs>
                      </AreaChart>
                   </ResponsiveContainer>
                </div>
             </div>
-         </div>
 
-         {/* RIGHT: TEACHER OBSERVATIONS */}
-         <div className="lg:col-span-4 flex flex-col gap-10">
-            <div className="bg-slate-900 rounded-[4.5rem] p-12 text-white shadow-2xl flex flex-col flex-1 relative overflow-hidden group">
-               <div className="absolute -top-10 -right-10 w-48 h-48 bg-white/5 rounded-full blur-3xl group-hover:scale-150 transition-all duration-1000" />
-               <div className="flex items-center gap-5 mb-12 relative z-10">
-                  <div className="w-16 h-16 rounded-[2rem] bg-white/10 flex items-center justify-center text-white shadow-xl">
-                     <User size={30} />
-                  </div>
-                  <h3 className="text-sm font-black text-white uppercase tracking-[0.3em]">Faculty Observations</h3>
-               </div>
-
-               <div className="space-y-6 flex-1 relative z-10">
-                  {teacherNotes.length === 0 ? (
-                     <div className="h-full flex flex-col items-center justify-center text-center opacity-30 py-20 px-10">
-                        <Clock className="w-16 h-16 mb-8 animate-pulse" />
-                        <p className="text-[11px] font-black uppercase tracking-[0.3em] leading-relaxed">No qualitative observations logged in the current audit window.</p>
-                     </div>
-                  ) : (
-                     teacherNotes.map((note) => (
-                        <div key={note.id} className="p-8 bg-white/5 border border-white/10 rounded-[3rem] group/note hover:bg-white/10 transition-all">
-                           <div className="flex items-start gap-5 mb-4">
-                              <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0 font-black text-xs uppercase">
-                                 {note.teacherName?.[0] || 'F'}
-                              </div>
-                              <div className="flex-1 min-w-0 text-left">
-                                 <h4 className="text-sm font-black text-white uppercase tracking-tight truncate">{note.teacherName}</h4>
-                                 <p className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest">{note.subject}</p>
-                              </div>
-                           </div>
-                           <p className="text-sm font-bold text-slate-400 leading-relaxed mb-6 line-clamp-3 italic">"{note.content}"</p>
-                           <button onClick={() => navigate('/teacher-notes')} className="w-full py-4 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-slate-900 transition-all">
-                              Initiate Dialogue
-                           </button>
-                        </div>
-                     ))
-                  )}
-               </div>
-
-               <div className="mt-10 pt-10 border-t border-white/5 relative z-10">
-                  <div className="flex items-center gap-4 bg-emerald-500/10 p-6 rounded-[2.5rem] border border-emerald-500/20">
-                     <Activity className="w-6 h-6 text-emerald-400" />
-                     <p className="text-[10px] font-black text-emerald-100 uppercase tracking-widest leading-relaxed">System monitoring is live. Behavioral trends are recalculated every 24 hours.</p>
-                  </div>
-               </div>
-            </div>
-         </div>
-
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
-};
-
-const BehaviourStat = ({ label, value, trend }: any) => (
-  <div className="text-left group/stat">
-     <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-2 group-hover/stat:text-[#1e3a8a] transition-colors">{label}</p>
-     <div className="flex items-end gap-3">
-        <h4 className="text-3xl font-black text-slate-800 tracking-tighter">{value}</h4>
-        {trend === 'up' && <TrendingUp className="w-5 h-5 text-emerald-500 mb-1" />}
-        {trend === 'down' && <TrendingDown className="w-5 h-5 text-rose-500 mb-1" />}
-        {trend === 'neutral' && <Minus className="w-5 h-5 text-slate-400 mb-1" />}
-     </div>
-  </div>
-);
-
-export default BehaviourPage;
+}

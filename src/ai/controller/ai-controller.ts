@@ -2,7 +2,6 @@ import { generateParentDashboardInsights } from "../engines/dashboard-engine";
 import { generateParentPerformanceInsights } from "../engines/performance-engine";
 import { generateParentConceptInsights } from "../engines/concept-engine";
 import { generateAssignmentInsights } from "../engines/assignments-engine";
-import { generateMessageInsights } from "../engines/messages-engine";
 import { generateAlertInsights } from "../engines/alerts-engine";
 import { generateAttendanceInsights } from "../engines/attendance-engine";
 import { functions } from "../../lib/firebase";
@@ -63,10 +62,7 @@ const generateAssignmentFallback = () => ({
   submission_feedback: { remark: "Offline", improvement: "Check network." }
 });
 
-const generateMessageFallback = (content: string) => ({
-  translation: { from: "Auto", to: "Formal English", content: content || "Thank you for the update." },
-  reply_suggestions: ["Noted, thank you.", "I will look into it tonight."]
-});
+
 
 const generateAlertFallback = (title: string) => ({
   alert_story: `Regarding ${title}: This is a high-priority update.`,
@@ -109,6 +105,17 @@ export const ParentAIController = {
     }
   },
 
+  async getRealConceptMastery(studentName: string, data: { scores: any[], assignments: any[], global_context?: any[] }): Promise<any> {
+    const importConceptEngine = await import("../engines/concept-engine");
+    try {
+      const matrix = await importConceptEngine.analyzeConceptMastery(studentName, data);
+      return { status: "success", data: matrix };
+    } catch (e) {
+      console.error("Mastery Matrix AI failure", e);
+      return { status: "error", message: "AI Analysis currently unavailable." };
+    }
+  },
+
   async getConceptIntelligence(data: any): Promise<any> {
     if (!data) return { status: "no_data", message: NO_DATA_MSG };
     try {
@@ -134,14 +141,7 @@ export const ParentAIController = {
     }
   },
 
-  async getMessageIntelligence(data: any): Promise<any> {
-    try {
-      const insights = await generateMessageInsights(data);
-      return { status: "success", data: insights, source: "live" };
-    } catch {
-      return { status: "success", data: generateMessageFallback(data.content), source: "fallback" };
-    }
-  },
+
 
   async getAlertIntelligence(data: any): Promise<any> {
     const cacheKey = "alert_story_" + JSON.stringify(data);

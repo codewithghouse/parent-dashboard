@@ -151,11 +151,11 @@ const MyChildPage = () => {
                   <h1 className="text-5xl font-black text-slate-900 tracking-tighter uppercase italic">{studentData?.name}</h1>
                   <div className="flex justify-center items-center gap-2">
                      <span className="px-5 py-1.5 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-widest rounded-full border border-emerald-100">Active</span>
-                     <span className="px-5 py-1.5 bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-widest rounded-full border border-indigo-100">2025-26</span>
+                     <span className="px-5 py-1.5 bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-widest rounded-full border border-indigo-100">{teachers.length > 1 ? "Multi-Course" : "Regular"}</span>
                   </div>
                </div>
                <p className="text-xl font-bold text-slate-400 capitalize">
-                  Class {enrollmentInfo.className} • Roll Number {enrollmentInfo.rollNo || "N/A"}
+                  Primary Identity: <span className="text-[#1e3a8a]">{studentData?.className || enrollmentInfo.className}</span> • ID {studentData?.rollNo || studentData?.id?.slice(-6) || "N/A"}
                </p>
             </div>
          </div>
@@ -169,39 +169,46 @@ const MyChildPage = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-         <div className="lg:col-span-7 bg-white border border-slate-100 rounded-[3rem] p-10 shadow-sm overflow-hidden flex flex-col">
-            <h3 className="text-2xl font-black text-slate-800 mb-10 tracking-tight">Teachers</h3>
-            <div className="space-y-6 flex-1 max-h-[400px] overflow-y-auto no-scrollbar pr-2">
+         <div className="lg:col-span-12 bg-white border border-slate-100 rounded-[3rem] p-10 shadow-sm overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center mb-10 px-4">
+               <h3 className="text-2xl font-black text-slate-800 tracking-tight">Active Registrations & Faculty</h3>
+               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{teachers.length} Subject Streams</span>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                {teachers.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center py-20 opacity-30">
+                  <div className="col-span-full py-20 opacity-30 flex flex-col items-center">
                      <Users size={48} className="mb-4" />
                      <p className="text-[11px] font-black uppercase tracking-widest italic">Synchronizing Faculty List...</p>
                   </div>
                ) : (
                   teachers.map((t, idx) => (
-                     <div key={idx} className="p-6 bg-slate-50/50 border border-slate-100 rounded-3xl flex items-center justify-between group hover:bg-white hover:shadow-xl transition-all">
+                     <div key={idx} className="p-8 bg-slate-50/50 border border-slate-100 rounded-[2.5rem] flex flex-col gap-6 group hover:bg-white hover:shadow-xl transition-all relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-6 opacity-[0.05] group-hover:scale-110 transition-transform">
+                           <GraduationCap size={40} className="text-[#1e3a8a]" />
+                        </div>
                         <div className="flex items-center gap-6">
-                           <div className={`w-14 h-14 rounded-2xl ${teacherColors[idx % teacherColors.length]} flex items-center justify-center text-white text-xl font-black italic shadow-lg group-hover:rotate-6 transition-transform`}>{t.initials}</div>
+                           <div className={`w-16 h-16 rounded-2xl ${teacherColors[idx % teacherColors.length]} flex items-center justify-center text-white text-2xl font-black italic shadow-lg group-hover:rotate-6 transition-transform shrink-0`}>
+                              {t.initials}
+                           </div>
                            <div>
-                              <h4 className="text-lg font-black text-slate-800 tracking-tight uppercase leading-none mb-1">{t.name}</h4>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.subject}</p>
+                              <h4 className="text-xl font-black text-slate-800 tracking-tight uppercase leading-tight mb-1">{t.subject}</h4>
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.name}</p>
                            </div>
                         </div>
-                        <button className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 hover:bg-[#1e3a8a] hover:text-white transition-all shadow-sm">
-                           <MessageSquare size={18} />
-                        </button>
+                        
+                        <div className="flex items-center justify-between border-t border-slate-100 pt-6 mt-2">
+                           <div>
+                              <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Classroom / Group</p>
+                              <p className="text-sm font-black text-slate-700 italic">{t.className || "Standard Group"}</p>
+                           </div>
+                           <button className="w-12 h-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center text-[#1e3a8a] hover:bg-[#1e3a8a] hover:text-white transition-all shadow-sm">
+                              <MessageSquare size={18} />
+                           </button>
+                        </div>
                      </div>
                   ))
                )}
-            </div>
-         </div>
-         <div className="lg:col-span-5 bg-white border border-slate-100 rounded-[3rem] p-10 shadow-sm flex flex-col">
-            <h3 className="text-2xl font-black text-slate-800 mb-10 tracking-tight">This Term Overview</h3>
-            <div className="space-y-8 flex-1 flex flex-col justify-center">
-               <OverviewRow icon={Calendar} label="Attendance" value={overview.attendance} color="emerald" />
-               <OverviewRow icon={CheckCircle} label="Assignments" value={overview.assignments} color="indigo" />
-               <OverviewRow icon={FileText} label="Tests Taken" value={overview.testsTaken.toString()} color="amber" />
-               <OverviewRow icon={Star} label="Average Grade" value={overview.avgGrade} color="emerald" />
             </div>
          </div>
       </div>

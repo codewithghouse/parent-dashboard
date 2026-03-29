@@ -1,21 +1,23 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { 
-  Loader2, MessageSquare, Search, CheckCircle2, MoreVertical, X, Sparkles, Send, User, Trash2, Paperclip, Smile, Bot, ChevronLeft, Clock, Phone, Video, Check, CheckCheck, GraduationCap, Mic
+  MessageSquare, Search, CheckCircle2, MoreVertical, Send, User, Paperclip, Smile, ChevronLeft, Clock, Phone, Video, Check, CheckCheck, GraduationCap, Mic
 } from "lucide-react";
 import { db } from "../lib/firebase";
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, writeBatch } from "firebase/firestore";
 import { useAuth } from "../lib/AuthContext";
 import { toast } from "sonner";
 import { ParentAIController } from "../ai/controller/ai-controller";
+import { useLocation } from "react-router-dom";
 
 const ParentTeacherNotes = () => {
   const { studentData } = useAuth();
+  const location = useLocation();
   const [selectedTeacher, setSelectedTeacher] = useState<any>(null);
   const [allNotes, setAllNotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [messageContent, setMessageContent] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
+
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -50,6 +52,14 @@ const ParentTeacherNotes = () => {
     ).sort((a, b) => (b.lastMessage.createdAt?.toMillis?.() || 0) - (a.lastMessage.createdAt?.toMillis?.() || 0));
   }, [allNotes, searchQuery]);
 
+  // Deep Link Selection Effect
+  useEffect(() => {
+    if (location.state?.teacherId && teacherConversations.length > 0) {
+      const match = teacherConversations.find(t => t.teacherId === location.state.teacherId);
+      if (match) setSelectedTeacher(match);
+    }
+  }, [location.state, teacherConversations]);
+
   const chatMessages = useMemo(() => 
     selectedTeacher ? allNotes.filter(n => n.teacherId === selectedTeacher.teacherId) : []
   , [allNotes, selectedTeacher]);
@@ -74,16 +84,7 @@ const ParentTeacherNotes = () => {
     } catch (e) { toast.error("Sync failure."); setMessageContent(content); }
   };
 
-  const generateAI = async () => {
-    if (!selectedTeacher) return;
-    setIsGenerating(true);
-    try {
-      const result = await ParentAIController.getMessageIntelligence({ content: messageContent || "Inquiry about progress" });
-      if (result.status === "success" && result.data?.reply_suggestions) {
-         setMessageContent(result.data.reply_suggestions[0]);
-      }
-    } catch (e) { toast.error("AI Busy."); } finally { setIsGenerating(false); }
-  };
+
 
   const stats = useMemo(() => {
     const total = allNotes.length;
@@ -105,9 +106,9 @@ const ParentTeacherNotes = () => {
       <div className="flex justify-between items-center mb-6 px-4">
         <div>
           <h1 className="text-3xl font-black text-slate-800 tracking-tight leading-none mb-1 italic">Teacher Notes</h1>
-          <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest flex items-center gap-2">
+          <div className="text-[10px] uppercase font-bold text-slate-400 tracking-widest flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Secure Communication Hub
-          </p>
+          </div>
         </div>
         <div className="flex gap-4">
           {[
@@ -199,7 +200,7 @@ const ParentTeacherNotes = () => {
                     <button className="p-2 text-slate-500 hover:bg-slate-300 rounded-full"><Paperclip size={20}/></button>
                     <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-100 flex items-center pr-2">
                        <textarea rows={1} value={messageContent} onChange={(e)=>setMessageContent(e.target.value)} onKeyDown={(e)=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleSendMessage();}}} placeholder="Type a response to educator..." className="flex-1 bg-transparent border-none focus:ring-0 p-3 text-sm font-medium resize-none no-scrollbar" />
-                       <button onClick={generateAI} disabled={isGenerating} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg group transition-all">{isGenerating ? <Loader2 className="animate-spin" size={16}/> : <Sparkles className="group-hover:scale-110 transition-transform" size={18}/>}</button>
+
                     </div>
                     <button onClick={handleSendMessage} disabled={!messageContent.trim()} className={`w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-lg ${messageContent.trim() ? 'bg-[#00a884] text-white shadow-[#00a884]/20' : 'bg-slate-300 text-slate-500'}`}><Send size={20}/></button>
                  </div>
