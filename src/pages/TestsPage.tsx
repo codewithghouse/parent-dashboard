@@ -27,20 +27,18 @@ const TestsPage = () => {
   useEffect(() => {
     if (!studentData?.id) return;
     setLoading(true);
+    const studentEmail = studentData.email?.toLowerCase() || "";
 
-    // 1. Fetch Class Enrollments to get relevant tests
-    const qEnroll = query(collection(db, "enrollments"), where("studentId", "==", studentData.id));
-    const unsubEnroll = onSnapshot(qEnroll, (enrollSnap) => {
-        const classIds = enrollSnap.docs.map(d => d.data().classId).filter(id => !!id);
+    // 1. Dual-Lookup for Class Enrollments
+    let enrollSnap1: any = null;
+    let enrollSnap2: any = null;
+    const processEnrollments = () => {
+        const enrollDocs = [...(enrollSnap1?.docs || []), ...(enrollSnap2?.docs || [])];
+        const classIds = Array.from(new Set(enrollDocs.map(d => d.data().classId).filter(id => !!id))) as string[];
         const searchIds = classIds.length > 0 ? classIds : [studentData.classId || "General"];
 
         // 2. Fetch Tests for these classes
-        const qTests = query(
-          collection(db, "tests"),
-          where("classId", "in", searchIds.slice(0, 10)) // Firestore limit
-        );
-
-        const unsubTests = onSnapshot(qTests, (snap) => {
+        return onSnapshot(query(collection(db, "tests"), where("classId", "in", searchIds.slice(0, 10))), (snap) => {
             const now = new Date();
             const allTests = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
             const filtered = allTests
@@ -49,32 +47,34 @@ const TestsPage = () => {
                    return d && new Date(d) >= now;
                 })
                 .sort((a: any, b: any) => new Date(a.date || a.testDate).getTime() - new Date(b.date || b.testDate).getTime());
-            
             setUpcomingTests(filtered);
         });
+    };
 
-        return () => unsubTests();
+    let unsubTests: any = () => {};
+    const unsubEnroll1 = onSnapshot(query(collection(db, "enrollments"), where("studentId", "==", studentData.id)), (snap) => {
+        enrollSnap1 = snap; unsubTests(); unsubTests = processEnrollments();
     });
+    const unsubEnroll2 = studentEmail ? onSnapshot(query(collection(db, "enrollments"), where("studentEmail", "==", studentEmail)), (snap) => {
+        enrollSnap2 = snap; unsubTests(); unsubTests = processEnrollments();
+    }) : () => {};
 
-    // 3. Fetch Student Test Scores (Removed server-side orderBy to bypass indexing requirements)
-    const qScores = query(
-        collection(db, "test_scores"), 
-        where("studentId", "==", studentData.id),
-        limit(20)
-    );
-
-    const unsubScores = onSnapshot(qScores, (snap) => {
-        // Sort client-side to avoid "Query requires an index" error
-        const scores = snap.docs
-          .map(d => ({ id: d.id, ...(d.data() as any) }))
-          .sort((a, b) => {
+    // 3. Dual-Lookup for Test Scores
+    let scoreSnap1: any = null;
+    let scoreSnap2: any = null;
+    const processScores = () => {
+        const scoreDocs = [...(scoreSnap1?.docs || []), ...(scoreSnap2?.docs || [])];
+        const scoreMap = new Map();
+        scoreDocs.forEach(d => { if (!scoreMap.has(d.id)) scoreMap.set(d.id, { id: d.id, ...d.data() }); });
+        
+        const scores = Array.from(scoreMap.values())
+          .sort((a: any, b: any) => {
             const timeA = a.timestamp?.toMillis?.() || new Date(a.timestamp || 0).getTime();
             const timeB = b.timestamp?.toMillis?.() || new Date(b.timestamp || 0).getTime();
-            return timeB - timeA; // Latest first
+            return timeB - timeA;
           });
 
         setRecentResults(scores);
-
         let a=0, b=0, c=0, d=0;
         scores.forEach((s: any) => {
            const pct = s.percentage || (s.score / s.maxScore * 100);
@@ -85,13 +85,17 @@ const TestsPage = () => {
         });
         setStats({ aGrade: a, bGrade: b, cGrade: c, belowC: d, totalTaken: scores.length });
         setLoading(false);
-    }, (err) => {
-        console.error("Scores Sync Error:", err);
-        setLoading(false);
-    });
+    };
 
-    return () => { unsubEnroll(); unsubScores(); };
-  }, [studentData?.id, studentData?.classId]);
+    const unsubScore1 = onSnapshot(query(collection(db, "test_scores"), where("studentId", "==", studentData.id), limit(20)), (snap) => {
+        scoreSnap1 = snap; processScores();
+    });
+    const unsubScore2 = studentEmail ? onSnapshot(query(collection(db, "test_scores"), where("studentEmail", "==", studentEmail), limit(20)), (snap) => {
+        scoreSnap2 = snap; processScores();
+    }) : () => {};
+
+    return () => { unsubEnroll1(); unsubEnroll2(); unsubScore1(); unsubScore2(); unsubTests(); };
+  }, [studentData?.id]);
 
   const getSubjectIcon = (title: string = "") => {
      const t = title.toLowerCase();

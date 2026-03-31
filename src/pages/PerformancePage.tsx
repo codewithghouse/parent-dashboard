@@ -26,19 +26,26 @@ const PerformancePage = () => {
   });
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
 
-  // ─── DATA SYNCHRONIZATION ───
+    // ─── DATA SYNCHRONIZATION ───
   useEffect(() => {
     if (!studentData?.id) return;
     setLoading(true);
+    const studentEmail = studentData.email?.toLowerCase() || "";
 
     // Fetch Global Resource Library
     const unsubResources = onSnapshot(collection(db, "resources_library"), (snap) => {
         setResourceLibrary(snap.docs.map(d => ({id: d.id, ...d.data()})));
     });
 
-    const qScores = query(collection(db, "test_scores"), where("studentId", "==", studentData.id));
-    const unsubScores = onSnapshot(qScores, (snap) => {
-        const scores = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    // Dual-Lookup for Test Scores
+    let snap1Cache: any = null;
+    let snap2Cache: any = null;
+    const processScores = () => {
+        const scoreMap = new Map();
+        [...(snap1Cache?.docs || []), ...(snap2Cache?.docs || [])].forEach((d: any) => {
+          if (!scoreMap.has(d.id)) scoreMap.set(d.id, { id: d.id, ...d.data() });
+        });
+        const scores = Array.from(scoreMap.values());
         
         // Group by Subject
         const subMap = new Map();
@@ -100,7 +107,6 @@ const PerformancePage = () => {
             curr.count += 1;
         });
 
-        // Determine which months to show (last 4 months that have data, or default last 4)
         const currentMonthIdx = new Date().getMonth();
         const displayMonths = monthsInOrder.slice(Math.max(0, currentMonthIdx - 3), currentMonthIdx + 1);
 
@@ -112,37 +118,49 @@ const PerformancePage = () => {
                 if (subData) {
                     entry[s.name] = Math.round(subData.total / subData.count);
                 } else {
-                    // Search for most recent prior month value for continuity, or fallback
-                    entry[s.name] = null; // Graph will gap instead of liar
+                    entry[s.name] = null;
                 }
             });
             return entry;
         });
-
-        // Clean up: if everything in a month is null, or if only 1 data point exists, handle UX
         setTrendData(chartData.filter(d => Object.keys(d).length > 1));
-    });
+    };
 
-    // Fetch Formal Pedagogical Feedback (By ID or Email)
-    const qFeed = query(collection(db, "performance_feedback"), where("studentId", "==", studentData.id));
-    const unsubFeed = onSnapshot(qFeed, (snap) => {
-        let items = snap.docs.map(d => ({id: d.id, ...d.data()}));
-        
-        // Also fetch by email to cover ID differences
-        if (studentData.email) {
-            const qEmail = query(collection(db, "performance_feedback"), where("studentEmail", "==", studentData.email.toLowerCase()));
-            getDocs(qEmail).then(eSnap => {
-                const combined = [...items, ...eSnap.docs.map(d => ({id: d.id, ...d.data()}))];
-                const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
-                setFeedbacks(unique);
-            });
-        } else {
-            setFeedbacks(items);
-        }
+    const unsubScore1 = onSnapshot(query(collection(db, "test_scores"), where("studentId", "==", studentData.id)), (snap) => {
+        snap1Cache = snap; processScores();
     });
+    const unsubScore2 = studentEmail ? onSnapshot(query(collection(db, "test_scores"), where("studentEmail", "==", studentEmail)), (snap) => {
+        snap2Cache = snap; processScores();
+    }) : () => {};
+
+    // Dual-Lookup for Performance Feedback
+    const setupFeedback = async () => {
+        const q1 = query(collection(db, "performance_feedback"), where("studentId", "==", studentData.id));
+        const q2 = studentEmail ? query(collection(db, "performance_feedback"), where("studentEmail", "==", studentEmail)) : null;
+
+        const mergeFeedback = (docs: any[]) => {
+            const feedMap = new Map();
+            docs.forEach(d => { if (!feedMap.has(d.id)) feedMap.set(d.id, { id: d.id, ...d.data() }); });
+            setFeedbacks(Array.from(feedMap.values()));
+        };
+
+        const unsub1 = onSnapshot(q1, (snap) => {
+            if (studentEmail) {
+                getDocs(query(collection(db, "performance_feedback"), where("studentEmail", "==", studentEmail))).then(snap2 => {
+                    mergeFeedback([...snap.docs, ...snap2.docs]);
+                });
+            } else {
+                mergeFeedback(snap.docs);
+            }
+        });
+        return unsub1;
+    };
+
+    let unsubFeed: any = () => {};
+    setupFeedback().then(u => unsubFeed = u);
 
     setLoading(false);
-    return () => { unsubScores(); unsubFeed(); unsubResources(); };
+    return () => { unsubScore1(); unsubScore2(); unsubFeed(); unsubResources(); };
   }, [studentData?.id]);
 
   const getSubIcon = (name: string) => {
