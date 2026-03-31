@@ -39,39 +39,54 @@ const ConceptStrengthsPage = () => {
     if (!studentData?.id) return;
     setLoading(true);
     
-    // Sync Enrollments
-    const qEnroll = query(collection(db, "enrollments"), where("studentId", "==", studentData.id));
-    const unsubEnroll = onSnapshot(qEnroll, (snap) => {
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
-      // Filter out redundant 'General' labels if real classes exist
+    const studentEmail = studentData.email?.toLowerCase() || "";
+
+    // Merge enrollment snapshots from both queries
+    let snap1Cache: any = null;
+    let snap2Cache: any = null;
+    const mergeAndSetEnrollments = () => {
+      const enrollMap = new Map();
+      [...(snap1Cache?.docs || []), ...(snap2Cache?.docs || [])].forEach((d: any) => {
+        if (!enrollMap.has(d.id)) enrollMap.set(d.id, { id: d.id, ...d.data() });
+      });
+      const data = Array.from(enrollMap.values()) as any[];
       const filtered = data.filter((en: any) => (en.subject || en.className || "").toLowerCase() !== "general");
       const sorted = filtered.sort((a: any, b: any) => (a.subject || "").localeCompare(b.subject || ""));
       setEnrollments(sorted);
-      if (!activeSubject) {
-        setActiveSubject("Overview");
-      }
-    });
+      if (!activeSubject) setActiveSubject("Overview");
+    };
 
-    // Sync Test Scores
-    const qScores = query(collection(db, "test_scores"), where("studentId", "==", studentData.id));
-    const unsubScores = onSnapshot(qScores, (snap) => {
-      setAllScores(snap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
-    });
+    // DUAL LOOKUP: by studentId AND by studentEmail (teacher-added students use email as key)
+    const unsubById = onSnapshot(
+      query(collection(db, "enrollments"), where("studentId", "==", studentData.id)),
+      (snap) => { snap1Cache = snap; mergeAndSetEnrollments(); }
+    );
+    const unsubByEmail = studentEmail
+      ? onSnapshot(
+          query(collection(db, "enrollments"), where("studentEmail", "==", studentEmail)),
+          (snap) => { snap2Cache = snap; mergeAndSetEnrollments(); }
+        )
+      : () => {};
+
+    // Sync Test Scores — also by email fallback
+    const unsubScores = onSnapshot(
+      query(collection(db, "test_scores"), where("studentId", "==", studentData.id)),
+      (snap) => { setAllScores(snap.docs.map(d => ({ id: d.id, ...d.data() } as any))); }
+    );
 
     // Sync Attendance
-    const qAtt = query(collection(db, "attendance"), where("studentId", "==", studentData.id));
-    const unsubAtt = onSnapshot(qAtt, (snap) => {
-      setAttendance(snap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
-    });
+    const unsubAtt = onSnapshot(
+      query(collection(db, "attendance"), where("studentId", "==", studentData.id)),
+      (snap) => { setAttendance(snap.docs.map(d => ({ id: d.id, ...d.data() } as any))); }
+    );
 
     // Sync Assignments
-    const qAssign = query(collection(db, "assignments"));
-    const unsubAssign = onSnapshot(qAssign, (snap) => {
+    const unsubAssign = onSnapshot(collection(db, "assignments"), (snap) => {
        setAssignments(snap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
        setLoading(false);
     });
 
-    return () => { unsubEnroll(); unsubScores(); unsubAtt(); unsubAssign(); };
+    return () => { unsubById(); unsubByEmail(); unsubScores(); unsubAtt(); unsubAssign(); };
   }, [studentData?.id]);
 
   useEffect(() => {
