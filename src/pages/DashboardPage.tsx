@@ -211,6 +211,7 @@ const DashboardPage = () => {
                </div>
                <div className="flex-1 text-left">
                   <h2 className="text-4xl font-black text-slate-800 tracking-tighter mb-2 italic uppercase">{studentData?.name}</h2>
+                  <p className="text-xs font-black text-[#1e3a8a] uppercase tracking-[0.2em] mb-1">{studentData?.schoolName || "Institutional Academy"}</p>
                   <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-10">Class: {studentMeta.className} • Roll: {studentMeta.rollNo}</p>
                   
                   <div className="grid grid-cols-2 gap-10">
