@@ -29,19 +29,49 @@ const AssignmentsPage = () => {
     if (!studentData?.id) return;
     setLoading(true);
     let unsubAssignments: Unsubscribe | null = null;
-    const qEnroll = query(collection(db, "enrollments"), where("studentId", "==", studentData.id));
-    const unsubEnroll = onSnapshot(qEnroll, (enrollSnap) => {
+
+    const setupAssignmentListener = (classIds: string[]) => {
         if (unsubAssignments) unsubAssignments();
-        const classIds = enrollSnap.docs.map(d => d.data().classId).filter(id => !!id);
-        const enrolledGrades = enrollSnap.docs.map(d => d.data().className).filter(g => !!g);
-        const gradeSearch = enrolledGrades.length > 0 ? enrolledGrades : [studentData.grade || "8"];
+        if (classIds.length === 0) {
+            setAssignments([]);
+            setLoading(false);
+            return;
+        }
         const assignmentsRef = collection(db, "assignments");
-        let q = classIds.length > 0 ? query(assignmentsRef, where("classId", "in", classIds)) : query(assignmentsRef, where("grade", "in", gradeSearch));
+        const q = query(assignmentsRef, where("classId", "in", classIds));
         unsubAssignments = onSnapshot(q, (snap) => {
             setAssignments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             setLoading(false);
         });
-    });
+    };
+
+    // DUAL LOOKUP: Search by studentId AND studentEmail (handles both creation patterns)
+    const studentEmail = studentData.email?.toLowerCase() || "";
+    const fetchEnrollments = async () => {
+        const classIdSet = new Set<string>();
+        
+        // 1. By studentId (for enrollments created from principal dashboard)
+        const byId = await getDocs(query(collection(db, "enrollments"), where("studentId", "==", studentData.id)));
+        byId.docs.forEach(d => { if (d.data().classId) classIdSet.add(d.data().classId); });
+
+        // 2. By studentEmail (for enrollments created from teacher dashboard)
+        if (studentEmail) {
+            const byEmail = await getDocs(query(collection(db, "enrollments"), where("studentEmail", "==", studentEmail)));
+            byEmail.docs.forEach(d => { if (d.data().classId) classIdSet.add(d.data().classId); });
+        }
+
+        console.log("[ASSIGNMENTS] Found classIds from enrollments:", Array.from(classIdSet));
+        setupAssignmentListener(Array.from(classIdSet));
+    };
+
+    fetchEnrollments();
+    
+    // Also set up a live listener on enrollments by email for real-time updates
+    const unsubEnroll = studentEmail 
+        ? onSnapshot(query(collection(db, "enrollments"), where("studentEmail", "==", studentEmail)), () => {
+            fetchEnrollments(); // Re-fetch on enrollment changes
+          })
+        : () => {};
     const qSub = query(collection(db, "submissions"), where("studentId", "==", studentData.id));
     const unsubSub = onSnapshot(qSub, (snapshot) => {
         setSubmissions(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
