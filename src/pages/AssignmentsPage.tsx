@@ -59,7 +59,8 @@ const AssignmentsPage = () => {
         const url = await getDownloadURL(snap.ref);
 
         await addDoc(collection(db, "submissions"), {
-            assignmentId: selectedTask.id,
+            homeworkId: selectedTask.id, // Renamed from assignmentId to differentiate from teaching_assignment
+            assignmentId: selectedTask.assignmentId || "legacy", // Enforced Phase 1 spec: tracking the teaching_assignment
             studentId: studentData.id,
             studentName: studentData.name,
             fileUrl: url,
