@@ -111,7 +111,10 @@ const AssignmentsPage = () => {
     }
   };
 
-  const getSub = (aId: string) => submissions.find(s => s.assignmentId === aId);
+  const getSub = (aId: string) => submissions.find(s => 
+    s.homeworkId === aId ||    // Parent dashboard saves here
+    s.assignmentId === aId     // Fallback for older records
+  );
 
   const filteredAssignments = assignments.filter(a => {
     const sub = getSub(a.id);
