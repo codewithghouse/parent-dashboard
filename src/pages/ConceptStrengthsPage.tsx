@@ -68,17 +68,59 @@ const ConceptStrengthsPage = () => {
         )
       : () => {};
 
-    // Sync Test Scores — also by email fallback
-    const unsubScores = onSnapshot(
-      query(collection(db, "test_scores"), where("studentId", "==", studentData.id)),
-      (snap) => { setAllScores(snap.docs.map(d => ({ id: d.id, ...d.data() } as any))); }
-    );
+    // Sync Test Scores — by email fallback
+    let scoreSnap1: any = null;
+    let scoreSnap2: any = null;
+    let gbSnap1: any = null;
+    let gbSnap2: any = null;
+
+    const processScores = () => {
+        const combinedTests = [...(scoreSnap1?.docs || []), ...(scoreSnap2?.docs || [])].map(d => ({ id: d.id, ...d.data() as any }));
+        const combinedGB = [...(gbSnap1?.docs || []), ...(gbSnap2?.docs || [])].map(d => {
+           const data = d.data();
+           return {
+              id: d.id,
+              ...data,
+              testName: data.columnName || "Class Assessment",
+              score: data.mark,
+              maxScore: data.maxMarks || 100,
+              type: 'gradebook'
+           };
+        });
+        
+        const unique = Array.from(new Map([...combinedTests, ...combinedGB].map(d => [d.id, d])).values());
+        setAllScores(unique);
+    };
+
+    const unsubScores1 = onSnapshot(query(collection(db, "test_scores"), where("studentId", "==", studentData.id)), (snap) => {
+        scoreSnap1 = snap; processScores();
+    });
+    const unsubScores2 = studentEmail ? onSnapshot(query(collection(db, "test_scores"), where("studentEmail", "==", studentEmail)), (snap) => {
+        scoreSnap2 = snap; processScores();
+    }) : () => {};
+
+    const unsubGB1 = onSnapshot(query(collection(db, "gradebook_scores"), where("studentId", "==", studentData.id)), (snap) => {
+        gbSnap1 = snap; processScores();
+    });
+    const unsubGB2 = studentEmail ? onSnapshot(query(collection(db, "gradebook_scores"), where("studentEmail", "==", studentEmail)), (snap) => {
+        gbSnap2 = snap; processScores();
+    }) : () => {};
 
     // Sync Attendance
-    const unsubAtt = onSnapshot(
-      query(collection(db, "attendance"), where("studentId", "==", studentData.id)),
-      (snap) => { setAttendance(snap.docs.map(d => ({ id: d.id, ...d.data() } as any))); }
-    );
+    let attSnap1: any = null;
+    let attSnap2: any = null;
+    const processAtt = () => {
+        const combined = [...(attSnap1?.docs || []), ...(attSnap2?.docs || [])];
+        const unique = Array.from(new Map(combined.map(d => [d.id, { id: d.id, ...d.data() as any }])).values());
+        setAttendance(unique);
+    };
+
+    const unsubAtt1 = onSnapshot(query(collection(db, "attendance"), where("studentId", "==", studentData.id)), (snap) => {
+        attSnap1 = snap; processAtt();
+    });
+    const unsubAtt2 = studentEmail ? onSnapshot(query(collection(db, "attendance"), where("studentEmail", "==", studentEmail)), (snap) => {
+        attSnap2 = snap; processAtt();
+    }) : () => {};
 
     // Sync Assignments
     const unsubAssign = onSnapshot(collection(db, "assignments"), (snap) => {
@@ -86,7 +128,13 @@ const ConceptStrengthsPage = () => {
        setLoading(false);
     });
 
-    return () => { unsubById(); unsubByEmail(); unsubScores(); unsubAtt(); unsubAssign(); };
+    return () => { 
+        unsubById(); unsubByEmail(); 
+        unsubScores1(); unsubScores2(); 
+        unsubGB1(); unsubGB2();
+        unsubAtt1(); unsubAtt2(); 
+        unsubAssign(); 
+    };
   }, [studentData?.id]);
 
   useEffect(() => {

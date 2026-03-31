@@ -204,7 +204,6 @@ export const ParentAIController = {
     // Pulse frequency logic
     const PULSE_WINDOW = 1000 * 60 * 60 * 1; // 1 hour
     if (cached && (now - cached.timestamp < PULSE_WINDOW)) {
-      console.log("Using cached intelligence...");
       // return { status: "success", data: cached.data, source: "cache", message: "Pulse still fresh." };
     }
 
@@ -219,6 +218,16 @@ export const ParentAIController = {
     } catch (e) {
       console.error("Alerts Pulse Failed:", e);
       return { status: "error", data: [], message: "Brain resting. Retrying later." };
+    }
+  },
+
+  async getParentReplyDraft(data: { scholar_name: string; context: string }): Promise<any> {
+    try {
+      // Direct prompt generation for rapid discourse
+      const draft = `Respected Faculty, thank you for the update on ${data.scholar_name}. I have noted the points regarding ${data.context}. We will ensure focused alignment on these areas at home to support the academic trajectory. Looking forward to continued collaboration. Best regards.`;
+      return { status: "success", data: { draft }, source: "local-discourse-engine" };
+    } catch (e) {
+      return { status: "error", message: "Discourse engine offline." };
     }
   }
 };

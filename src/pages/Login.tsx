@@ -10,8 +10,12 @@ const Login = () => {
     setIsLoggingIn(true);
     try {
       await loginWithGoogle();
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      if (err.code === 'auth/popup-closed-by-user') {
+        // User closed popup — no message needed
+      } else {
+        alert("Login failed. Please try again.");
+      }
     } finally {
       setIsLoggingIn(false);
     }

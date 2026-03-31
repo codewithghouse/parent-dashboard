@@ -30,8 +30,6 @@ export async function generateAssignmentInsights(data: any): Promise<any> {
   
   const result = await response.json();
   const content = result.choices[0].message.content;
-  console.log("Raw AI Output:", content);
-  
   try {
     return JSON.parse(content);
   } catch (e) {

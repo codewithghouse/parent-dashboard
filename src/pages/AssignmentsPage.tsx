@@ -60,7 +60,6 @@ const AssignmentsPage = () => {
             byEmail.docs.forEach(d => { if (d.data().classId) classIdSet.add(d.data().classId); });
         }
 
-        console.log("[ASSIGNMENTS] Found classIds from enrollments:", Array.from(classIdSet));
         setupAssignmentListener(Array.from(classIdSet));
     };
 
@@ -92,6 +91,7 @@ const AssignmentsPage = () => {
             homeworkId: selectedTask.id, // Renamed from assignmentId to differentiate from teaching_assignment
             assignmentId: selectedTask.assignmentId || "legacy", // Enforced Phase 1 spec: tracking the teaching_assignment
             studentId: studentData.id,
+            studentEmail: studentData.email?.toLowerCase() || "",
             studentName: studentData.name,
             fileUrl: url,
             fileName: uploadFile.name,

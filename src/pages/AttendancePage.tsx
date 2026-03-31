@@ -28,51 +28,38 @@ const AttendancePage = () => {
   // ─── DATA SYNCHRONIZATION ───
   useEffect(() => {
     if (!studentData?.id) return;
-
     setLoading(true);
-    // Fetch by Student ID
-    const qById = query(
-      collection(db, "attendance"),
-      where("studentId", "==", studentData.id)
-    );
+    const studentEmail = (studentData.email || "").toLowerCase();
 
-    // Fetch by Student Email (resilient mapping)
-    const qByEmail = query(
-        collection(db, "attendance"),
-        where("studentEmail", "==", studentData.email)
-    );
+    let snap1: any = null;
+    let snap2: any = null;
 
-    const unsubById = onSnapshot(qById, (snap1) => {
-        const logs1 = snap1.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
-        onSnapshot(qByEmail, (snap2) => {
-            const logs2 = snap2.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            
-            // Deduplicate and sort
-            const combined = [...logs1, ...logs2];
-            const uniqueLogs = Array.from(new Map(combined.map(item => [item.id, item])).values())
-                .sort((a: any, b: any) => b.date.localeCompare(a.date));
+    const processLogs = () => {
+        const combined = [...(snap1?.docs || []), ...(snap2?.docs || [])];
+        const uniqueLogs = Array.from(new Map(combined.map((d: any) => [d.id, { id: d.id, ...d.data() as any }])).values())
+            .sort((a: any, b: any) => b.date.localeCompare(a.date));
 
-            setAttendanceLogs(uniqueLogs);
+        setAttendanceLogs(uniqueLogs);
 
-            // Institutional Health calculation
-            const pCount = uniqueLogs.filter((l: any) => l.status === 'present').length;
-            const aCount = uniqueLogs.filter((l: any) => l.status === 'absent').length;
-            const lCount = uniqueLogs.filter((l: any) => l.status === 'late').length;
-            const total = pCount + aCount + lCount;
-            const pct = total === 0 ? 100 : Math.round(((pCount + lCount) / total) * 100);
+        const pCount = uniqueLogs.filter((l: any) => l.status === 'present').length;
+        const aCount = uniqueLogs.filter((l: any) => l.status === 'absent').length;
+        const lCount = uniqueLogs.filter((l: any) => l.status === 'late').length;
+        const total = pCount + aCount + lCount;
+        const pct = total === 0 ? 100 : Math.round(((pCount + lCount) / total) * 100);
 
-            setStats({
-                present: pCount,
-                absent: aCount,
-                late: lCount,
-                percentage: pct
-            });
-            setLoading(false);
-        });
+        setStats({ present: pCount, absent: aCount, late: lCount, percentage: pct });
+        setLoading(false);
+    };
+
+    const unsub1 = onSnapshot(query(collection(db, "attendance"), where("studentId", "==", studentData.id)), (snap) => {
+        snap1 = snap; processLogs();
     });
 
-    return () => unsubById();
+    const unsubByEmail = studentEmail ? onSnapshot(query(collection(db, "attendance"), where("studentEmail", "==", studentEmail)), (snap) => {
+        snap2 = snap; processLogs();
+    }) : () => {};
+
+    return () => { unsub1(); unsubByEmail(); };
   }, [studentData?.id, studentData?.email]);
 
   // ─── AI CORRELATION ENGINE ───

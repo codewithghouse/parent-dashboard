@@ -26,74 +26,69 @@ const AlertsPage = () => {
 
   useEffect(() => {
     if (!studentData?.id) return;
-
     setLoading(true);
-    const qSmart = query(collection(db, "student_smart_alerts"), where("studentId", "==", studentData.id));
-    const qDirect = query(collection(db, "attendance"), where("studentId", "==", studentData.id));
+    const studentEmail = studentData.email?.toLowerCase() || "";
 
-    const unsubSmart = onSnapshot(qSmart, (snap) => {
-       const smart = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-       setAlerts(prev => {
-          const direct = prev.filter(p => (p as any).isSystem);
-          return [...direct, ...smart];
-       });
-       setLoading(false);
-    });
+    // State buckets for merging
+    let smartSnap1: any = null, smartSnap2: any = null;
+    let attSnap1: any = null, attSnap2: any = null;
+    let enrollSnap1: any = null, enrollSnap2: any = null;
+    let scoresSnap1: any = null, scoresSnap2: any = null;
+    let notesSnap1: any = null, notesSnap2: any = null;
 
-    const unsubDirect = onSnapshot(qDirect, (snap) => {
-       const direct = snap.docs.map(doc => ({ id: doc.id, ...doc.data(), isSystem: true, type: 'attendance' }));
-       setAlerts(prev => {
-          const others = prev.filter(p => !(p as any).isSystem || (p as any).type !== 'attendance');
-          return [...others, ...direct];
-       });
-       setLoading(false);
-    });
+    const processAll = () => {
+      const allSmart = [...(smartSnap1?.docs || []), ...(smartSnap2?.docs || [])];
+      const allAtt = [...(attSnap1?.docs || []), ...(attSnap2?.docs || [])];
+      const allEnroll = [...(enrollSnap1?.docs || []), ...(enrollSnap2?.docs || [])];
+      const allScores = [...(scoresSnap1?.docs || []), ...(scoresSnap2?.docs || [])];
+      const allNotes = [...(notesSnap1?.docs || []), ...(notesSnap2?.docs || [])];
 
-    const qEnroll = query(collection(db, "enrollments"), where("studentId", "==", studentData.id));
-    const unsubEnroll = onSnapshot(qEnroll, (snap) => {
-       const enrollData = snap.docs.map(doc => ({ id: doc.id, ...doc.data(), isSystem: true, type: 'rating' }));
-       setAlerts(prev => {
-          const others = prev.filter(p => !(p as any).isSystem || (p as any).type !== 'rating');
-          return [...others, ...enrollData];
-       });
-       setLoading(false);
-    });
+      const seen = new Set();
+      const smart = allSmart.filter(d => { if(!seen.has(d.id)){ seen.add(d.id); return true;} return false; }).map(d => ({id: d.id, ...d.data()}));
+      
+      const seenAtt = new Set();
+      const direct = allAtt.filter(d => { if(!seenAtt.has(d.id)){ seenAtt.add(d.id); return true;} return false; }).map(d => ({id: d.id, ...d.data(), isSystem: true, type: 'attendance'}));
+      
+      const seenEnroll = new Set();
+      const enroll = allEnroll.filter(d => { if(!seenEnroll.has(d.id)){ seenEnroll.add(d.id); return true;} return false; }).map(d => ({id: d.id, ...d.data(), isSystem: true, type: 'rating'}));
+      
+      const seenScores = new Set();
+      const scores = allScores.filter(d => { if(!seenScores.has(d.id)){ seenScores.add(d.id); return true;} return false; }).map(d => ({id: d.id, ...d.data(), isSystem: true, type: 'academic'}));
+      
+      const seenNotes = new Set();
+      const notes = allNotes.filter(d => { if(!seenNotes.has(d.id)){ seenNotes.add(d.id); return true;} return false; }).map(d => ({id: d.id, ...d.data(), isSystem: true, type: 'behaviour'}));
 
-    const qScores = query(collection(db, "test_scores"), where("studentId", "==", studentData.id));
-    const unsubScores = onSnapshot(qScores, (snap) => {
-       const scores = snap.docs.map(doc => ({ id: doc.id, ...doc.data(), isSystem: true, type: 'academic' }));
-       setAlerts(prev => {
-          const others = prev.filter(p => !(p as any).isSystem || (p as any).type !== 'academic');
-          return [...others, ...scores];
-       });
-       setLoading(false);
-    });
+      setAlerts([...smart, ...direct, ...enroll, ...scores, ...notes]);
+      setLoading(false);
+    };
 
-    const qNotes = query(collection(db, "parent_notes"), where("studentId", "==", studentData.id));
-    const unsubNotes = onSnapshot(qNotes, (snap) => {
-       const bNotes = snap.docs.map(doc => ({ id: doc.id, ...doc.data(), isSystem: true, type: 'behaviour' }));
-       setAlerts(prev => {
-          const others = prev.filter(p => !(p as any).isSystem || (p as any).type !== 'behaviour');
-          return [...others, ...bNotes];
-       });
-       setLoading(false);
-    });
+    const unsubSmart1 = onSnapshot(query(collection(db, "student_smart_alerts"), where("studentId", "==", studentData.id)), (s) => { smartSnap1 = s; processAll(); });
+    const unsubSmart2 = studentEmail ? onSnapshot(query(collection(db, "student_smart_alerts"), where("studentEmail", "==", studentEmail)), (s) => { smartSnap2 = s; processAll(); }) : () => {};
+    
+    const unsubAtt1 = onSnapshot(query(collection(db, "attendance"), where("studentId", "==", studentData.id)), (s) => { attSnap1 = s; processAll(); });
+    const unsubAtt2 = studentEmail ? onSnapshot(query(collection(db, "attendance"), where("studentEmail", "==", studentEmail)), (s) => { attSnap2 = s; processAll(); }) : () => {};
+
+    const unsubEnroll1 = onSnapshot(query(collection(db, "enrollments"), where("studentId", "==", studentData.id)), (s) => { enrollSnap1 = s; processAll(); });
+    const unsubEnroll2 = studentEmail ? onSnapshot(query(collection(db, "enrollments"), where("studentEmail", "==", studentEmail)), (s) => { enrollSnap2 = s; processAll(); }) : () => {};
+
+    const unsubScores1 = onSnapshot(query(collection(db, "test_scores"), where("studentId", "==", studentData.id)), (s) => { scoresSnap1 = s; processAll(); });
+    const unsubScores2 = studentEmail ? onSnapshot(query(collection(db, "test_scores"), where("studentEmail", "==", studentEmail)), (s) => { scoresSnap2 = s; processAll(); }) : () => {};
+
+    const unsubNotes1 = onSnapshot(query(collection(db, "parent_notes"), where("studentId", "==", studentData.id)), (s) => { notesSnap1 = s; processAll(); });
+    const unsubNotes2 = studentEmail ? onSnapshot(query(collection(db, "parent_notes"), where("studentEmail", "==", studentEmail)), (s) => { notesSnap2 = s; processAll(); }) : () => {};
 
     const runPulse = async () => {
        const lastPulse = localStorage.getItem(`last_pulse_${studentData.id}`);
-       const now = Date.now();
-       if (!lastPulse || (now - parseInt(lastPulse) > 1000 * 60 * 60 * 1)) {
+       if (!lastPulse || (Date.now() - parseInt(lastPulse) > 1000 * 60 * 60 * 1)) {
           generateAIAlerts();
        }
     };
     runPulse();
 
-    return () => {
-       unsubSmart();
-       unsubDirect();
-       unsubScores();
-       unsubNotes();
-       unsubEnroll();
+    return () => { 
+        unsubSmart1(); unsubSmart2(); unsubAtt1(); unsubAtt2(); 
+        unsubEnroll1(); unsubEnroll2(); unsubScores1(); unsubScores2(); 
+        unsubNotes1(); unsubNotes2(); 
     };
   }, [studentData?.id]);
 
@@ -113,25 +108,33 @@ const AlertsPage = () => {
       setIsRefreshing(true);
       try {
          const studentId = studentData.id;
-         const scoresSnap = await getDocs(query(collection(db, "test_scores"), where("studentId", "==", studentId)));
-         const attndSnap = await getDocs(query(collection(db, "attendance"), where("studentId", "==", studentId)));
-         const notesSnap = await getDocs(query(collection(db, "parent_notes"), where("studentId", "==", studentId)));
-         const enrollSnap = await getDocs(query(collection(db, "enrollments"), where("studentId", "==", studentId)));
+         const studentEmail = studentData.email?.toLowerCase() || "";
+
+         // Dual-Lookup Context Gathering
+         const fetchDual = async (coll: string) => {
+            const s1 = await getDocs(query(collection(db, coll), where("studentId", "==", studentId)));
+            const s2 = studentEmail ? await getDocs(query(collection(db, coll), where("studentEmail", "==", studentEmail))) : { docs: [] };
+            const seen = new Set();
+            return [...s1.docs, ...s2.docs].filter(d => { if(!seen.has(d.id)) { seen.add(d.id); return true; } return false; }).map(d => d.data() as any);
+         };
+
+         const [scoresData, attndData, notesData, enrollData] = await Promise.all([
+            fetchDual("test_scores"), fetchDual("attendance"), fetchDual("parent_notes"), fetchDual("enrollments")
+         ]);
          
-         const scoresData = scoresSnap.docs.map(d => ({...d.data() as any}));
          const context = {
             student_name: studentData.name,
             overall_grade: studentData.avgScorePct || "N/A",
-            behaviour_rating: enrollSnap.docs[0]?.data()?.manualBehaviourRating || 5,
-            test_performance: scoresData.map(d => ({ test: d.testName, percentage: d.percentage, subject: d.subject })).slice(-10),
-            absent_dates: attndSnap.docs.filter(d => (d.data().status || "").toLowerCase() === "absent").map(d => d.data().date).slice(-8),
-            teacher_notes: notesSnap.docs.map(d => ({ category: d.data().category, content: d.data().content })).slice(-5),
+            behaviour_rating: enrollData[0]?.manualBehaviourRating || 5,
+            test_performance: scoresData.map(d => ({ test: d.testName, percentage: d.percentage || d.score, subject: d.subject })).slice(-10),
+            absent_dates: attndData.filter(d => (d.status || "").toLowerCase() === "absent").map(d => d.date).slice(-8),
+            teacher_notes: notesData.map(d => ({ category: d.category, content: d.content })).slice(-5),
             attendance_summary: {
-               present: attndSnap.docs.filter(d => (d.data().status || "").toLowerCase() === "present").length,
-               absent: attndSnap.docs.filter(d => (d.data().status || "").toLowerCase() === "absent").length,
-               late: attndSnap.docs.filter(d => (d.data().status || "").toLowerCase() === "late").length,
-               percentage: attndSnap.docs.length > 0 
-                  ? Math.round((attndSnap.docs.filter(d => (d.data().status || "").toLowerCase() === "present").length / attndSnap.docs.length) * 100) 
+               present: attndData.filter(d => (d.status || "").toLowerCase() === "present").length,
+               absent: attndData.filter(d => (d.status || "").toLowerCase() === "absent").length,
+               late: attndData.filter(d => (d.status || "").toLowerCase() === "late").length,
+               percentage: attndData.length > 0 
+                  ? Math.round((attndData.filter(d => (d.status || "").toLowerCase() === "present").length / attndData.length) * 100) 
                   : 100
             }
          };

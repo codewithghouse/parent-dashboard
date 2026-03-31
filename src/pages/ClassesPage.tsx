@@ -19,10 +19,15 @@ const ClassesPage = () => {
   useEffect(() => {
     if (!studentData?.id) return;
     setLoading(true);
+    const studentEmail = studentData.email?.toLowerCase() || "";
 
-    const qEnroll = query(collection(db, "enrollments"), where("studentId", "==", studentData.id));
-    const unsub = onSnapshot(qEnroll, async (snap) => {
-        const rawEnrollments = snap.docs.map(d => ({ id: d.id, ...d.data() as any }));
+    let snap1: any = null;
+    let snap2: any = null;
+
+    const processEnrollments = async () => {
+        const docs = [...(snap1?.docs || []), ...(snap2?.docs || [])];
+        const seenIds = new Set();
+        const rawEnrollments = docs.filter(d => { if(!seenIds.has(d.id)) { seenIds.add(d.id); return true; } return false; }).map(d => ({ id: d.id, ...d.data() as any }));
         
         // Resolve Teacher Names with aliased fbDoc/fbGetDoc
         const enriched = await Promise.all(rawEnrollments.map(async (en) => {
@@ -47,9 +52,16 @@ const ClassesPage = () => {
 
         setEnrollments(enriched);
         setLoading(false);
-    });
+    };
 
-    return () => unsub();
+    const unsub1 = onSnapshot(query(collection(db, "enrollments"), where("studentId", "==", studentData.id)), (snap) => {
+        snap1 = snap; processEnrollments();
+    });
+    const unsub2 = studentEmail ? onSnapshot(query(collection(db, "enrollments"), where("studentEmail", "==", studentEmail)), (snap) => {
+        snap2 = snap; processEnrollments();
+    }) : () => {};
+
+    return () => { unsub1(); unsub2(); };
   }, [studentData?.id]);
 
   const cardColors = ["bg-[#1e3a8a]", "bg-emerald-600", "bg-indigo-600", "bg-orange-600", "bg-rose-600", "bg-purple-600"];

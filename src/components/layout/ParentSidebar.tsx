@@ -3,13 +3,14 @@ import { useAuth } from "../../lib/AuthContext";
 import {
   Home, User, TrendingUp, CalendarCheck, ClipboardList,
   FileText, Brain, SmilePlus, StickyNote,
-  Bell, Settings, GraduationCap, LogOut
+  Bell, Settings, GraduationCap, LogOut, CreditCard, CalendarDays
 } from "lucide-react";
 
 const navItems = [
   { title: "Dashboard", path: "/", icon: Home },
   { title: "My Child", path: "/my-child", icon: User },
   { title: "Classes", path: "/classes", icon: GraduationCap },
+  { title: "Timetable", path: "/timetable", icon: CalendarDays },
   { title: "Performance", path: "/performance", icon: TrendingUp },
   { title: "Attendance", path: "/attendance", icon: CalendarCheck },
   { title: "Assignments", path: "/assignments", icon: ClipboardList },
@@ -17,6 +18,7 @@ const navItems = [
   { title: "Concept Strengths", path: "/concepts", icon: Brain },
   { title: "Behaviour", path: "/behaviour", icon: SmilePlus },
   { title: "Teacher Notes", path: "/teacher-notes", icon: StickyNote },
+  { title: "Fee Status", path: "/fees", icon: CreditCard },
   { title: "Reports", path: "/reports", icon: FileText },
   { title: "Alerts", path: "/alerts", icon: Bell, badge: 3 },
   { title: "Settings", path: "/settings", icon: Settings },

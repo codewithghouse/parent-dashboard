@@ -39,31 +39,26 @@ const DashboardPage = () => {
   // ─── DATA SYNCHRONIZATION ───
   useEffect(() => {
     if (!studentData?.id) return;
-    const studentEmail = studentData.email?.toLowerCase() || "";
+    const studentEmail = (studentData.email || "").toLowerCase();
 
-    // 1. Attendance Sync (Dual-Lookup)
-    const setupAttendance = async () => {
-      const q1 = query(collection(db, "attendance"), where("studentId", "==", studentData.id));
-      const q2 = studentEmail ? query(collection(db, "attendance"), where("studentEmail", "==", studentEmail)) : null;
-      
-      const updateAttendance = (docs: any[]) => {
-        const records = docs.map(d => d.data());
-        const pCount = records.filter(r => r.status === 'present' || r.status === 'late').length;
-        const total = records.length;
+    // 1. Attendance Sync
+    let attSnap1: any = null;
+    let attSnap2: any = null;
+    const processAttendance = () => {
+        const combined = [...(attSnap1?.docs || []), ...(attSnap2?.docs || [])];
+        const unique = Array.from(new Map(combined.map(d => [d.id, d.data()])).values());
+        const pCount = unique.filter((r: any) => r.status === 'present' || r.status === 'late').length;
+        const total = unique.length;
         setLiveStats(prev => ({ ...prev, attendance: total === 0 ? "100%" : `${Math.round((pCount/total)*100)}%` }));
-      };
-
-      const unsub1 = onSnapshot(q1, (snap) => updateAttendance(snap.docs));
-      const unsub2 = q2 ? onSnapshot(q2, (snap) => updateAttendance(snap.docs)) : () => {};
-      return () => { unsub1(); unsub2(); };
     };
+    const unsubAtt1 = onSnapshot(query(collection(db, "attendance"), where("studentId", "==", studentData.id)), (snap) => { attSnap1 = snap; processAttendance(); });
+    const unsubAtt2 = studentEmail ? onSnapshot(query(collection(db, "attendance"), where("studentEmail", "==", studentEmail)), (snap) => { attSnap2 = snap; processAttendance(); }) : () => {};
 
-    // 2. Enrollments & Tasks Sync (Dual-Lookup)
-    const setupTasks = async () => {
-      const q1 = query(collection(db, "enrollments"), where("studentId", "==", studentData.id));
-      const q2 = studentEmail ? query(collection(db, "enrollments"), where("studentEmail", "==", studentEmail)) : null;
-
-      const processEnrollments = async (docs: any[]) => {
+    // 2. Enrollments & Tasks
+    let enSnap1: any = null;
+    let enSnap2: any = null;
+    const processTasks = async () => {
+        const docs = [...(enSnap1?.docs || []), ...(enSnap2?.docs || [])];
         if (docs.length === 0) return;
         const first = docs[0].data();
         setTeacherInfo({ name: first.teacherName || "Institutional Faculty", id: first.teacherId || "" });
@@ -74,87 +69,85 @@ const DashboardPage = () => {
 
         const classIds = Array.from(new Set(docs.map(d => d.data().classId).filter(id => !!id))) as string[];
         if (classIds.length > 0) {
-          // Fetch Assignments
-          const qAssign = query(collection(db, "assignments"), where("classId", "in", classIds));
-          const aSnap = await getDocs(qAssign);
-          
-          // Fetch Submissions (Dual-Lookup)
-          const subQ1 = query(collection(db, "submissions"), where("studentId", "==", studentData.id));
-          const subQ2 = studentEmail ? query(collection(db, "submissions"), where("studentEmail", "==", studentEmail)) : null;
-          const [sSnap1, sSnap2] = await Promise.all([getDocs(subQ1), subQ2 ? getDocs(subQ2) : Promise.resolve({docs:[]})]);
-          
-          const submittedIds = new Set();
-          [...sSnap1.docs, ...sSnap2.docs].forEach(d => {
-            const data = d.data();
-            if (data.homeworkId) submittedIds.add(data.homeworkId);
-            if (data.assignmentId) submittedIds.add(data.assignmentId);
-          });
-
-          const pending = aSnap.docs.filter(d => !submittedIds.has(d.id)).length;
-          
-          // Fetch Tests
-          const qTests = query(collection(db, "tests"), where("classId", "in", classIds));
-          const tSnap = await getDocs(qTests);
-          const today = new Date().toISOString().split('T')[0];
-          const nextWeek = new Date(); nextWeek.setDate(nextWeek.getDate() + 7);
-          const nextWeekStr = nextWeek.toISOString().split('T')[0];
-          const tests = tSnap.docs.filter(d => d.data().date >= today && d.data().date <= nextWeekStr).length;
-          
-          setLiveStats(prev => ({ ...prev, pending, tests }));
+            const aSnap = await getDocs(query(collection(db, "assignments"), where("classId", "in", classIds)));
+            const subQ1 = query(collection(db, "submissions"), where("studentId", "==", studentData.id));
+            const subQ2 = studentEmail ? query(collection(db, "submissions"), where("studentEmail", "==", studentEmail)) : null;
+            const [sSnap1, sSnap2] = await Promise.all([getDocs(subQ1), subQ2 ? getDocs(subQ2) : Promise.resolve({docs:[]})]);
+            
+            const subIds = new Set();
+            [...sSnap1.docs, ...sSnap2.docs].forEach(d => {
+                const data = d.data();
+                if (data.homeworkId) subIds.add(data.homeworkId);
+                if (data.assignmentId) subIds.add(data.assignmentId);
+            });
+            const pending = aSnap.docs.filter(d => !subIds.has(d.id)).length;
+            
+            const tSnap = await getDocs(query(collection(db, "tests"), where("classId", "in", classIds)));
+            const today = new Date().toISOString().split('T')[0];
+            const nextWeek = new Date(); nextWeek.setDate(nextWeek.getDate() + 7);
+            const nextWeekStr = nextWeek.toISOString().split('T')[0];
+            const tests = tSnap.docs.filter(d => d.data().date >= today && d.data().date <= nextWeekStr).length;
+            
+            setLiveStats(prev => ({ ...prev, pending, tests }));
         }
-      };
-
-      const unsub1 = onSnapshot(q1, (snap) => processEnrollments(snap.docs));
-      const unsub2 = q2 ? onSnapshot(q2, (snap) => processEnrollments(snap.docs)) : () => {};
-      return () => { unsub1(); unsub2(); };
     };
+    const unsubEn1 = onSnapshot(query(collection(db, "enrollments"), where("studentId", "==", studentData.id)), (snap) => { enSnap1 = snap; processTasks(); });
+    const unsubEn2 = studentEmail ? onSnapshot(query(collection(db, "enrollments"), where("studentEmail", "==", studentEmail)), (snap) => { enSnap2 = snap; processTasks(); }) : () => {};
 
-    // 3. Results Sync (Dual-Lookup)
-    const setupResults = async () => {
-      const q1 = query(collection(db, "results"), where("studentId", "==", studentData.id));
-      const q2 = studentEmail ? query(collection(db, "results"), where("studentEmail", "==", studentEmail)) : null;
+    // 3. Results & Gradebook
+    let resSnap1: any = null;
+    let resSnap2: any = null;
+    let gbSnap1: any = null;
+    let gbSnap2: any = null;
 
-      const processResults = (docs: any[]) => {
-        const results = docs.map(d => ({ id: d.id, ...d.data() as any }))
+    const processResults = () => {
+        const testRes = [...(resSnap1?.docs || []), ...(resSnap2?.docs || [])].map(d => ({ id: d.id, ...d.data() as any }));
+        const gbRes = [...(gbSnap1?.docs || []), ...(gbSnap2?.docs || [])].map(d => {
+            const data = d.data();
+            return {
+                id: d.id,
+                ...data,
+                score: (data.mark / (data.maxMarks || 100)) * 100,
+                subject: data.subject || data.className || "General",
+                timestamp: data.updatedAt ? Timestamp.fromMillis(data.updatedAt) : Timestamp.now()
+            };
+        });
+
+        const unique = Array.from(new Map([...testRes, ...gbRes].map(d => [d.id, d])).values())
             .sort((a,b) => (b.timestamp?.toDate() || 0) - (a.timestamp?.toDate() || 0));
         
-        if (results.length > 0) {
-           const avg = results.reduce((acc, curr) => acc + (parseFloat(curr.score) || 0), 0) / results.length;
-           const latest = results[0];
-           const getGrade = (s: number) => s >= 90 ? "A+" : s >= 80 ? "A" : s >= 70 ? "A-" : s >= 60 ? "B" : "C";
-           setLiveStats(prev => ({ ...prev, avgScore: `${Math.round(avg)}%`, recentGrade: getGrade(parseFloat(latest.score) || 0), recentSubject: latest.className || "Mathematics" }));
-           setRecentEvents(results.slice(0, 5).map(r => ({ id: r.id, type: 'result', title: `Performance Logged: ${r.assignmentTitle || 'Assessment'}`, value: `${r.score}%`, time: r.timestamp?.toDate() || new Date(), color: 'text-emerald-500' })));
+        if (unique.length > 0) {
+            const avg = unique.reduce((acc, curr) => acc + (parseFloat(curr.score) || 0), 0) / unique.length;
+            const latest = unique[0];
+            const getGrade = (s: number) => s >= 90 ? "A+" : s >= 80 ? "A" : s >= 70 ? "A-" : s >= 60 ? "B" : "C";
+            setLiveStats(prev => ({ ...prev, avgScore: `${Math.round(avg)}%`, recentGrade: getGrade(parseFloat(latest.score) || 0), recentSubject: latest.className || latest.subject || "General" }));
+            setRecentEvents(unique.slice(0, 5).map(r => ({ id: r.id, type: 'result', title: `Performance Logged: ${r.assignmentTitle || r.title || r.columnName || 'Assessment'}`, value: `${Math.round(parseFloat(r.score))}%`, time: r.timestamp?.toDate() || new Date(), color: 'text-emerald-500' })));
         }
-      };
-
-      const unsub1 = onSnapshot(q1, (snap) => processResults(snap.docs));
-      const unsub2 = q2 ? onSnapshot(q2, (snap) => processResults(snap.docs)) : () => {};
-      return () => { unsub1(); unsub2(); };
     };
 
-    // 4. Risks/Alerts Sync (Dual-Lookup)
-    const setupRisks = async () => {
-      const q1 = query(collection(db, "risks"), where("studentId", "==", studentData.id));
-      const q2 = studentEmail ? query(collection(db, "risks"), where("studentEmail", "==", studentEmail)) : null;
+    const unsubRes1 = onSnapshot(query(collection(db, "results"), where("studentId", "==", studentData.id)), (snap) => { resSnap1 = snap; processResults(); });
+    const unsubRes2 = studentEmail ? onSnapshot(query(collection(db, "results"), where("studentEmail", "==", studentEmail)), (snap) => { resSnap2 = snap; processResults(); }) : () => {};
 
-      const processRisks = (docs: any[]) => {
-        let alerts = docs.map(d => ({ id: d.id, title: d.data().issue, time: d.data().timestamp?.toDate() || new Date(), type: d.data().severity === 'Critical' ? 'urgent' : 'normal' }))
-            .sort((a,b) => b.time - a.time);
-        setRecentAlerts(alerts.slice(0, 2));
-      };
+    const unsubGB1 = onSnapshot(query(collection(db, "gradebook_scores"), where("studentId", "==", studentData.id)), (snap) => { gbSnap1 = snap; processResults(); });
+    const unsubGB2 = studentEmail ? onSnapshot(query(collection(db, "gradebook_scores"), where("studentEmail", "==", studentEmail)), (snap) => { gbSnap2 = snap; processResults(); }) : () => {};
 
-      const unsub1 = onSnapshot(q1, (snap) => processRisks(snap.docs));
-      const unsub2 = q2 ? onSnapshot(q2, (snap) => processRisks(snap.docs)) : () => {};
-      return () => { unsub1(); unsub2(); };
+
+    // 4. Risks
+    let riskSnap1: any = null;
+    let riskSnap2: any = null;
+    const processRisks = () => {
+        const combined = [...(riskSnap1?.docs || []), ...(riskSnap2?.docs || [])];
+        const unique = Array.from(new Map(combined.map(d => [d.id, { id: d.id, ...d.data() as any }])).values())
+            .sort((a,b) => (b.timestamp?.toDate() || 0) - (a.timestamp?.toDate() || 0));
+        setRecentAlerts(unique.slice(0, 2).map(d => ({ id: d.id, title: d.issue, time: d.timestamp?.toDate() || new Date(), type: d.severity === 'Critical' ? 'urgent' : 'normal' })));
     };
+    const unsubRisk1 = onSnapshot(query(collection(db, "risks"), where("studentId", "==", studentData.id)), (snap) => { riskSnap1 = snap; processRisks(); });
+    const unsubRisk2 = studentEmail ? onSnapshot(query(collection(db, "risks"), where("studentEmail", "==", studentEmail)), (snap) => { riskSnap2 = snap; processRisks(); }) : () => {};
 
-    let cleanup: (() => void)[] = [];
-    setupAttendance().then(c => cleanup.push(c));
-    setupTasks().then(c => cleanup.push(c));
-    setupResults().then(c => cleanup.push(c));
-    setupRisks().then(c => cleanup.push(c));
-
-    return () => cleanup.forEach(c => c());
+    return () => { 
+        unsubAtt1(); unsubAtt2(); unsubEn1(); unsubEn2(); 
+        unsubRes1(); unsubRes2(); unsubGB1(); unsubGB2(); unsubRisk1(); unsubRisk2(); 
+    };
   }, [studentData?.id]);
 
   // ─── AI INSIGHTS ENGINE ───
