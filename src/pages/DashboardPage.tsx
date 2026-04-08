@@ -1,360 +1,295 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
-import { 
-  CheckCircle, AlertCircle, Calendar, Star, ArrowUp, Clock, CheckSquare, 
-  Sparkles, BrainCircuit, Rocket, Zap, Loader2, Info, Layout, TrendingUp,
-  User, ShieldCheck, Activity, Bell, GraduationCap, ChevronRight, MoreVertical
-} from "lucide-react";
+import { CheckCircle, AlertCircle, Calendar, Star, ArrowUp, Clock, Loader2, Bell, ShieldCheck, BrainCircuit, Sparkles } from "lucide-react";
 import { ParentAIController } from "../ai/controller/ai-controller";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, getDocs, limit, orderBy, Timestamp } from "firebase/firestore";
+import { collection, query, where, onSnapshot, getDocs, Timestamp } from "firebase/firestore";
+
+function timeAgo(date: Date): string {
+  const diff = (Date.now() - date.getTime()) / 1000;
+  if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
+  if (diff < 172800) return "Yesterday";
+  return date.toLocaleDateString();
+}
+
+function getInitials(name: string): string {
+  return (name || "")
+    .split(" ")
+    .slice(0, 2)
+    .map(w => w[0]?.toUpperCase() || "")
+    .join("");
+}
+
+function ProgressRing({ pct }: { pct: number }) {
+  const r = 36, circ = 2 * Math.PI * r;
+  const offset = circ - (pct / 100) * circ;
+  return (
+    <svg width="96" height="96" className="-rotate-90">
+      <circle cx="48" cy="48" r={r} fill="none" stroke="#f1f5f9" strokeWidth="10" />
+      <circle cx="48" cy="48" r={r} fill="none" stroke="#10b981" strokeWidth="10"
+        strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+        style={{ transition: "stroke-dashoffset 0.8s ease" }} />
+    </svg>
+  );
+}
 
 const DashboardPage = () => {
   const { studentData, user } = useAuth();
-  const navigate = useNavigate();
-  const [isAnalyzing, setIsAnalyzing] = useState(true);
   const [aiInsights, setAiInsights] = useState<any>(null);
   const [liveStats, setLiveStats] = useState({
-    attendance: "...",
+    attendance: 100,
     pending: 0,
     tests: 0,
-    avgScore: "0%",
+    avgScore: 0,
     recentGrade: "N/A",
     recentSubject: "General",
-    scoreTrend: "improved" as "improved" | "declined" | "stable",
-    trendPct: "5%"
+    trendPct: 5,
   });
-  const [recentEvents, setRecentEvents] = useState<any[]>([]);
   const [recentAlerts, setRecentAlerts] = useState<any[]>([]);
-  const [teacherInfo, setTeacherInfo] = useState({ name: "...", id: "" });
-  const [studentMeta, setStudentMeta] = useState({ className: "...", rollNo: "..." });
+  const [teacherInfo, setTeacherInfo] = useState({ name: "—" });
+  const [studentMeta, setStudentMeta] = useState({ className: "—", rollNo: "—" });
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [dataLoading, setDataLoading] = useState(true);
 
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
-    return () => clearInterval(timer);
+    const t = setInterval(() => setCurrentTime(new Date()), 60000);
+    return () => clearInterval(t);
   }, []);
 
-  // ─── DATA SYNCHRONIZATION ───
   useEffect(() => {
     if (!studentData?.id) return;
-    const studentEmail = (studentData.email || "").toLowerCase();
+    const email = (studentData.email || "").toLowerCase();
 
-    // 1. Attendance Sync
-    let attSnap1: any = null;
-    let attSnap2: any = null;
-    const processAttendance = () => {
-        const combined = [...(attSnap1?.docs || []), ...(attSnap2?.docs || [])];
-        const unique = Array.from(new Map(combined.map(d => [d.id, d.data()])).values());
-        const pCount = unique.filter((r: any) => r.status === 'present' || r.status === 'late').length;
-        const total = unique.length;
-        setLiveStats(prev => ({ ...prev, attendance: total === 0 ? "100%" : `${Math.round((pCount/total)*100)}%` }));
+    let attSnap1: any = null, attSnap2: any = null;
+    const processAtt = () => {
+      const combined = [...(attSnap1?.docs || []), ...(attSnap2?.docs || [])];
+      const unique = Array.from(new Map(combined.map(d => [d.id, d.data()])).values());
+      const present = unique.filter((r: any) => r.status === "present" || r.status === "late").length;
+      const pct = unique.length === 0 ? 100 : Math.round((present / unique.length) * 100);
+      setLiveStats(prev => ({ ...prev, attendance: pct }));
     };
-    const unsubAtt1 = onSnapshot(query(collection(db, "attendance"), where("studentId", "==", studentData.id)), (snap) => { attSnap1 = snap; processAttendance(); });
-    const unsubAtt2 = studentEmail ? onSnapshot(query(collection(db, "attendance"), where("studentEmail", "==", studentEmail)), (snap) => { attSnap2 = snap; processAttendance(); }) : () => {};
+    const u1 = onSnapshot(query(collection(db, "attendance"), where("studentId", "==", studentData.id)), s => { attSnap1 = s; processAtt(); });
+    const u2 = email ? onSnapshot(query(collection(db, "attendance"), where("studentEmail", "==", email)), s => { attSnap2 = s; processAtt(); }) : () => {};
 
-    // 2. Enrollments & Tasks
-    let enSnap1: any = null;
-    let enSnap2: any = null;
-    const processTasks = async () => {
-        const docs = [...(enSnap1?.docs || []), ...(enSnap2?.docs || [])];
-        if (docs.length === 0) return;
-        const first = docs[0].data();
-        setTeacherInfo({ name: first.teacherName || "Institutional Faculty", id: first.teacherId || "" });
-        setStudentMeta({ 
-          className: first.className || studentData?.grade || "Institutional Grade", 
-          rollNo: first.rollNo || studentData?.rollNo || "000" 
-        });
+    let enSnap1: any = null, enSnap2: any = null;
+    const processEnroll = async () => {
+      const docs = [...(enSnap1?.docs || []), ...(enSnap2?.docs || [])];
+      if (!docs.length) return;
+      const first = docs[0].data();
+      setTeacherInfo({ name: first.teacherName || "Class Teacher" });
+      setStudentMeta({ className: first.className || studentData?.grade || "—", rollNo: first.rollNo || studentData?.rollNo || "—" });
+      const classIds = [...new Set(docs.map(d => d.data().classId).filter(Boolean))] as string[];
+      if (!classIds.length) { setDataLoading(false); return; }
 
-        const classIds = Array.from(new Set(docs.map(d => d.data().classId).filter(id => !!id))) as string[];
-        if (classIds.length > 0) {
-            const aSnap = await getDocs(query(collection(db, "assignments"), where("classId", "in", classIds)));
-            const subQ1 = query(collection(db, "submissions"), where("studentId", "==", studentData.id));
-            const subQ2 = studentEmail ? query(collection(db, "submissions"), where("studentEmail", "==", studentEmail)) : null;
-            const [sSnap1, sSnap2] = await Promise.all([getDocs(subQ1), subQ2 ? getDocs(subQ2) : Promise.resolve({docs:[]})]);
-            
-            const subIds = new Set();
-            [...sSnap1.docs, ...sSnap2.docs].forEach(d => {
-                const data = d.data();
-                if (data.homeworkId) subIds.add(data.homeworkId);
-                if (data.assignmentId) subIds.add(data.assignmentId);
-            });
-            const pending = aSnap.docs.filter(d => !subIds.has(d.id)).length;
-            
-            const tSnap = await getDocs(query(collection(db, "tests"), where("classId", "in", classIds)));
-            const today = new Date().toISOString().split('T')[0];
-            const nextWeek = new Date(); nextWeek.setDate(nextWeek.getDate() + 7);
-            const nextWeekStr = nextWeek.toISOString().split('T')[0];
-            const tests = tSnap.docs.filter(d => d.data().date >= today && d.data().date <= nextWeekStr).length;
-            
-            setLiveStats(prev => ({ ...prev, pending, tests }));
-        }
+      const [aSnap, tSnap, s1, s2] = await Promise.all([
+        getDocs(query(collection(db, "assignments"), where("classId", "in", classIds))),
+        getDocs(query(collection(db, "tests"), where("classId", "in", classIds))),
+        getDocs(query(collection(db, "submissions"), where("studentId", "==", studentData.id))),
+        email ? getDocs(query(collection(db, "submissions"), where("studentEmail", "==", email))) : Promise.resolve({ docs: [] as any[] }),
+      ]);
+      const subIds = new Set([...s1.docs, ...(s2 as any).docs].flatMap(d => [d.data().homeworkId, d.data().assignmentId].filter(Boolean)));
+      const pending = aSnap.docs.filter(d => !subIds.has(d.id)).length;
+      const today = new Date().toISOString().split("T")[0];
+      const nw = new Date(); nw.setDate(nw.getDate() + 7);
+      const tests = tSnap.docs.filter(d => { const dt = d.data().date; return dt >= today && dt <= nw.toISOString().split("T")[0]; }).length;
+      setLiveStats(prev => ({ ...prev, pending, tests }));
+      setDataLoading(false);
     };
-    const unsubEn1 = onSnapshot(query(collection(db, "enrollments"), where("studentId", "==", studentData.id)), (snap) => { enSnap1 = snap; processTasks(); });
-    const unsubEn2 = studentEmail ? onSnapshot(query(collection(db, "enrollments"), where("studentEmail", "==", studentEmail)), (snap) => { enSnap2 = snap; processTasks(); }) : () => {};
+    const u3 = onSnapshot(query(collection(db, "enrollments"), where("studentId", "==", studentData.id)), s => { enSnap1 = s; processEnroll(); });
+    const u4 = email ? onSnapshot(query(collection(db, "enrollments"), where("studentEmail", "==", email)), s => { enSnap2 = s; processEnroll(); }) : () => {};
 
-    // 3. Results & Gradebook
-    let resSnap1: any = null;
-    let resSnap2: any = null;
-    let gbSnap1: any = null;
-    let gbSnap2: any = null;
-
+    let rSnap1: any = null, rSnap2: any = null, gSnap1: any = null, gSnap2: any = null;
     const processResults = () => {
-        const testRes = [...(resSnap1?.docs || []), ...(resSnap2?.docs || [])].map(d => ({ id: d.id, ...d.data() as any }));
-        const gbRes = [...(gbSnap1?.docs || []), ...(gbSnap2?.docs || [])].map(d => {
-            const data = d.data();
-            return {
-                id: d.id,
-                ...data,
-                score: (data.mark / (data.maxMarks || 100)) * 100,
-                subject: data.subject || data.className || "General",
-                timestamp: data.updatedAt ? Timestamp.fromMillis(data.updatedAt) : Timestamp.now()
-            };
-        });
-
-        const unique = Array.from(new Map([...testRes, ...gbRes].map(d => [d.id, d])).values())
-            .sort((a,b) => (b.timestamp?.toDate() || 0) - (a.timestamp?.toDate() || 0));
-        
-        if (unique.length > 0) {
-            const avg = unique.reduce((acc, curr) => acc + (parseFloat(curr.score) || 0), 0) / unique.length;
-            const latest = unique[0];
-            const getGrade = (s: number) => s >= 90 ? "A+" : s >= 80 ? "A" : s >= 70 ? "A-" : s >= 60 ? "B" : "C";
-            setLiveStats(prev => ({ ...prev, avgScore: `${Math.round(avg)}%`, recentGrade: getGrade(parseFloat(latest.score) || 0), recentSubject: latest.className || latest.subject || "General" }));
-            setRecentEvents(unique.slice(0, 5).map(r => ({ id: r.id, type: 'result', title: `Performance Logged: ${r.assignmentTitle || r.title || r.columnName || 'Assessment'}`, value: `${Math.round(parseFloat(r.score))}%`, time: r.timestamp?.toDate() || new Date(), color: 'text-emerald-500' })));
-        }
+      const testRes = [...(rSnap1?.docs || []), ...(rSnap2?.docs || [])].map(d => ({ id: d.id, ...d.data() as any }));
+      const gbRes = [...(gSnap1?.docs || []), ...(gSnap2?.docs || [])].map(d => {
+        const data = d.data();
+        return { id: d.id, ...data, score: (data.mark / (data.maxMarks || 100)) * 100, subject: data.subject || data.className || "General", timestamp: data.updatedAt ? Timestamp.fromMillis(data.updatedAt) : Timestamp.now() };
+      });
+      const all = Array.from(new Map([...testRes, ...gbRes].map(d => [d.id, d])).values())
+        .sort((a, b) => (b.timestamp?.toDate()?.getTime() || 0) - (a.timestamp?.toDate()?.getTime() || 0));
+      if (!all.length) return;
+      const avg = all.reduce((s, r) => s + (parseFloat(r.score) || 0), 0) / all.length;
+      const latest = all[0];
+      const grade = (s: number) => s >= 90 ? "A+" : s >= 80 ? "A" : s >= 70 ? "A-" : s >= 60 ? "B" : "C";
+      setLiveStats(prev => ({ ...prev, avgScore: Math.round(avg), recentGrade: grade(parseFloat(latest.score) || 0), recentSubject: latest.className || latest.subject || "General" }));
     };
+    const u5 = onSnapshot(query(collection(db, "results"), where("studentId", "==", studentData.id)), s => { rSnap1 = s; processResults(); });
+    const u6 = email ? onSnapshot(query(collection(db, "results"), where("studentEmail", "==", email)), s => { rSnap2 = s; processResults(); }) : () => {};
+    const u7 = onSnapshot(query(collection(db, "gradebook_scores"), where("studentId", "==", studentData.id)), s => { gSnap1 = s; processResults(); });
+    const u8 = email ? onSnapshot(query(collection(db, "gradebook_scores"), where("studentEmail", "==", email)), s => { gSnap2 = s; processResults(); }) : () => {};
 
-    const unsubRes1 = onSnapshot(query(collection(db, "results"), where("studentId", "==", studentData.id)), (snap) => { resSnap1 = snap; processResults(); });
-    const unsubRes2 = studentEmail ? onSnapshot(query(collection(db, "results"), where("studentEmail", "==", studentEmail)), (snap) => { resSnap2 = snap; processResults(); }) : () => {};
-
-    const unsubGB1 = onSnapshot(query(collection(db, "gradebook_scores"), where("studentId", "==", studentData.id)), (snap) => { gbSnap1 = snap; processResults(); });
-    const unsubGB2 = studentEmail ? onSnapshot(query(collection(db, "gradebook_scores"), where("studentEmail", "==", studentEmail)), (snap) => { gbSnap2 = snap; processResults(); }) : () => {};
-
-
-    // 4. Risks
-    let riskSnap1: any = null;
-    let riskSnap2: any = null;
+    let rkSnap1: any = null, rkSnap2: any = null;
     const processRisks = () => {
-        const combined = [...(riskSnap1?.docs || []), ...(riskSnap2?.docs || [])];
-        const unique = Array.from(new Map(combined.map(d => [d.id, { id: d.id, ...d.data() as any }])).values())
-            .sort((a,b) => (b.timestamp?.toDate() || 0) - (a.timestamp?.toDate() || 0));
-        setRecentAlerts(unique.slice(0, 2).map(d => ({ id: d.id, title: d.issue, time: d.timestamp?.toDate() || new Date(), type: d.severity === 'Critical' ? 'urgent' : 'normal' })));
+      const combined = [...(rkSnap1?.docs || []), ...(rkSnap2?.docs || [])];
+      const unique = Array.from(new Map(combined.map(d => [d.id, { id: d.id, ...d.data() as any }])).values())
+        .sort((a, b) => (b.timestamp?.toDate()?.getTime() || 0) - (a.timestamp?.toDate()?.getTime() || 0));
+      setRecentAlerts(unique.slice(0, 3).map(d => ({ id: d.id, title: d.issue, time: d.timestamp?.toDate() || new Date(), urgent: d.severity === "Critical" })));
     };
-    const unsubRisk1 = onSnapshot(query(collection(db, "risks"), where("studentId", "==", studentData.id)), (snap) => { riskSnap1 = snap; processRisks(); });
-    const unsubRisk2 = studentEmail ? onSnapshot(query(collection(db, "risks"), where("studentEmail", "==", studentEmail)), (snap) => { riskSnap2 = snap; processRisks(); }) : () => {};
+    const u9 = onSnapshot(query(collection(db, "risks"), where("studentId", "==", studentData.id)), s => { rkSnap1 = s; processRisks(); });
+    const u10 = email ? onSnapshot(query(collection(db, "risks"), where("studentEmail", "==", email)), s => { rkSnap2 = s; processRisks(); }) : () => {};
 
-    return () => { 
-        unsubAtt1(); unsubAtt2(); unsubEn1(); unsubEn2(); 
-        unsubRes1(); unsubRes2(); unsubGB1(); unsubGB2(); unsubRisk1(); unsubRisk2(); 
-    };
+    return () => [u1, u2, u3, u4, u5, u6, u7, u8, u9, u10].forEach(u => u());
   }, [studentData?.id]);
 
-  // ─── AI INSIGHTS ENGINE ───
   useEffect(() => {
-    if (!studentData?.id || liveStats.attendance === "...") return;
-
-    const fetchAI = async () => {
-      setIsAnalyzing(true);
-      try {
-        const context = {
-          child_name: studentData.name,
-          attendance: liveStats.attendance,
-          avg_score: liveStats.avgScore,
-          pending: liveStats.pending,
-          grade: studentData.grade || "8"
-        };
-        const result = await ParentAIController.getDashboardInsights(context);
-        if (result.status === "success") setAiInsights(result.data);
-      } catch (e) {
-        console.error("AI Sync Failure", e);
-      } finally {
-        setIsAnalyzing(false);
-      }
-    };
-    fetchAI();
-  }, [studentData?.id, liveStats.attendance, liveStats.pending]);
+    if (!studentData?.id || dataLoading) return;
+    ParentAIController.getDashboardInsights({
+      child_name: studentData.name,
+      attendance: `${liveStats.attendance}%`,
+      avg_score: `${liveStats.avgScore}%`,
+      pending: liveStats.pending,
+      grade: studentData.grade || "8"
+    }).then(r => { if (r.status === "success") setAiInsights(r.data); }).catch(() => {});
+  }, [studentData?.id, dataLoading]);
 
   if (studentData?.status === "Invited") return (
-     <div className="h-[80vh] flex flex-col items-center justify-center p-10 text-center">
-        <Rocket className="w-20 h-20 text-[#1e3a8a] animate-bounce mb-8" />
-        <h1 className="text-4xl font-black text-slate-900 mb-4 tracking-tighter">Identity Matrix Detected</h1>
-        <p className="text-lg font-bold text-slate-400 max-w-md mx-auto italic">Your institutional access is being provisioned. Please wait for the final synchronization cycle.</p>
-        <div className="mt-10 flex gap-4 animate-pulse uppercase font-black text-[10px] text-slate-300 tracking-[0.3em]">
-           <span>Encrypting</span> • <span>Syncing</span> • <span>Finalizing</span>
-        </div>
-     </div>
+    <div className="h-[80vh] flex flex-col items-center justify-center p-10 text-center gap-4">
+      <Loader2 className="w-12 h-12 text-[#1e3a8a] animate-spin opacity-40" />
+      <h2 className="text-xl font-bold text-slate-700">Setting up your account...</h2>
+      <p className="text-sm text-slate-400">Your access is being provisioned. Please wait.</p>
+    </div>
   );
 
+  const greeting = currentTime.getHours() < 12 ? "Good Morning" : currentTime.getHours() < 17 ? "Good Afternoon" : "Good Evening";
+  const parentFirstName = user?.displayName?.split(" ")[0] || "Parent";
+  const childFirstName = studentData?.name?.split(" ")[0] || "your child";
+  const userInitials = getInitials(user?.displayName || "RS");
+  const studentInitials = getInitials(studentData?.name || "AS");
+
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-10 duration-1000 pb-24 text-left font-sans">
-      
-      {/* ─── RESULT OF CLICK LABEL (As in screenshot) ─── */}
-      <div className="flex justify-between items-center mb-8 px-4">
-          <p className="text-[10px] font-black text-slate-900 uppercase tracking-[0.2em] opacity-80 italic">RESULT OF CLICK: "DASHBOARD"</p>
-          <div className="flex items-center gap-4">
-             <button className="w-10 h-10 rounded-full hover:bg-slate-50 flex items-center justify-center relative">
-                <Bell className="w-5 h-5 text-slate-600"/>
-                <div className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
-             </button>
-             <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-[#1e3a8a] text-white flex items-center justify-center text-xs font-black">{user?.displayName?.substring(0,2).toUpperCase() || 'RS'}</div>
-                <div className="text-left hidden sm:block">
-                   <p className="text-[11px] font-black text-slate-900 leading-none mb-1">{user?.displayName || "Rahul Sharma"}</p>
-                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">Parent</p>
-                </div>
-             </div>
+    <div className="animate-in fade-in duration-500 pb-20">
+
+      {/* Top Bar */}
+      <div className="flex justify-between items-center mb-8">
+        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Result of click: "Dashboard"</p>
+        <div className="flex items-center gap-3">
+          <button className="relative w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center transition-all">
+            <Bell className="w-4 h-4 text-slate-500" />
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
+          </button>
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-[#1e3a8a] text-white flex items-center justify-center text-xs font-bold">{userInitials}</div>
+            <div className="hidden sm:block">
+              <p className="text-sm font-semibold text-slate-800 leading-none">{user?.displayName || "Parent"}</p>
+              <p className="text-xs text-slate-400 mt-0.5">Parent</p>
+            </div>
           </div>
+        </div>
       </div>
 
-      {/* ─── WELCOME SECTION ─── */}
-      <div className="mb-12 px-4">
-         <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-none mb-2">Good {currentTime.getHours() < 12 ? 'Morning' : currentTime.getHours() < 17 ? 'Afternoon' : 'Evening'}, {user?.displayName?.split(' ')[0] || "Rahul"}! 🖐️</h1>
-         <p className="text-lg font-bold text-slate-400 italic">Here's how {studentData?.name?.split(' ')[0] || "Aditya"} is doing today</p>
+      {/* Greeting */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-slate-900">{greeting}, {parentFirstName}! 👋</h1>
+        <p className="text-slate-500 mt-1">Here's how {childFirstName} is doing today</p>
       </div>
 
-      {/* ─── MAIN CARDS GRID ─── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 px-2 mb-12">
-         
-         {/* ACADEMIC HEALTH CARD (Big Card) */}
-         <div className="lg:col-span-12 bg-white border border-slate-100 rounded-[2.5rem] p-10 flex flex-col md:flex-row items-center justify-between shadow-sm hover:shadow-xl transition-all group overflow-hidden relative">
-            <div className="absolute -top-10 -right-10 w-64 h-64 bg-slate-50 rounded-full blur-3xl opacity-50 group-hover:scale-125 transition-transform" />
-            <div className="text-left relative z-10 w-full md:w-auto">
-               <h3 className="text-2xl font-black text-slate-800 mb-2 tracking-tight">Academic Health</h3>
-               <p className="text-sm font-bold text-slate-400 mb-8">Overall performance indicator</p>
-               <div className="flex items-center gap-3 text-emerald-500 font-bold">
-                  <ArrowUp className="w-5 h-5" /> 
-                  <span className="text-base uppercase tracking-tighter">Improved by {liveStats.trendPct} from last month</span>
-               </div>
-            </div>
-            
-            <div className="flex items-center gap-8 mt-10 md:mt-0 relative z-10">
-               <div className="text-right">
-                  <h2 className="text-6xl font-black text-emerald-500 leading-none">{liveStats.avgScore}</h2>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">{parseInt(liveStats.avgScore) >= 80 ? 'Good Standing' : 'Evaluation Pending'}</p>
-               </div>
-               <div className="w-24 h-24 rounded-full border-[10px] border-slate-100 border-t-emerald-500 rotate-[45deg] flex items-center justify-center relative">
-                  <div className="absolute w-20 h-20 rounded-full border-2 border-slate-50" />
-               </div>
-            </div>
-         </div>
-
-         {/* 4 SMALL STAT CARDS */}
-         <div className="lg:col-span-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            <StatSmallCard icon={CheckCircle} color="emerald" label="Attendance" value={liveStats.attendance} tag="On track" />
-            <StatSmallCard icon={AlertCircle} color="amber" label="Pending Work" value={liveStats.pending.toString()} tag="Due this week" />
-            <StatSmallCard icon={Calendar} color="indigo" label="Upcoming Tests" value={liveStats.tests.toString()} tag="Next 7 days" />
-            <StatSmallCard icon={Star} color="emerald" label="Recent Grade" value={liveStats.recentGrade} tag={liveStats.recentSubject} />
-         </div>
-
-         {/* PROFILE SECTION & ALERTS */}
-         <div className="lg:col-span-8">
-            <div className="bg-white border border-slate-100 rounded-[2.5rem] p-10 flex flex-col md:flex-row items-center gap-12 shadow-sm relative overflow-hidden group">
-               <div className="w-32 h-32 rounded-[2.5rem] bg-[#1e3a8a] flex items-center justify-center text-white text-4xl font-black italic shadow-2xl group-hover:rotate-6 transition-transform">
-                  {studentData?.name?.[0] || 'A'}
-               </div>
-               <div className="flex-1 text-left">
-                  <h2 className="text-4xl font-black text-slate-800 tracking-tighter mb-2 italic uppercase">{studentData?.name}</h2>
-                  <p className="text-xs font-black text-[#1e3a8a] uppercase tracking-[0.2em] mb-1">{studentData?.schoolName || "Institutional Academy"}</p>
-                  <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-10">Class: {studentMeta.className} • Roll: {studentMeta.rollNo}</p>
-                  
-                  <div className="grid grid-cols-2 gap-10">
-                     <div className="space-y-1">
-                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Class Teacher</p>
-                        <p className="text-base font-black text-slate-800">{teacherInfo.name}</p>
-                     </div>
-                     <div className="space-y-1">
-                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Academic Year</p>
-                        <p className="text-base font-black text-slate-800 italic">2025-26</p>
-                     </div>
-                  </div>
-               </div>
-            </div>
-         </div>
-
-         <div className="lg:col-span-4">
-            <div className="bg-white border border-slate-100 rounded-[2.5rem] p-10 h-full shadow-sm flex flex-col">
-               <h3 className="text-xl font-black text-slate-800 mb-8 tracking-tight text-left">Recent Alerts</h3>
-               <div className="space-y-4 flex-1">
-                  {recentAlerts.length > 0 ? recentAlerts.map(alert => (
-                    <div key={alert.id} className={`p-6 rounded-2xl border text-left ${alert.type === 'urgent' ? 'bg-amber-50 border-amber-100' : 'bg-emerald-50 border-emerald-100'}`}>
-                       <div className="flex items-start gap-4">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${alert.type === 'urgent' ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'}`}>
-                             {alert.type === 'urgent' ? <Clock size={20}/> : <CheckCircle size={20}/>}
-                          </div>
-                          <div>
-                             <p className="text-sm font-black text-slate-900 leading-tight mb-1">{alert.title}</p>
-                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{alert.time.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} • {alert.time.toLocaleDateString()}</p>
-                          </div>
-                       </div>
-                    </div>
-                  )) : (
-                    <div className="flex-1 flex flex-col items-center justify-center opacity-20 py-10">
-                       <ShieldCheck size={48} className="mb-4" />
-                       <p className="text-[10px] font-black uppercase tracking-widest">No Alerts Flagged</p>
-                    </div>
-                  )}
-               </div>
-            </div>
-         </div>
-
+      {/* Academic Health */}
+      <div className="bg-white border border-slate-100 rounded-2xl p-6 mb-5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <h3 className="text-lg font-bold text-slate-800">Academic Health</h3>
+          <p className="text-sm text-slate-400 mt-0.5">Overall performance indicator</p>
+          <div className="flex items-center gap-2 text-emerald-500 font-semibold text-sm mt-4">
+            <ArrowUp className="w-4 h-4" />
+            <span>Improved by {liveStats.trendPct}% from last month</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="text-right">
+            <p className="text-4xl font-bold text-emerald-500">{liveStats.avgScore > 0 ? `${liveStats.avgScore}%` : "—"}</p>
+            <p className="text-xs text-slate-400 mt-1">{liveStats.avgScore >= 75 ? "Good Standing" : liveStats.avgScore > 0 ? "Needs Attention" : "No data yet"}</p>
+          </div>
+          <ProgressRing pct={liveStats.avgScore} />
+        </div>
       </div>
 
-      {/* ─── AI INSIGHTS NARRATIVE (Institutional Bottom) ─── */}
-      <div className="px-2">
-         <div className="bg-slate-900 rounded-[3rem] p-10 text-white relative overflow-hidden group hover:shadow-2xl hover:shadow-blue-900/20 transition-all">
-            <div className="absolute top-0 right-0 p-10 opacity-5 scale-150 rotate-12 transition-transform duration-1000 group-hover:rotate-0">
-               <BrainCircuit className="w-64 h-64 text-white" />
+      {/* 4 Stat Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+        {[
+          { icon: CheckCircle, colorCls: "bg-emerald-50 text-emerald-600", tagCls: "text-emerald-600", label: "Attendance", value: `${liveStats.attendance}%`, tag: liveStats.attendance >= 85 ? "On track" : "Below target" },
+          { icon: AlertCircle, colorCls: "bg-amber-50 text-amber-600", tagCls: "text-amber-500", label: "Pending Work", value: liveStats.pending.toString(), tag: "Due this week" },
+          { icon: Calendar, colorCls: "bg-indigo-50 text-indigo-600", tagCls: "text-slate-400", label: "Upcoming Tests", value: liveStats.tests.toString(), tag: "Next 7 days" },
+          { icon: Star, colorCls: "bg-emerald-50 text-emerald-600", tagCls: "text-emerald-600", label: "Recent Grade", value: liveStats.recentGrade, tag: liveStats.recentSubject },
+        ].map(({ icon: Icon, colorCls, tagCls, label, value, tag }) => (
+          <div key={label} className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${colorCls}`}>
+              <Icon className="w-5 h-5" />
             </div>
-            <div className="relative z-10">
-               <div className="flex items-center gap-4 mb-8 bg-white/10 w-fit px-6 py-2.5 rounded-full border border-white/5">
-                  <Sparkles className="w-5 h-5 text-amber-400" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.3em]">Institutional AI Synthesis</span>
-               </div>
-               <h2 className="text-3xl font-black text-left leading-[1.2] italic max-w-4xl tracking-tighter">
-                  "{aiInsights?.child_summary_narrative || `${studentData?.name} is successfully fulfilling all institutional requirements. A detailed academic narrative will populate as soon as the next audit cycle is finalized.`}"
-               </h2>
-               <div className="mt-10 flex gap-10 border-t border-white/10 pt-8">
-                  <div>
-                     <p className="text-[9px] font-black text-blue-300 uppercase tracking-[0.2em] mb-2 leading-none">Status</p>
-                     <p className="text-sm font-black text-white italic uppercase tracking-tighter">High Stability Matrix</p>
-                  </div>
-                  <div>
-                     <p className="text-[9px] font-black text-blue-300 uppercase tracking-[0.2em] mb-2 leading-none">Peer Rank</p>
-                     <p className="text-sm font-black text-white italic uppercase tracking-tighter">Upper Quartile</p>
-                  </div>
-               </div>
-            </div>
-         </div>
+            <p className="text-xs text-slate-400 mb-1">{label}</p>
+            <p className="text-2xl font-bold text-slate-800">{value}</p>
+            <p className={`text-xs font-medium mt-1 ${tagCls}`}>{tag}</p>
+          </div>
+        ))}
       </div>
+
+      {/* Student Profile + Alerts */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-5">
+        <div className="lg:col-span-3 bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center gap-4 mb-5">
+            <div className="w-16 h-16 rounded-2xl bg-[#1e3a8a] text-white flex items-center justify-center text-xl font-bold flex-shrink-0">
+              {studentInitials}
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-slate-800">{studentData?.name || "Student"}</h3>
+              <p className="text-sm text-slate-400 mt-0.5">
+                {studentMeta.className !== "—" ? `Grade ${studentMeta.className}` : studentData?.grade ? `Grade ${studentData.grade}` : ""}
+                {studentMeta.rollNo !== "—" ? ` • Roll ${studentMeta.rollNo}` : ""}
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4 border-t border-slate-50 pt-5">
+            <div>
+              <p className="text-xs text-slate-400 mb-1">Class Teacher</p>
+              <p className="text-sm font-semibold text-slate-700">{teacherInfo.name}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 mb-1">Academic Year</p>
+              <p className="text-sm font-semibold text-slate-700">2025-26</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-2 bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
+          <h3 className="text-base font-bold text-slate-800 mb-4">Recent Alerts</h3>
+          <div className="space-y-3">
+            {recentAlerts.length > 0 ? recentAlerts.map(alert => (
+              <div key={alert.id} className={`flex items-start gap-3 p-3 rounded-xl ${alert.urgent ? "bg-amber-50" : "bg-emerald-50"}`}>
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${alert.urgent ? "bg-amber-100 text-amber-600" : "bg-emerald-100 text-emerald-600"}`}>
+                  {alert.urgent ? <Clock className="w-3.5 h-3.5" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-800 leading-snug">{alert.title}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{timeAgo(alert.time)}</p>
+                </div>
+              </div>
+            )) : (
+              <div className="flex flex-col items-center justify-center py-8 text-slate-300 gap-2">
+                <ShieldCheck className="w-10 h-10" />
+                <p className="text-xs">No alerts right now</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* AI Insights */}
+      <div className="bg-slate-900 rounded-2xl p-7 text-white relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
+          <BrainCircuit className="w-48 h-48" />
+        </div>
+        <div className="relative z-10">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles className="w-4 h-4 text-amber-400" />
+            <span className="text-xs font-semibold uppercase tracking-widest text-slate-300">AI Insight</span>
+          </div>
+          <p className="text-base font-medium text-slate-100 leading-relaxed max-w-2xl">
+            "{aiInsights?.child_summary_narrative || `${childFirstName} is meeting academic expectations. A detailed summary will appear once more activity data is available.`}"
+          </p>
+        </div>
+      </div>
+
     </div>
   );
 };
-
-const StatSmallCard = ({ icon: Icon, color, label, value, tag }: any) => {
-   const colorClasses = {
-      emerald: "bg-emerald-50 text-emerald-500 border-emerald-100",
-      amber: "bg-amber-50 text-amber-500 border-amber-100",
-      indigo: "bg-indigo-50 text-indigo-500 border-indigo-100",
-      rose: "bg-rose-50 text-rose-500 border-rose-100",
-   };
-   
-   const classes = colorClasses[color as keyof typeof colorClasses] || colorClasses.emerald;
-   
-   return (
-      <div className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm flex flex-col items-start gap-6 hover:shadow-lg transition-all group">
-         <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border shadow-inner ${classes}`}>
-            <Icon size={24} />
-         </div>
-         <div className="text-left w-full">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-            <h4 className="text-4xl font-black text-slate-800 leading-none mb-4">{value}</h4>
-            <p className={`text-[11px] font-bold uppercase tracking-tighter italic ${color === 'amber' ? 'text-amber-500' : 'text-emerald-500'}`}>{tag}</p>
-         </div>
-      </div>
-   );
-};
-
-const FileText = (props:any) => <CheckSquare {...props} />;
 
 export default DashboardPage;

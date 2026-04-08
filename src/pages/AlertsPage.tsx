@@ -1,468 +1,586 @@
- import { useState, useEffect } from "react";
-import { 
-  AlertCircle, Clock, Trophy, Calendar, CheckCircle, User, Sparkles, Brain, 
-  ArrowRight, Loader2, Info, BellRing, ChevronRight, XCircle, Eye, ShieldAlert, Star,
-  AlertTriangle, BookOpen, HandHeart, Lightbulb
+import { useState, useEffect } from "react";
+import {
+  AlertCircle, Clock, Trophy, Calendar, User,
+  Loader2, BellRing, CheckCircle, BookOpen, ShieldAlert
 } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useNavigate } from "react-router-dom";
-import { ParentAIController } from "../ai/controller/ai-controller";
 import { useAuth } from "@/lib/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, orderBy, getDocs, addDoc, deleteDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
+import {
+  collection, query, where, onSnapshot,
+  doc, updateDoc
+} from "firebase/firestore";
 import { toast } from "sonner";
 
-const filterTabs = ["All", "Academic", "Attendance", "Behavior"];
+const filterTabs = ["All", "Academic", "Attendance", "General"];
+
+interface ParsedAlert {
+  id: string;
+  title: string;
+  description: string;
+  category: "Academic" | "Attendance" | "General";
+  priority: "High Priority" | "Medium Priority" | "Good News" | "General";
+  createdAt: any;
+  teacherName?: string;
+  date?: string;
+  arrivalTime?: string;
+  source: string; // which collection it came from
+  sourceId?: string; // for dismissing in Firestore
+  dismissed?: boolean;
+}
 
 const AlertsPage = () => {
   const { studentData } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
-  const [analyzingId, setAnalyzingId] = useState<string | null>(null);
-  const [aiStories, setAiStories] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [alerts, setAlerts] = useState<any[]>([]);
+  const [dismissed, setDismissed] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("dismissed_alerts") || "[]")); }
+    catch { return new Set(); }
+  });
+
+  // Raw data from Firebase
+  const [risks, setRisks] = useState<any[]>([]);
+  const [attendance, setAttendance] = useState<any[]>([]);
+  const [scores, setScores] = useState<any[]>([]);
+  const [notes, setNotes] = useState<any[]>([]);
+  const [assignments, setAssignments] = useState<any[]>([]);
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [smartAlerts, setSmartAlerts] = useState<any[]>([]);
 
   useEffect(() => {
     if (!studentData?.id) return;
     setLoading(true);
-    const studentEmail = studentData.email?.toLowerCase() || "";
+    const sid = studentData.id;
+    const email = studentData.email?.toLowerCase() || "";
 
-    // State buckets for merging
-    let smartSnap1: any = null, smartSnap2: any = null;
-    let attSnap1: any = null, attSnap2: any = null;
+    const unsubs: (() => void)[] = [];
+    let loaded = 0;
+    const total = 7; // number of collections
+
+    const done = () => {
+      loaded++;
+      if (loaded >= total) setLoading(false);
+    };
+
+    // Helper: merge two snapshots by id
+    const merge = (s1: any, s2: any) => {
+      const m = new Map();
+      [...(s1?.docs || []), ...(s2?.docs || [])].forEach((d: any) => {
+        if (!m.has(d.id)) m.set(d.id, { id: d.id, ...d.data() });
+      });
+      return Array.from(m.values());
+    };
+
+    // Dual snapshot helper
+    const dualSnap = (
+      collName: string,
+      setter: (docs: any[]) => void,
+    ) => {
+      let s1: any = null, s2: any = null;
+      const process = () => setter(merge(s1, s2));
+
+      const q1 = query(collection(db, collName), where("studentId", "==", sid));
+      const q2 = email
+        ? query(collection(db, collName), where("studentEmail", "==", email))
+        : null;
+
+      const u1 = onSnapshot(q1, s => { s1 = s; process(); done(); });
+      unsubs.push(u1);
+      if (q2) {
+        const u2 = onSnapshot(q2, s => { s2 = s; process(); });
+        unsubs.push(u2);
+      } else {
+        done();
+      }
+    };
+
+    // 1. risks — teacher-created student risk flags
+    dualSnap("risks", setRisks);
+
+    // 2. attendance
+    dualSnap("attendance", setAttendance);
+
+    // 3. test_scores + gradebook_scores merged
+    let scoreSnap1: any = null, scoreSnap2: any = null;
+    let gbSnap1: any = null, gbSnap2: any = null;
+    const processScores = () => {
+      const ts = merge(scoreSnap1, scoreSnap2);
+      const gb = merge(gbSnap1, gbSnap2).map(d => ({
+        ...d, testName: d.columnName || "Class Assessment",
+        score: d.mark, maxScore: d.maxMarks || 100
+      }));
+      const all = new Map();
+      [...ts, ...gb].forEach(d => { if (!all.has(d.id)) all.set(d.id, d); });
+      setScores(Array.from(all.values()));
+    };
+    const us1 = onSnapshot(query(collection(db, "test_scores"), where("studentId", "==", sid)), s => { scoreSnap1 = s; processScores(); done(); });
+    const us2 = email ? onSnapshot(query(collection(db, "test_scores"), where("studentEmail", "==", email)), s => { scoreSnap2 = s; processScores(); }) : null;
+    const ug1 = onSnapshot(query(collection(db, "gradebook_scores"), where("studentId", "==", sid)), s => { gbSnap1 = s; processScores(); });
+    const ug2 = email ? onSnapshot(query(collection(db, "gradebook_scores"), where("studentEmail", "==", email)), s => { gbSnap2 = s; processScores(); }) : null;
+    unsubs.push(us1, ug1);
+    if (us2) unsubs.push(us2);
+    if (ug2) unsubs.push(ug2);
+
+    // 4. parent_notes (teacher notes to parent)
+    dualSnap("parent_notes", setNotes);
+
+    // 5. student_smart_alerts (AI-generated)
+    dualSnap("student_smart_alerts", setSmartAlerts);
+
+    // 6. submissions (to detect overdue assignments)
+    dualSnap("submissions", setSubmissions);
+
+    // 7. enrollments → classIds → assignments
     let enrollSnap1: any = null, enrollSnap2: any = null;
-    let scoresSnap1: any = null, scoresSnap2: any = null;
-    let notesSnap1: any = null, notesSnap2: any = null;
-
-    const processAll = () => {
-      const allSmart = [...(smartSnap1?.docs || []), ...(smartSnap2?.docs || [])];
-      const allAtt = [...(attSnap1?.docs || []), ...(attSnap2?.docs || [])];
-      const allEnroll = [...(enrollSnap1?.docs || []), ...(enrollSnap2?.docs || [])];
-      const allScores = [...(scoresSnap1?.docs || []), ...(scoresSnap2?.docs || [])];
-      const allNotes = [...(notesSnap1?.docs || []), ...(notesSnap2?.docs || [])];
-
-      const seen = new Set();
-      const smart = allSmart.filter(d => { if(!seen.has(d.id)){ seen.add(d.id); return true;} return false; }).map(d => ({id: d.id, ...d.data()}));
-      
-      const seenAtt = new Set();
-      const direct = allAtt.filter(d => { if(!seenAtt.has(d.id)){ seenAtt.add(d.id); return true;} return false; }).map(d => ({id: d.id, ...d.data(), isSystem: true, type: 'attendance'}));
-      
-      const seenEnroll = new Set();
-      const enroll = allEnroll.filter(d => { if(!seenEnroll.has(d.id)){ seenEnroll.add(d.id); return true;} return false; }).map(d => ({id: d.id, ...d.data(), isSystem: true, type: 'rating'}));
-      
-      const seenScores = new Set();
-      const scores = allScores.filter(d => { if(!seenScores.has(d.id)){ seenScores.add(d.id); return true;} return false; }).map(d => ({id: d.id, ...d.data(), isSystem: true, type: 'academic'}));
-      
-      const seenNotes = new Set();
-      const notes = allNotes.filter(d => { if(!seenNotes.has(d.id)){ seenNotes.add(d.id); return true;} return false; }).map(d => ({id: d.id, ...d.data(), isSystem: true, type: 'behaviour'}));
-
-      setAlerts([...smart, ...direct, ...enroll, ...scores, ...notes]);
-      setLoading(false);
+    let unsubAssign: (() => void) | null = null;
+    const processEnrollments = () => {
+      const enrolls = merge(enrollSnap1, enrollSnap2);
+      const classIds = [...new Set(enrolls.map((e: any) => e.classId).filter(Boolean))] as string[];
+      if (unsubAssign) { unsubAssign(); unsubAssign = null; }
+      if (classIds.length === 0) { done(); return; }
+      unsubAssign = onSnapshot(
+        query(collection(db, "assignments"), where("classId", "in", classIds.slice(0, 10))),
+        s => { setAssignments(s.docs.map(d => ({ id: d.id, ...d.data() }))); done(); }
+      );
     };
+    const ue1 = onSnapshot(query(collection(db, "enrollments"), where("studentId", "==", sid)), s => { enrollSnap1 = s; processEnrollments(); });
+    const ue2 = email ? onSnapshot(query(collection(db, "enrollments"), where("studentEmail", "==", email)), s => { enrollSnap2 = s; processEnrollments(); }) : null;
+    unsubs.push(ue1);
+    if (ue2) unsubs.push(ue2);
 
-    const unsubSmart1 = onSnapshot(query(collection(db, "student_smart_alerts"), where("studentId", "==", studentData.id)), (s) => { smartSnap1 = s; processAll(); });
-    const unsubSmart2 = studentEmail ? onSnapshot(query(collection(db, "student_smart_alerts"), where("studentEmail", "==", studentEmail)), (s) => { smartSnap2 = s; processAll(); }) : () => {};
-    
-    const unsubAtt1 = onSnapshot(query(collection(db, "attendance"), where("studentId", "==", studentData.id)), (s) => { attSnap1 = s; processAll(); });
-    const unsubAtt2 = studentEmail ? onSnapshot(query(collection(db, "attendance"), where("studentEmail", "==", studentEmail)), (s) => { attSnap2 = s; processAll(); }) : () => {};
-
-    const unsubEnroll1 = onSnapshot(query(collection(db, "enrollments"), where("studentId", "==", studentData.id)), (s) => { enrollSnap1 = s; processAll(); });
-    const unsubEnroll2 = studentEmail ? onSnapshot(query(collection(db, "enrollments"), where("studentEmail", "==", studentEmail)), (s) => { enrollSnap2 = s; processAll(); }) : () => {};
-
-    const unsubScores1 = onSnapshot(query(collection(db, "test_scores"), where("studentId", "==", studentData.id)), (s) => { scoresSnap1 = s; processAll(); });
-    const unsubScores2 = studentEmail ? onSnapshot(query(collection(db, "test_scores"), where("studentEmail", "==", studentEmail)), (s) => { scoresSnap2 = s; processAll(); }) : () => {};
-
-    const unsubNotes1 = onSnapshot(query(collection(db, "parent_notes"), where("studentId", "==", studentData.id)), (s) => { notesSnap1 = s; processAll(); });
-    const unsubNotes2 = studentEmail ? onSnapshot(query(collection(db, "parent_notes"), where("studentEmail", "==", studentEmail)), (s) => { notesSnap2 = s; processAll(); }) : () => {};
-
-    const runPulse = async () => {
-       const lastPulse = localStorage.getItem(`last_pulse_${studentData.id}`);
-       if (!lastPulse || (Date.now() - parseInt(lastPulse) > 1000 * 60 * 60 * 1)) {
-          generateAIAlerts();
-       }
-    };
-    runPulse();
-
-    return () => { 
-        unsubSmart1(); unsubSmart2(); unsubAtt1(); unsubAtt2(); 
-        unsubEnroll1(); unsubEnroll2(); unsubScores1(); unsubScores2(); 
-        unsubNotes1(); unsubNotes2(); 
+    return () => {
+      unsubs.forEach(u => u());
+      if (unsubAssign) unsubAssign();
     };
   }, [studentData?.id]);
 
-  const markAsRead = async (id: string) => {
-      try {
-         await updateDoc(doc(db, "student_smart_alerts", id), {
-            resolved: true
-         });
-         toast.success("Notification acknowledged.");
-      } catch (e) {
-         toast.error("Process failed.");
-      }
-   };
+  // Build parsed alerts from all sources
+  const buildAlerts = (): ParsedAlert[] => {
+    const result: ParsedAlert[] = [];
+    const name = studentData?.name || "Student";
+    const now = Date.now();
 
-  const generateAIAlerts = async () => {
-      if (!studentData?.id) return;
-      setIsRefreshing(true);
-      try {
-         const studentId = studentData.id;
-         const studentEmail = studentData.email?.toLowerCase() || "";
-
-         // Dual-Lookup Context Gathering
-         const fetchDual = async (coll: string) => {
-            const s1 = await getDocs(query(collection(db, coll), where("studentId", "==", studentId)));
-            const s2 = studentEmail ? await getDocs(query(collection(db, coll), where("studentEmail", "==", studentEmail))) : { docs: [] };
-            const seen = new Set();
-            return [...s1.docs, ...s2.docs].filter(d => { if(!seen.has(d.id)) { seen.add(d.id); return true; } return false; }).map(d => d.data() as any);
-         };
-
-         const [scoresData, attndData, notesData, enrollData] = await Promise.all([
-            fetchDual("test_scores"), fetchDual("attendance"), fetchDual("parent_notes"), fetchDual("enrollments")
-         ]);
-         
-         const context = {
-            student_name: studentData.name,
-            overall_grade: studentData.avgScorePct || "N/A",
-            behaviour_rating: enrollData[0]?.manualBehaviourRating || 5,
-            test_performance: scoresData.map(d => ({ test: d.testName, percentage: d.percentage || d.score, subject: d.subject })).slice(-10),
-            absent_dates: attndData.filter(d => (d.status || "").toLowerCase() === "absent").map(d => d.date).slice(-8),
-            teacher_notes: notesData.map(d => ({ category: d.category, content: d.content })).slice(-5),
-            attendance_summary: {
-               present: attndData.filter(d => (d.status || "").toLowerCase() === "present").length,
-               absent: attndData.filter(d => (d.status || "").toLowerCase() === "absent").length,
-               late: attndData.filter(d => (d.status || "").toLowerCase() === "late").length,
-               percentage: attndData.length > 0 
-                  ? Math.round((attndData.filter(d => (d.status || "").toLowerCase() === "present").length / attndData.length) * 100) 
-                  : 100
-            }
-         };
-
-         const result = await ParentAIController.generateLiveAlerts(context);
-         if (result.status === "success" && result.source !== "cache") {
-            const existing = await getDocs(query(collection(db, "student_smart_alerts"), where("studentId", "==", studentData.id), where("resolved", "==", false)));
-            for (const d of existing.docs) await deleteDoc(doc(db, "student_smart_alerts", d.id));
-            for (const alert of result.data) {
-               await addDoc(collection(db, "student_smart_alerts"), {
-                  ...alert,
-                  studentId: studentData.id,
-                  createdAt: serverTimestamp(),
-                  resolved: false
-               });
-            }
-            localStorage.setItem(`last_pulse_${studentData.id}`, Date.now().toString());
-            toast.success("AI Brain Sync Complete!");
-         }
-      } catch (e) {
-         toast.error("AI Sync Delayed.");
-      } finally {
-         setIsRefreshing(false);
-      }
-   };
-
-  const allMergedAlerts = (() => {
-    const fallbackTeacher = alerts.find(a => a.studentId === studentData?.id && !a.isSystem)?.teacherName || "Jamaal Bhai";
-    const behaviorRating = alerts.find(a => a.manualBehaviourRating !== undefined)?.manualBehaviourRating;
-
-    const directAttendanceAlerts = alerts
-      .filter(a => (a.status || "").toLowerCase() === "absent" && a.isSystem && (a as any).type === 'attendance')
-      .map(att => ({
-        id: `sys_${att.id}`,
-        title: "Absence Recorded",
-        description: `${studentData?.name || 'Student'} was marked as absent on ${att.date || 'a recent date'}.`,
-        category: "Attendance",
-        priority: "Critical",
-        icon: "Clock",
-        createdAt: att.timestamp || att.createdAt,
-        teacherName: att.teacherName || fallbackTeacher,
-        resolved: att.resolved || false,
-        isSystem: true
-      }));
-
-    const directAcademicAlerts = alerts
-      .filter(a => (a as any).type === 'academic' && a.isSystem)
-      .map(score => {
-        const pct = score.percentage || 0;
-        let priority = "Normal", title = "Result Published", color = "indigo", icon = "Target";
-        if (pct >= 85) { priority = "Good News"; title = "Academic Excellence"; color = "emerald"; icon = "Trophy"; }
-        else if (pct < 60) { priority = "Critical"; title = "Academic Intervention"; color = "rose"; icon = "AlertCircle"; }
-        return {
-          id: `sys_score_${score.id}`,
-          title, description: `${studentData?.name || 'Student'} achieved ${pct}% in ${score.subject || 'a subject'}.`,
-          category: "Academic", priority, icon, color,
-          createdAt: score.timestamp || score.createdAt,
-          teacherName: score.teacherName || fallbackTeacher,
-          resolved: false, isSystem: true
+    // ── SOURCE 1: risks collection (teacher-created flags) ──
+    risks
+      .filter(r => !r.resolved)
+      .forEach(r => {
+        const catMap: Record<string, ParsedAlert["category"]> = {
+          Attendance: "Attendance", Grades: "Academic",
+          Submissions: "Academic", Behavior: "General"
         };
-      });
-
-    const directBehaviorAlerts = alerts
-      .filter(a => (a as any).type === 'behaviour' && a.isSystem)
-      .map(note => {
-        const isPositive = (note.category || "").toLowerCase().includes("positive") || (note.category || "").toLowerCase().includes("praise");
-        return {
-          id: `sys_note_${note.id}`,
-          title: isPositive ? "Positive Conduct Observed" : "Behavioral Review Required",
-          description: `${studentData?.name || 'Student'}: ${note.content}`,
-          category: "Behavior",
-          priority: isPositive ? "Good News" : "Critical",
-          icon: isPositive ? "Star" : "AlertCircle",
-          color: isPositive ? "emerald" : "rose",
-          createdAt: note.timestamp || note.createdAt,
-          teacherName: note.teacherName || fallbackTeacher,
-          resolved: false, isSystem: true, manualBehaviourRating: behaviorRating
+        const priMap: Record<string, ParsedAlert["priority"]> = {
+          Critical: "High Priority", "High Priority": "High Priority",
+          "Medium Priority": "Medium Priority"
         };
+        result.push({
+          id: `risk_${r.id}`,
+          title: r.issue || "Risk Flag",
+          description: Array.isArray(r.details) ? r.details.join(" · ") : (r.issue || ""),
+          category: catMap[r.type] || "General",
+          priority: priMap[r.severity] || "Medium Priority",
+          createdAt: r.createdAt || null,
+          teacherName: r.teacherName || "",
+          source: "risks",
+          sourceId: r.id
+        });
       });
 
-    const ratingAlerts = [];
-    if (behaviorRating !== undefined && behaviorRating < 3.0) {
-      const improvements = alerts
-        .filter(a => (a as any).type === 'behaviour' && !((a.category || "").toLowerCase().includes("positive")))
-        .map(n => n.content).slice(0, 2).join(", ");
-      ratingAlerts.push({
-        id: `sys_rating_critical`, title: "Critical Behavioral Review",
-        description: `${studentData?.name || 'Student'}'s behavior rating is currently ${behaviorRating}/5. Areas of Improvement: ${improvements || 'General Conduct'}.`,
-        category: "Behavior", priority: "Critical", icon: "ShieldAlert", color: "rose",
-        createdAt: serverTimestamp(), teacherName: fallbackTeacher, resolved: false, isSystem: true,
-        needs_attention: "Discipline & Conduct", manualBehaviourRating: behaviorRating
-      });
-    }
-
-    const smartAlerts = alerts
-      .filter(a => a.studentId === studentData?.id && !a.isSystem && !a.date)
-      .map(a => ({ ...a, teacherName: a.teacherName || fallbackTeacher, manualBehaviourRating: behaviorRating }));
-
-    return [...directAttendanceAlerts, ...directAcademicAlerts, ...directBehaviorAlerts, ...ratingAlerts, ...smartAlerts];
-  })();
-
-  const getTrendData = () => {
-    const rawNotes = alerts.filter(a => a.type === 'behaviour');
-    const months: any = {};
-    const now = new Date();
-    
-    // ── Precise Enrollment Start Date ──
-    let startDate = new Date(now.getFullYear(), now.getMonth() - 4, 1);
-    const rawJoinDate = studentData?.enrolledAt || studentData?.createdAt;
-    if (rawJoinDate) {
-       const jDate = rawJoinDate.toDate ? rawJoinDate.toDate() : new Date(rawJoinDate);
-       startDate = new Date(jDate.getFullYear(), jDate.getMonth(), 1);
-       // Optimization: Use a 6-month window for maximum dashboard clarity
-       const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-       if (startDate < sixMonthsAgo) startDate = sixMonthsAgo;
-    }
-    
-    let tempDate = new Date(startDate);
-    while (tempDate <= now) {
-       const mName = tempDate.toLocaleString('default', { month: 'short' });
-       const mYear = tempDate.getFullYear().toString().slice(-2);
-       const key = `${mName} ${mYear}`;
-       months[key] = { m: mName, key, pos: 0, improv: 0, count: 0, date: new Date(tempDate) };
-       tempDate.setMonth(tempDate.getMonth() + 1);
-    }
-    rawNotes.forEach(n => {
-      const date = n.createdAt?.toDate ? n.createdAt.toDate() : new Date();
-      const mName = date.toLocaleString('default', { month: 'short' });
-      const mYear = date.getFullYear().toString().slice(-2);
-      const key = `${mName} ${mYear}`;
-      if (months[key]) {
-        const isPositive = (n.category || "").toLowerCase().includes("positive");
-        if (isPositive) months[key].pos++; else months[key].improv++;
-        months[key].count++;
+    // ── SOURCE 2: attendance (absent = High, late = Medium) ──
+    attendance.forEach(a => {
+      if (a.status === "absent") {
+        result.push({
+          id: `att_absent_${a.id}`,
+          title: "Absence Recorded",
+          description: `${name} was marked absent on ${fmtDateStr(a.date)}.`,
+          category: "Attendance",
+          priority: "High Priority",
+          createdAt: a.createdAt || null,
+          teacherName: a.teacherName || "",
+          date: a.date,
+          source: "attendance"
+        });
+      } else if (a.status === "late") {
+        result.push({
+          id: `att_late_${a.id}`,
+          title: "Late Arrival Recorded",
+          description: `${name} arrived late on ${fmtDateStr(a.date)}.`,
+          category: "Attendance",
+          priority: "Medium Priority",
+          createdAt: a.createdAt || null,
+          teacherName: a.teacherName || "",
+          date: a.date,
+          arrivalTime: a.arrivalTime || a.time || "",
+          source: "attendance"
+        });
       }
     });
-    const behaviorRating = alerts.find(a => a.manualBehaviourRating !== undefined)?.manualBehaviourRating;
-    return Object.values(months).map((data: any) => {
-       const isCurrentMonth = data.m === now.toLocaleString('default', { month: 'short' }) && data.date?.getFullYear() === now.getFullYear();
-       const calculatedScore = data.count === 0 ? 5.0 : Math.min(5.0, Math.max(1.0, 5.0 - (data.improv * 0.3) + (data.pos * 0.1)));
-       return { m: data.m, key: data.key, score: isCurrentMonth && behaviorRating !== undefined ? behaviorRating : calculatedScore };
+
+    // ── SOURCE 3: test_scores / gradebook_scores ──
+    const submittedIds = new Set(submissions.map(s => s.assignmentId));
+    scores.forEach(s => {
+      const pct = s.percentage ?? (s.maxScore > 0 ? (s.score / s.maxScore * 100) : 0);
+      if (pct >= 85) {
+        result.push({
+          id: `score_good_${s.id}`,
+          title: `Great Score in ${s.subject || "a Subject"}!`,
+          description: `${name} scored ${Math.round(pct)}% in ${s.testName || s.subject || "a test"}. Keep it up!`,
+          category: "Academic",
+          priority: "Good News",
+          createdAt: s.timestamp || s.createdAt || null,
+          teacherName: s.teacherName || "",
+          source: "test_scores"
+        });
+      } else if (pct < 60 && pct > 0) {
+        result.push({
+          id: `score_low_${s.id}`,
+          title: `Low Score — ${s.subject || "Subject"}`,
+          description: `${name} scored ${Math.round(pct)}% in "${s.testName || "a test"}". Consider reviewing this topic.`,
+          category: "Academic",
+          priority: "High Priority",
+          createdAt: s.timestamp || s.createdAt || null,
+          teacherName: s.teacherName || "",
+          source: "test_scores"
+        });
+      }
     });
+
+    // ── SOURCE 4: assignments (overdue + due soon) ──
+    assignments.forEach(a => {
+      if (!a.dueDate) return;
+      const due = a.dueDate?.toMillis?.() || new Date(a.dueDate).getTime();
+      if (!due) return;
+      const alreadySubmitted = submittedIds.has(a.id);
+      if (alreadySubmitted) return;
+
+      const diffMs = due - now;
+      const diffDays = Math.ceil(diffMs / (1000 * 3600 * 24));
+
+      if (diffMs < 0) {
+        // Overdue
+        result.push({
+          id: `assign_overdue_${a.id}`,
+          title: "Assignment Overdue",
+          description: `"${a.title}" was due on ${fmtTs(a.dueDate)} and has not been submitted yet.`,
+          category: "Academic",
+          priority: "High Priority",
+          createdAt: a.dueDate,
+          teacherName: a.teacherName || "",
+          source: "assignments"
+        });
+      } else if (diffDays <= 3) {
+        // Due soon
+        result.push({
+          id: `assign_soon_${a.id}`,
+          title: "Assignment Due Soon",
+          description: `"${a.title}" is due in ${diffDays} day${diffDays === 1 ? "" : "s"} (${fmtTs(a.dueDate)}). Please ensure ${name} submits it on time.`,
+          category: "Academic",
+          priority: "Medium Priority",
+          createdAt: a.createdAt || null,
+          teacherName: a.teacherName || "",
+          source: "assignments"
+        });
+      }
+    });
+
+    // ── SOURCE 5: parent_notes (teacher notes to parent) ──
+    notes.forEach(n => {
+      const isPositive = (n.category || "").toLowerCase().includes("positive") || (n.category || "").toLowerCase().includes("praise");
+      result.push({
+        id: `note_${n.id}`,
+        title: isPositive ? "Positive Note from Teacher" : "Teacher Note",
+        description: n.content || "A note from your teacher.",
+        category: "General",
+        priority: isPositive ? "Good News" : "Medium Priority",
+        createdAt: n.createdAt || null,
+        teacherName: n.teacherName || "",
+        source: "parent_notes"
+      });
+    });
+
+    // ── SOURCE 6: student_smart_alerts (AI-generated) ──
+    smartAlerts
+      .filter(a => !a.resolved)
+      .forEach(a => {
+        const cat = a.category === "Behavior" ? "General" : (a.category || "General");
+        result.push({
+          id: `smart_${a.id}`,
+          title: a.title || "Alert",
+          description: a.description || "",
+          category: cat as ParsedAlert["category"],
+          priority: a.priority || "Medium Priority",
+          createdAt: a.createdAt || null,
+          teacherName: a.teacherName || "",
+          source: "student_smart_alerts",
+          sourceId: a.id
+        });
+      });
+
+    // Deduplicate by id, filter dismissed
+    const seen = new Set<string>();
+    return result
+      .filter(a => !dismissed.has(a.id) && !seen.has(a.id) && seen.add(a.id))
+      .sort((a, b) => {
+        const order: Record<string, number> = { "High Priority": 0, "Medium Priority": 1, "Good News": 2, General: 3 };
+        return (order[a.priority] ?? 3) - (order[b.priority] ?? 3);
+      });
   };
 
-  const trendData = getTrendData();
-  const filteredAlerts = allMergedAlerts
-    .filter(a => {
-      if (a.resolved) return false;
-      if (filterTabs[activeTab] === "All") return true;
-      return a.category === filterTabs[activeTab];
-    })
-    .sort((a,b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+  const allAlerts = buildAlerts();
 
-  const getPriorityColor = (p: string) => {
-     if (p === 'Critical' || p === 'High Priority' || p === 'Urgent') return 'bg-rose-500';
-     if (p === 'Normal' || p === 'Medium Priority') return 'bg-amber-400';
-     if (p === 'Good News') return 'bg-emerald-500';
-     return 'bg-indigo-500';
+  const dismissAlert = async (alert: ParsedAlert) => {
+    // Mark dismissed in local state + localStorage
+    const next = new Set(dismissed);
+    next.add(alert.id);
+    setDismissed(next);
+    localStorage.setItem("dismissed_alerts", JSON.stringify([...next]));
+
+    // If it came from a Firestore-writable source, persist it
+    if (alert.source === "student_smart_alerts" && alert.sourceId) {
+      try {
+        await updateDoc(doc(db, "student_smart_alerts", alert.sourceId), { resolved: true });
+      } catch { /* ignore */ }
+    }
+    if (alert.source === "risks" && alert.sourceId) {
+      try {
+        await updateDoc(doc(db, "risks", alert.sourceId), { resolved: true });
+      } catch { /* ignore */ }
+    }
+    toast.success("Alert dismissed.");
   };
 
-  const getTagColor = (p: string) => {
-     if (p === 'Critical' || p === 'High Priority' || p === 'Urgent') return 'bg-rose-50 text-rose-600 border-rose-100';
-     if (p === 'Normal' || p === 'Medium Priority') return 'bg-amber-50 text-amber-600 border-amber-100';
-     if (p === 'Good News') return 'bg-emerald-50 text-emerald-600 border-emerald-100';
-     return 'bg-blue-50 text-blue-600 border-blue-100';
+  const markAllRead = () => {
+    const next = new Set(dismissed);
+    allAlerts.forEach(a => next.add(a.id));
+    setDismissed(next);
+    localStorage.setItem("dismissed_alerts", JSON.stringify([...next]));
+    toast.success("All alerts dismissed.");
   };
+
+  const filteredAlerts = allAlerts.filter(a => {
+    const tab = filterTabs[activeTab];
+    return tab === "All" || a.category === tab;
+  });
+
+  const getTabCount = (tab: string) =>
+    tab === "All" ? allAlerts.length : allAlerts.filter(a => a.category === tab).length;
+
+  // ── Styling helpers ──
+  const getBorderColor = (p: ParsedAlert["priority"]) => ({
+    "High Priority": "border-l-rose-500",
+    "Medium Priority": "border-l-amber-400",
+    "Good News": "border-l-emerald-500",
+    General: "border-l-blue-400"
+  }[p] || "border-l-slate-300");
+
+  const getIconStyle = (alert: ParsedAlert) => {
+    if (alert.priority === "Good News")
+      return { bg: "bg-emerald-100", color: "text-emerald-600", icon: <Trophy className="w-5 h-5" /> };
+    if (alert.category === "Attendance" && alert.priority === "High Priority")
+      return { bg: "bg-rose-100", color: "text-rose-500", icon: <AlertCircle className="w-5 h-5" /> };
+    if (alert.category === "Attendance")
+      return { bg: "bg-amber-100", color: "text-amber-500", icon: <Clock className="w-5 h-5" /> };
+    if (alert.category === "Academic" && alert.priority === "High Priority")
+      return { bg: "bg-rose-100", color: "text-rose-500", icon: <BookOpen className="w-5 h-5" /> };
+    if (alert.category === "Academic")
+      return { bg: "bg-blue-100", color: "text-blue-500", icon: <BookOpen className="w-5 h-5" /> };
+    if (alert.source === "risks")
+      return { bg: "bg-rose-100", color: "text-rose-500", icon: <ShieldAlert className="w-5 h-5" /> };
+    return { bg: "bg-slate-100", color: "text-slate-500", icon: <Calendar className="w-5 h-5" /> };
+  };
+
+  const getPriorityBadge = (p: ParsedAlert["priority"]) => ({
+    "High Priority": "bg-rose-100 text-rose-600",
+    "Medium Priority": "bg-amber-100 text-amber-600",
+    "Good News": "bg-emerald-100 text-emerald-600",
+    General: "bg-slate-100 text-slate-500"
+  }[p] || "bg-slate-100 text-slate-500");
+
+  const getCategoryBadge = (c: ParsedAlert["category"]) => ({
+    Academic: "bg-blue-50 text-blue-600",
+    Attendance: "bg-emerald-50 text-emerald-600",
+    General: "bg-slate-100 text-slate-500"
+  }[c] || "bg-slate-100 text-slate-500");
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-700 pb-20 font-sans text-left bg-slate-50/30 p-4 md:p-8 rounded-[3rem]">
-      <div className="flex flex-col gap-8">
-        <div className="flex items-center justify-between">
-           <div>
-              <h1 className="text-4xl font-black text-slate-800 tracking-tighter italic uppercase underline decoration-indigo-200 decoration-8 underline-offset-8">Notification Hub</h1>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mt-3 ml-1 italic leading-none">Automated Institutional Intelligence Stream</p>
-           </div>
-           <button onClick={generateAIAlerts} disabled={isRefreshing} className="bg-white border border-slate-200 px-6 py-3 rounded-2xl text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:shadow-md transition-all flex items-center gap-3 disabled:opacity-50">
-             {isRefreshing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Sparkles className="w-4 h-4"/>} Regenerate Intelligence
-           </button>
-        </div>
-        <div className="flex flex-wrap gap-4 bg-white/50 p-2 rounded-[2rem] border border-slate-100 w-fit">
-          {filterTabs.map((tab, i) => (
-            <button key={tab} onClick={() => setActiveTab(i)} className={`px-8 py-3.5 rounded-[1.5rem] font-black uppercase tracking-[0.2em] transition-all text-[10px] ${i === activeTab ? "bg-[#1e3a8a] text-white shadow-xl shadow-blue-900/10" : "text-slate-500 hover:bg-white"}`}>
-              {tab} ({tab === 'All' ? allMergedAlerts.filter(a => !a.resolved).length : allMergedAlerts.filter(a => a.category === tab && !a.resolved).length})
-            </button>
-          ))}
-        </div>
+    <div className="animate-in fade-in duration-500 pb-20">
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+          Result of click: "Alerts &amp; Reminders"
+        </p>
+        <button
+          onClick={markAllRead}
+          className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-xl text-sm text-slate-500 hover:bg-slate-50 transition-all"
+        >
+          <CheckCircle className="w-4 h-4" />
+          Mark All Read
+        </button>
       </div>
 
-      <div className="space-y-6">
-        {loading ? (
-            <div className="py-40 text-center flex flex-col items-center justify-center">
-              <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
-              <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest italic">Decrypting Secure Alerts...</p>
-            </div>
-        ) : filteredAlerts.length === 0 ? (
-            <div className="py-40 bg-white border-2 border-slate-50 rounded-[4rem] text-center flex flex-col items-center">
-              <BellRing className="w-10 h-10 text-slate-200 mb-6" />
-              <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-2 italic">Hub Status: Clear</h3>
-              <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">No active interventions required.</p>
-            </div>
-        ) : (
-          <>
-            {filterTabs[activeTab] === "Behavior" && (
-               <div className="space-y-6 mb-10 overflow-hidden animate-in slide-in-from-top-4 duration-500">
-                  <div className="bg-white border-2 border-slate-50 rounded-[3rem] p-10 shadow-sm">
-                     <div className="flex items-center justify-between mb-10">
-                        <div>
-                           <h2 className="text-2xl font-black text-slate-800 tracking-tight italic">Behavior Trend</h2>
-                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2 italic leading-none whitespace-nowrap">Monthly Accountability Projection</p>
-                        </div>
-                        <Brain className="w-6 h-6 text-indigo-600" />
-                     </div>
-                     <div className="h-[200px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                           <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                              <defs><linearGradient id="colorScoreAlerts" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/></linearGradient></defs>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                              <XAxis dataKey="m" axisLine={false} tickLine={false} tick={{ fontSize: 13, fontWeight: 900, fill: '#cbd5e1' }} dy={10} />
-                              <YAxis domain={[1, 5]} axisLine={false} tickLine={false} tick={{ fontSize: 13, fontWeight: 900, fill: '#cbd5e1' }} dx={-10} />
-                              <Tooltip cursor={{ stroke: '#10b981', strokeWidth: 2 }} contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', fontWeight: '900', textTransform: 'uppercase', fontSize: '10px' }} />
-                              <Area type="monotone" dataKey="score" stroke="#10b981" fillOpacity={1} fill="url(#colorScoreAlerts)" strokeWidth={4} dot={{ r: 6, fill: '#10b981', strokeWidth: 3, stroke: '#fff' }} activeDot={{ r: 8, strokeWidth: 0, fill: '#10b981' }} />
-                           </AreaChart>
-                        </ResponsiveContainer>
-                     </div>
+      {/* Filter Tabs */}
+      <div className="flex flex-wrap gap-2 mb-6">
+        {filterTabs.map((tab, i) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(i)}
+            className={`px-4 py-2 rounded-full text-sm font-semibold border transition-all ${
+              i === activeTab
+                ? "bg-[#1e3a8a] text-white border-[#1e3a8a]"
+                : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
+            }`}
+          >
+            {tab} ({getTabCount(tab)})
+          </button>
+        ))}
+      </div>
+
+      {/* Alert List */}
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-24">
+          <Loader2 className="w-10 h-10 text-blue-600 animate-spin mb-3" />
+          <p className="text-xs text-slate-400">Loading alerts...</p>
+        </div>
+      ) : filteredAlerts.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 border-2 border-dashed border-slate-100 rounded-2xl">
+          <BellRing className="w-12 h-12 text-slate-200 mb-3" />
+          <p className="text-base font-semibold text-slate-400">No alerts</p>
+          <p className="text-sm text-slate-300 mt-1">You're all caught up!</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredAlerts.map((alert) => {
+            const iconStyle = getIconStyle(alert);
+            return (
+              <div
+                key={alert.id}
+                className={`bg-white border border-slate-100 border-l-4 ${getBorderColor(alert.priority)} rounded-2xl p-5 shadow-sm hover:shadow-md transition-all`}
+              >
+                <div className="flex items-start gap-4">
+                  {/* Icon */}
+                  <div className={`w-10 h-10 rounded-full ${iconStyle.bg} ${iconStyle.color} flex items-center justify-center shrink-0 mt-0.5`}>
+                    {iconStyle.icon}
                   </div>
 
-                  <div className="bg-white border-2 border-slate-50 rounded-[3rem] p-10 shadow-sm">
-                     <div className="flex items-center gap-3 mb-8">
-                        <AlertTriangle className="w-5 h-5 text-amber-500" />
-                        <h2 className="text-xl font-black text-slate-800 tracking-tight italic">Areas for Improvement</h2>
-                     </div>
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {alerts
-                          .filter(a => 
-                             a.type === 'behaviour' && 
-                             ((a.category || "").toLowerCase().includes("improv") || (a.category || "").toLowerCase().includes("needs") || (a.content || "").toLowerCase().includes("improve")) &&
-                             !((a.category || "").toLowerCase().includes("positive") || (a.category || "").toLowerCase().includes("praise"))
-                          )
-                          .slice(0, 4)
-                          .map((note, idx) => (
-                           <div key={idx} className="bg-white border-2 border-amber-400/30 rounded-3xl p-8 flex gap-6 transition-all hover:bg-amber-50/20 group">
-                              <div className="w-12 h-12 bg-white border-2 border-amber-100 rounded-2xl flex items-center justify-center text-amber-500 shrink-0 shadow-sm group-hover:scale-110 transition-transform">
-                                 {idx % 2 === 0 ? <Clock className="w-6 h-6" /> : <BookOpen className="w-6 h-6" />}
-                              </div>
-                              <div className="space-y-3">
-                                 <p className="text-[17px] font-black text-slate-700 italic tracking-tight leading-tight">{note.content}</p>
-                                 <div className="flex flex-wrap items-center gap-3 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">
-                                    <span>{note.createdAt?.toDate?.() ? note.createdAt.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent'}</span>
-                                    <span className="w-1 h-1 rounded-full bg-slate-200" />
-                                    <span className="text-slate-300">{note.teacherName || 'Jamaal Bhai'}</span>
-                                 </div>
-                              </div>
-                           </div>
-                        ))}
-                     </div>
-                  </div>
-                  <div className="pt-4 pb-2 border-b border-dashed border-slate-200"><p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.5em] italic">Historical Intervention Timeline</p></div>
-               </div>
-            )}
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                      <h3 className="text-base font-bold text-slate-800">{alert.title}</h3>
+                      <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${getPriorityBadge(alert.priority)}`}>
+                        {alert.priority}
+                      </span>
+                      <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${getCategoryBadge(alert.category)}`}>
+                        {alert.category}
+                      </span>
+                    </div>
 
-            {filteredAlerts.map((alert) => (
-              <div key={alert.id} className={`bg-white rounded-3xl border-2 border-slate-50 shadow-sm hover:shadow-xl transition-all relative overflow-hidden flex flex-col md:flex-row group ${alert.resolved ? 'hidden' : ''}`}>
-                <div className={`w-1.5 shrink-0 ${getPriorityColor(alert.priority)}`} />
-                <div className="flex-1 p-8 flex flex-col md:flex-row items-center gap-8">
-                   <div className={`w-16 h-16 shrink-0 rounded-2xl flex items-center justify-center border ${alert.category === 'Attendance' ? 'bg-amber-50 border-amber-100 text-amber-500' : alert.priority === 'Good News' ? 'bg-emerald-50 border-emerald-100 text-emerald-500' : alert.priority === 'Critical' && alert.category === 'Behavior' ? 'bg-rose-500/10 border-rose-500/20 text-rose-500' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
-                      {alert.category === 'Attendance' ? <Clock className="w-7 h-7" /> : alert.priority === 'Good News' ? <Trophy className="w-7 h-7" /> : alert.category === 'Behavior' && alert.priority === 'Critical' ? <ShieldAlert className="w-7 h-7" /> : <AlertCircle className="w-7 h-7" />}
-                   </div>
-                   <div className="flex-1 space-y-3 text-center md:text-left">
-                      <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mb-1">
-                         <h3 className="text-2xl font-black text-slate-800 tracking-tighter italic leading-none">{alert.title}</h3>
-                         <div className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border ${getTagColor(alert.priority)}`}>{alert.priority}</div>
-                         <div className="px-4 py-1.5 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 text-[9px] font-black uppercase tracking-widest">{alert.category}</div>
-                      </div>
-                      <p className="text-base font-bold text-slate-500 leading-relaxed italic max-w-2xl">{alert.description}</p>
-                      {alert.needs_attention && (
-                         <div className={`flex items-center gap-3 ${alert.priority === 'Critical' && alert.category === 'Behavior' ? 'bg-rose-500/10 border-rose-500/20 shadow-lg shadow-rose-900/10' : 'bg-rose-50 border border-rose-100'} px-5 py-2 rounded-2xl w-fit`}>
-                            <span className={`text-[9px] font-black ${alert.priority === 'Critical' && alert.category === 'Behavior' ? 'text-rose-400' : 'text-rose-500'} uppercase tracking-widest leading-none`}>Focus Area:</span>
-                            <span className={`text-sm font-black ${alert.priority === 'Critical' && alert.category === 'Behavior' ? 'text-rose-100' : 'text-rose-700'} italic`}>{alert.needs_attention}</span>
-                         </div>
+                    <p className="text-sm text-slate-500 leading-relaxed mb-3">{alert.description}</p>
+
+                    {/* Metadata */}
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400">
+                      {alert.date ? (
+                        <>
+                          <span className="flex items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5" />
+                            {fmtDateStr(alert.date)}
+                          </span>
+                          {alert.arrivalTime && (
+                            <span className="flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5" />
+                              Arrived at {alert.arrivalTime}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5" />
+                          {fmtTs(alert.createdAt)}
+                        </span>
                       )}
-                      {alert.category === 'Behavior' && alert.priority === 'Critical' && (
-                        <div className="mt-4 p-6 rounded-[2rem] bg-rose-500/5 border border-rose-500/10 relative overflow-hidden backdrop-blur-xl">
-                           <div className="flex items-center justify-between mb-4">
-                              <div><p className="text-[10px] font-black uppercase tracking-widest text-rose-500/60 italic mb-1">Accountability Score</p>
-                                 <div className="flex items-center gap-1.5 bg-rose-500/20 px-3 py-1.5 rounded-xl border border-rose-500/20">
-                                    {[...Array(5)].map((_, i) => (<Star key={i} className={`w-3.5 h-3.5 ${i < Math.floor(alert.manualBehaviourRating || 0) ? "text-rose-500 fill-rose-500" : "text-rose-500/20"}`} />))}
-                                    <span className="ml-2 text-[12px] font-black text-rose-300 italic">{(alert.manualBehaviourRating || 0).toFixed(1)}/5.0</span>
-                                 </div>
-                              </div>
-                           </div>
-                           <div className="space-y-3">
-                              <p className="text-[10px] font-black uppercase tracking-widest text-rose-500/40 font-bold">Diagnostic Areas for Improvement</p>
-                              <div className="flex flex-wrap gap-2.5 pt-1">
-                                 {(alert.description.includes("Improvement:") ? alert.description.split("Improvement:")[1] : alert.description).split(",").map((point, i) => (
-                                    <div key={i} className="flex items-center gap-1.5 bg-rose-500/10 px-3 py-1.5 rounded-xl border border-rose-500/20">
-                                       <XCircle className="w-3 h-3 text-rose-400" /><span className="text-[11px] font-black text-rose-200 lowercase italic tracking-tight">{point.trim().replace(".", "")}</span>
-                                    </div>
-                                 ))}
-                              </div>
-                           </div>
-                        </div>
+                      {alert.teacherName && (
+                        <span className="flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5" />
+                          {alert.teacherName}
+                        </span>
                       )}
-                      <div className="flex flex-wrap items-center justify-center md:justify-start gap-6 pt-2">
-                         <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest italic"><Calendar className="w-3.5 h-3.5" /> {alert.createdAt?.toDate?.() ? alert.createdAt.toDate().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Recent'}</div>
-                         <div className="flex items-center gap-2 text-[10px] font-black text-indigo-400 uppercase tracking-widest italic"><User className="w-3.5 h-3.5" /> {alert.teacherName || "Institutional Faculty"}</div>
-                      </div>
-                   </div>
-                   <div className="flex flex-col gap-3 min-w-[200px]">
-                      <div className="flex gap-3">
-                         <button onClick={() => navigate("/teacher-notes")} className="flex-1 bg-[#1e3a8a] text-white py-4 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-900 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-900/10 group-active:scale-95">Message</button>
-                         <button onClick={() => markAsRead(alert.id)} className="flex-1 bg-white border border-slate-200 text-slate-400 py-4 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 hover:text-slate-600 transition-all flex items-center justify-center gap-2 group-active:scale-95">Dismiss</button>
-                      </div>
-                   </div>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex flex-col gap-2 shrink-0 min-w-[120px]">
+                    {alert.category === "Attendance" && alert.priority !== "High Priority" ? (
+                      <button
+                        onClick={() => dismissAlert(alert)}
+                        className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-all"
+                      >
+                        Acknowledge
+                      </button>
+                    ) : alert.category === "General" ? (
+                      <>
+                        <button
+                          onClick={() => dismissAlert(alert)}
+                          className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition-all"
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          onClick={() => dismissAlert(alert)}
+                          className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-all"
+                        >
+                          Reschedule
+                        </button>
+                      </>
+                    ) : alert.priority === "Good News" ? (
+                      <button
+                        onClick={() => navigate("/performance")}
+                        className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition-all"
+                      >
+                        View Details
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => navigate("/teacher-notes")}
+                          className="px-4 py-2 bg-[#1e3a8a] text-white rounded-xl text-sm font-semibold hover:bg-blue-900 transition-all"
+                        >
+                          View Details
+                        </button>
+                        <button
+                          onClick={() => dismissAlert(alert)}
+                          className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-all"
+                        >
+                          Dismiss
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
-            ))}
-          </>
-        )}
-      </div>
-
-      {filterTabs[activeTab] === "All" && (
-        <div className="fixed bottom-10 right-10 flex flex-col gap-4 pointer-events-none opacity-50 hidden lg:flex">
-           {[{ label: 'Critical Alert', color: 'bg-rose-500' }, { label: 'Standard Alert', color: 'bg-amber-400' }, { label: 'Good News', color: 'bg-emerald-500' }].map(ind => (
-              <div key={ind.label} className="flex items-center justify-end gap-3"><span className="text-[8px] font-black uppercase tracking-widest text-slate-400">{ind.label}</span><div className={`w-3 h-3 rounded-full ${ind.color}`} /></div>
-           ))}
+            );
+          })}
         </div>
       )}
     </div>
   );
 };
+
+// ── Utility functions ──
+const fmtDateStr = (dateStr: string) => {
+  if (!dateStr) return "Recent";
+  const parts = dateStr.split("-");
+  if (parts.length === 3) {
+    const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  }
+  return dateStr;
+};
+
+const fmtTs = (ts: any): string => {
+  if (!ts) return "Recent";
+  const d = ts?.toDate ? ts.toDate() : new Date(ts);
+  if (isNaN(d.getTime())) return "Recent";
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+};
+
 export default AlertsPage;

@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
-import { 
-  GraduationCap, Users, MessageSquare, BookOpen, 
-  MapPin, Clock, School, ShieldCheck, ChevronRight, Loader2, Info, Target 
+import { useState, useEffect } from "react";
+import {
+  GraduationCap, Users, MessageSquare,
+  MapPin, Clock, School, ShieldCheck, Loader2, Info, Target
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/AuthContext";
@@ -67,7 +67,7 @@ const ClassesPage = () => {
   const cardColors = ["bg-[#1e3a8a]", "bg-emerald-600", "bg-indigo-600", "bg-orange-600", "bg-rose-600", "bg-purple-600"];
 
   return (
-    <div className="animate-in fade-in duration-700 pb-24 text-left font-sans">
+    <div className="animate-in fade-in duration-700 pb-24 text-left font-montserrat">
       
       {/* ── HEADER ── */}
       <div className="flex flex-col mb-12 px-4 italic">

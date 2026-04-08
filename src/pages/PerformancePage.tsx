@@ -1,16 +1,26 @@
-import React, { useEffect, useState } from "react";
-import { 
-  ArrowUp, ArrowDown, Minus, ChevronRight, Sparkles, BrainCircuit, 
-  Target, TrendingUp, Users, Info, Loader2, Zap, Rocket, Activity, Star, 
-  ShieldCheck, ArrowUpRight, GraduationCap, ChevronLeft, Calendar,
+import { useEffect, useState } from "react";
+import {
+  ArrowUp, ArrowDown, Minus, Loader2,
   Calculator, FlaskConical, Languages, Globe, Monitor, Palette, BookOpen
 } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, Legend } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { SubjectPerformanceDetail } from "@/components/performance/SubjectPerformanceDetail";
-import { ParentAIController } from "../ai/controller/ai-controller";
 import { useAuth } from "@/lib/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, getDocs } from "firebase/firestore";
+
+const getSubIcon = (name: string) => {
+  const n = name.toLowerCase();
+  if (n.includes("math")) return Calculator;
+  if (n.includes("science")) return FlaskConical;
+  if (n.includes("english")) return Languages;
+  if (n.includes("social")) return Globe;
+  if (n.includes("computer")) return Monitor;
+  if (n.includes("art")) return Palette;
+  return BookOpen;
+};
+
+const CHART_COLORS = ["#1e3a8a", "#10b981", "#f59e0b", "#6366f1", "#ef4444", "#06b6d4"];
 
 const PerformancePage = () => {
   const { studentData } = useAuth();
@@ -18,385 +28,263 @@ const PerformancePage = () => {
   const [loading, setLoading] = useState(true);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [trendData, setTrendData] = useState<any[]>([]);
-  const [resourceLibrary, setResourceLibrary] = useState<any[]>([]);
-  const [overallStats, setOverallStats] = useState({
-    grade: "N/A",
-    avg: 0,
-    trend: "+0%"
-  });
+  const [overallStats, setOverallStats] = useState({ grade: "N/A", avg: 0, trend: "+8%" });
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
 
-    // ─── DATA SYNCHRONIZATION ───
   useEffect(() => {
     if (!studentData?.id) return;
     setLoading(true);
     const studentEmail = studentData.email?.toLowerCase() || "";
 
-    // Fetch Global Resource Library
-    const unsubResources = onSnapshot(collection(db, "resources_library"), (snap) => {
-        setResourceLibrary(snap.docs.map(d => ({id: d.id, ...d.data()})));
-    });
-
-    // Dual-Lookup for Test Scores
-    let snap1Cache: any = null;
-    let snap2Cache: any = null;
+    let snap1Cache: any = null, snap2Cache: any = null;
     const processScores = () => {
-        const scoreMap = new Map();
-        [...(snap1Cache?.docs || []), ...(snap2Cache?.docs || [])].forEach((d: any) => {
-          if (!scoreMap.has(d.id)) scoreMap.set(d.id, { id: d.id, ...d.data() });
-        });
-        const scores = Array.from(scoreMap.values());
-        
-        // Group by Subject
-        const subMap = new Map();
-        scores.forEach(s => {
-            const sub = s.subject || "General curriculum";
-            if (!subMap.has(sub)) {
-                subMap.set(sub, { name: sub, total: 0, count: 0, scores: [] });
-            }
-            const curr = subMap.get(sub);
-            curr.total += (s.percentage || 0);
-            curr.count += 1;
-            curr.scores.push(s);
-        });
+      const scoreMap = new Map();
+      [...(snap1Cache?.docs || []), ...(snap2Cache?.docs || [])].forEach((d: any) => {
+        if (!scoreMap.has(d.id)) scoreMap.set(d.id, { id: d.id, ...d.data() });
+      });
+      const scores = Array.from(scoreMap.values());
 
-        const derivedSubjs = Array.from(subMap.values()).map(s => {
-            const avg = Math.round(s.total / s.count);
-            const sorted = s.scores.sort((a: any, b: any) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
-            const last = sorted[sorted.length - 1]?.percentage || 0;
-            const prev = sorted[sorted.length - 2]?.percentage || last;
-            const trendDir = last >= prev ? 'up' : 'down';
-            
-            return {
-                name: s.name,
-                grade: avg >= 90 ? "A+" : avg >= 80 ? "A" : avg >= 70 ? "B+" : avg >= 65 ? "B" : "C",
-                progress: avg,
-                status: avg >= 85 ? "Excellent" : avg >= 75 ? "Improving" : avg >= 60 ? "Stable" : "Needs Attention",
-                color: avg >= 80 ? "bg-emerald-500" : avg >= 60 ? "bg-amber-500" : "bg-rose-500",
-                trendDir,
-                raw: s.scores
-            };
-        });
-
-        setSubjects(derivedSubjs);
-
-        if (derivedSubjs.length > 0) {
-            const globalAvg = Math.round(derivedSubjs.reduce((a, b) => a + b.progress, 0) / derivedSubjs.length);
-            setOverallStats({
-                avg: globalAvg,
-                grade: globalAvg >= 90 ? "A+" : globalAvg >= 80 ? "A" : globalAvg >= 70 ? "B+" : globalAvg >= 65 ? "B" : "C",
-                trend: "+8%"
-            });
-        }
-
-        // Group by Month for Trend (Real Aggregation)
-        const monthsInOrder = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        const scoresByMonth = new Map<string, Map<string, { total: number, count: number }>>();
-
-        scores.forEach(s => {
-            const date = s.timestamp?.toDate() || new Date();
-            const monthName = monthsInOrder[date.getMonth()];
-            const sub = s.subject || "General curriculum";
-
-            if (!scoresByMonth.has(monthName)) scoresByMonth.set(monthName, new Map());
-            const monthMap = scoresByMonth.get(monthName)!;
-
-            if (!monthMap.has(sub)) monthMap.set(sub, { total: 0, count: 0 });
-            const curr = monthMap.get(sub)!;
-            curr.total += (s.percentage || 0);
-            curr.count += 1;
-        });
-
-        const currentMonthIdx = new Date().getMonth();
-        const displayMonths = monthsInOrder.slice(Math.max(0, currentMonthIdx - 3), currentMonthIdx + 1);
-
-        const chartData = displayMonths.map(m => {
-            const entry: any = { month: m };
-            const monthMap = scoresByMonth.get(m);
-            derivedSubjs.forEach(s => {
-                const subData = monthMap?.get(s.name);
-                if (subData) {
-                    entry[s.name] = Math.round(subData.total / subData.count);
-                } else {
-                    entry[s.name] = null;
-                }
-            });
-            return entry;
-        });
-        setTrendData(chartData.filter(d => Object.keys(d).length > 1));
-    };
-
-    const unsubScore1 = onSnapshot(query(collection(db, "test_scores"), where("studentId", "==", studentData.id)), (snap) => {
-        snap1Cache = snap; processScores();
-    });
-    const unsubScore2 = studentEmail ? onSnapshot(query(collection(db, "test_scores"), where("studentEmail", "==", studentEmail)), (snap) => {
-        snap2Cache = snap; processScores();
-    }) : () => {};
-
-    // Dual-Lookup for Performance Feedback
-    const setupFeedback = async () => {
-        const q1 = query(collection(db, "performance_feedback"), where("studentId", "==", studentData.id));
-        const q2 = studentEmail ? query(collection(db, "performance_feedback"), where("studentEmail", "==", studentEmail)) : null;
-
-        const mergeFeedback = (docs: any[]) => {
-            const feedMap = new Map();
-            docs.forEach(d => { if (!feedMap.has(d.id)) feedMap.set(d.id, { id: d.id, ...d.data() }); });
-            setFeedbacks(Array.from(feedMap.values()));
-        };
-
-        const unsub1 = onSnapshot(q1, (snap) => {
-            if (studentEmail) {
-                getDocs(query(collection(db, "performance_feedback"), where("studentEmail", "==", studentEmail))).then(snap2 => {
-                    mergeFeedback([...snap.docs, ...snap2.docs]);
-                });
-            } else {
-                mergeFeedback(snap.docs);
-            }
-        });
-        return unsub1;
-    };
-
-    let unsubFeed: any = () => {};
-    setupFeedback().then(u => unsubFeed = u);
-
-    setLoading(false);
-    return () => { unsubScore1(); unsubScore2(); unsubFeed(); unsubResources(); };
-  }, [studentData?.id]);
-
-  const getSubIcon = (name: string) => {
-      const n = name.toLowerCase();
-      if (n.includes("math")) return Calculator;
-      if (n.includes("science")) return FlaskConical;
-      if (n.includes("english")) return Languages;
-      if (n.includes("social")) return Globe;
-      if (n.includes("computer")) return Monitor;
-      if (n.includes("art")) return Palette;
-      return BookOpen;
-  };
-
-  if (selectedSubject && subjects.length > 0) {
-      const s = subjects.find(sub => sub.name === selectedSubject);
-      if (!s) return null;
-      
-      // Calculate real topic-level mastery from raw scores
-      const topicMasteryMap = new Map();
-      s.raw.forEach((score: any) => {
-         // Fallback to subject if topics are missing
-         const topics = score.topics || [s.name]; 
-         topics.forEach((t: string) => {
-            if (!topicMasteryMap.has(t)) topicMasteryMap.set(t, { total: 0, count: 0 });
-            const curr = topicMasteryMap.get(t);
-            curr.total += (score.percentage || 0);
-            curr.count += 1;
-         });
+      const subMap = new Map();
+      scores.forEach(s => {
+        const sub = s.subject || "General";
+        if (!subMap.has(sub)) subMap.set(sub, { name: sub, total: 0, count: 0, scores: [] });
+        const curr = subMap.get(sub);
+        curr.total += (s.percentage || 0);
+        curr.count += 1;
+        curr.scores.push(s);
       });
 
-      const processedTopics = Array.from(topicMasteryMap.entries()).map(([name, data]: any) => ({
-          name,
-          score: Math.round(data.total / data.count)
-      })).sort((a,b) => a.score - b.score);
+      const derivedSubjs = Array.from(subMap.values()).map(s => {
+        const avg = Math.round(s.total / s.count);
+        const sorted = s.scores.sort((a: any, b: any) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
+        const last = sorted[sorted.length - 1]?.percentage || 0;
+        const prev = sorted[sorted.length - 2]?.percentage || last;
+        const trendDir = last > prev ? "up" : last < prev ? "down" : "stable";
+        const status = avg >= 90 ? "Outstanding" : avg >= 80 ? "Excellent" : avg >= 70 ? "Improving" : avg >= 60 ? "Stable" : "Needs Attention";
+        const barColor = avg >= 75 ? "bg-emerald-500" : avg >= 60 ? "bg-amber-500" : "bg-rose-500";
+        const grade = avg >= 90 ? "A+" : avg >= 85 ? "A" : avg >= 80 ? "A-" : avg >= 75 ? "B+" : avg >= 70 ? "B" : avg >= 65 ? "C+" : "C";
+        return { name: s.name, grade, progress: avg, status, trendDir, barColor, raw: s.scores };
+      });
 
-      // 1. Holistic Growth & Behavioral Analysis (Self-Improvement)
-      const growthSuggestions: any[] = [];
-      const stats = overallStats;
-      const attPct = studentData.attendancePct || 90; // Fallback
-
-      // Behavioral Trigger: Low Attendance -> Discipline/Time Management
-      if (attPct < 85) {
-          growthSuggestions.push({
-              icon: "Star",
-              title: "Developing Self-Discipline",
-              subtitle: "Growth Mindset • Self-Improvement",
-              action: "Watch",
-              color: "text-amber-500 bg-amber-50",
-              url: "https://www.youtube.com/results?search_query=how+to+build+discipline+and+consistency+for+students"
-          });
+      setSubjects(derivedSubjs);
+      if (derivedSubjs.length > 0) {
+        const globalAvg = Math.round(derivedSubjs.reduce((a, b) => a + b.progress, 0) / derivedSubjs.length);
+        setOverallStats({
+          avg: globalAvg,
+          grade: globalAvg >= 90 ? "A+" : globalAvg >= 85 ? "A" : globalAvg >= 80 ? "A-" : globalAvg >= 75 ? "B+" : globalAvg >= 70 ? "B" : "C",
+          trend: "+8%"
+        });
       }
 
-      // Behavioral Trigger: Low Grades -> Study Techniques
-      if (stats.avg < 60) {
-          growthSuggestions.push({
-              icon: "PlayCircle",
-              title: "Scientific Study Secrets",
-              subtitle: "Success Strategies • Memory Mastery",
-              action: "Watch",
-              color: "text-rose-500 bg-rose-50",
-              url: "https://www.youtube.com/results?search_query=best+study+techniques+for+low+grades+improvement"
-          });
+      // Trend chart
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const scoresByMonth = new Map<string, Map<string, { total: number; count: number }>>();
+      scores.forEach(s => {
+        const date = s.timestamp?.toDate() || new Date();
+        const month = monthNames[date.getMonth()];
+        const sub = s.subject || "General";
+        if (!scoresByMonth.has(month)) scoresByMonth.set(month, new Map());
+        const mm = scoresByMonth.get(month)!;
+        if (!mm.has(sub)) mm.set(sub, { total: 0, count: 0 });
+        const curr = mm.get(sub)!;
+        curr.total += (s.percentage || 0);
+        curr.count += 1;
+      });
+      const currMonth = new Date().getMonth();
+      const displayMonths = monthNames.slice(Math.max(0, currMonth - 3), currMonth + 1);
+      const chartData = displayMonths.map(m => {
+        const entry: any = { month: m };
+        const mm = scoresByMonth.get(m);
+        derivedSubjs.forEach(s => {
+          const d = mm?.get(s.name);
+          entry[s.name] = d ? Math.round(d.total / d.count) : null;
+        });
+        return entry;
+      });
+      setTrendData(chartData.filter(d => Object.keys(d).length > 1));
+      setLoading(false);
+    };
+
+    const u1 = onSnapshot(query(collection(db, "test_scores"), where("studentId", "==", studentData.id)), s => { snap1Cache = s; processScores(); });
+    const u2 = studentEmail ? onSnapshot(query(collection(db, "test_scores"), where("studentEmail", "==", studentEmail)), s => { snap2Cache = s; processScores(); }) : () => {};
+
+    // Feedback
+    const feedMap = new Map();
+    const mergeFeedback = (docs: any[]) => {
+      docs.forEach(d => { if (!feedMap.has(d.id)) feedMap.set(d.id, { id: d.id, ...d.data() }); });
+      setFeedbacks(Array.from(feedMap.values()));
+    };
+    const u3 = onSnapshot(query(collection(db, "performance_feedback"), where("studentId", "==", studentData.id)), snap => {
+      if (studentEmail) {
+        getDocs(query(collection(db, "performance_feedback"), where("studentEmail", "==", studentEmail)))
+          .then(s2 => mergeFeedback([...snap.docs, ...s2.docs]));
+      } else {
+        mergeFeedback(snap.docs);
       }
+    });
 
-      // Behavioral Trigger: High Performance -> Leadership/Advanced
-      if (stats.avg >= 90) {
-          growthSuggestions.push({
-              icon: "Rocket",
-              title: "Future Leadership Skills",
-              subtitle: "Expansion Module • Beyond Curriculum",
-              action: "Watch",
-              color: "text-indigo-500 bg-indigo-50",
-              url: "https://www.youtube.com/results?search_query=leadership+and+critical+thinking+for+top+students"
-          });
-      }
+    return () => { u1(); u2(); u3(); };
+  }, [studentData?.id]);
 
-      // 2. Subject-Specific Analysis
-      let subjectSuggestions: any[] = [];
-      if (processedTopics.length > 0) {
-          subjectSuggestions = processedTopics
-            .filter(t => t.score < 85)
-            .map(t => ({
-                icon: "PlayCircle",
-                title: `${t.name} Concept Clarity`,
-                subtitle: `Targeted Improvement Tutorial`, 
-                action: "Watch",
-                color: "text-blue-500 bg-blue-50",
-                url: `https://www.youtube.com/results?search_query=how+to+solve+${t.name.replace(/\s+/g, '+')}+problems+tutorial`
-            }));
-      }
+  // Subject detail view
+  if (selectedSubject) {
+    const s = subjects.find(sub => sub.name === selectedSubject);
+    if (!s) return null;
 
-      // Combine and prioritize growth suggestions first as requested by USER
-      const finalSuggestions = [...growthSuggestions, ...subjectSuggestions].slice(0, 3);
+    const topicMasteryMap = new Map();
+    s.raw.forEach((score: any) => {
+      const topics = score.topics || [s.name];
+      topics.forEach((t: string) => {
+        if (!topicMasteryMap.has(t)) topicMasteryMap.set(t, { total: 0, count: 0 });
+        const curr = topicMasteryMap.get(t);
+        curr.total += (score.percentage || 0);
+        curr.count += 1;
+      });
+    });
+    const processedTopics = Array.from(topicMasteryMap.entries())
+      .map(([name, data]: any) => ({ name, score: Math.round(data.total / data.count) }))
+      .sort((a, b) => b.score - a.score);
 
-      // Final fallback if no suggestions generated locally
-      if (finalSuggestions.length === 0) {
-          finalSuggestions.push({
-              icon: "Star",
-              title: "Continuous Learning Guide",
-              subtitle: "Strategic Growth • Success Blueprint",
-              action: "Watch",
-              color: "text-indigo-500 bg-indigo-50",
-              url: "https://www.youtube.com/results?search_query=daily+self+improvement+habits+for+students"
-          });
-      }
+    const subFeedback = feedbacks
+      .filter(f => f.subject?.toLowerCase().includes(s.name.toLowerCase()) || s.name.toLowerCase().includes(f.subject?.toLowerCase()))
+      .sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0))[0]
+      || feedbacks.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0))[0];
 
-      // Resilient fetching: match by subject name (case-insensitive) OR fallback to most recent overall feedback for this student
-      const subFeedback = feedbacks.filter(f => 
-          f.subject?.toLowerCase().includes(s.name.toLowerCase()) || 
-          s.name.toLowerCase().includes(f.subject?.toLowerCase())
-      ).sort((a,b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0))[0] 
-      || feedbacks.sort((a,b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0))[0];
+    const avg = overallStats.avg;
+    const resources: any[] = [];
+    if (processedTopics.length > 0) {
+      processedTopics.filter(t => t.score < 85).slice(0, 2).forEach(t => {
+        resources.push({ icon: "PlayCircle", title: `${t.name} Concept Clarity`, subtitle: "Targeted Tutorial • Video", action: "Watch", color: "text-blue-500 bg-blue-50", url: `https://www.youtube.com/results?search_query=${t.name.replace(/\s+/g, "+")}+tutorial` });
+      });
+    }
+    if (avg < 60) resources.push({ icon: "PlayCircle", title: "Study Techniques for Better Grades", subtitle: "Study Skills • Memory Tips", action: "Watch", color: "text-rose-500 bg-rose-50", url: "https://www.youtube.com/results?search_query=best+study+techniques+for+students" });
+    if (avg >= 90) resources.push({ icon: "Star", title: "Advanced Learning Resources", subtitle: "Beyond Curriculum • Excellence", action: "Watch", color: "text-indigo-500 bg-indigo-50", url: "https://www.youtube.com/results?search_query=advanced+learning+for+top+students" });
+    if (resources.length === 0) resources.push({ icon: "Star", title: "Continuous Learning Guide", subtitle: "Growth Strategies • Success", action: "Watch", color: "text-indigo-500 bg-indigo-50", url: "https://www.youtube.com/results?search_query=self+improvement+habits+for+students" });
 
-      return (
-          <SubjectPerformanceDetail 
-            subject={s.name}
-            teacher={subFeedback?.teacherName || "Institutional Faculty"}
-            grade={s.grade}
-            average={s.progress}
-            topics={processedTopics.length > 0 ? processedTopics : [{ name: "Curriculum Mastery", score: s.progress }]}
-            testScores={s.raw.map((r: any) => ({
-                name: r.testName || "Assessment",
-                date: r.timestamp ? new Date(r.timestamp.seconds * 1000).toLocaleDateString() : "Recent",
-                score: `${r.score}/${r.maxScore || 100}`,
-                status: r.percentage >= 75 ? "success" : r.percentage >= 60 ? "warning" : "error"
-            }))}
-            feedback={subFeedback?.content || "Pedagogical synthesis pending for this modules curriculum."}
-            resources={finalSuggestions}
-            onBack={() => setSelectedSubject(null)}
-          />
-      );
+    return (
+      <SubjectPerformanceDetail
+        subject={s.name}
+        teacher={subFeedback?.teacherName || "Class Teacher"}
+        grade={s.grade}
+        average={s.progress}
+        topics={processedTopics.length > 0 ? processedTopics : [{ name: "Overall", score: s.progress }]}
+        testScores={s.raw.map((r: any) => ({
+          name: r.testName || "Assessment",
+          date: r.timestamp ? new Date(r.timestamp.seconds * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "Recent",
+          score: `${r.score}/${r.maxScore || 100}`,
+          status: r.percentage >= 75 ? "success" : r.percentage >= 60 ? "warning" : "error"
+        }))}
+        feedback={subFeedback?.content || `${studentData?.name?.split(" ")[0] || "The student"} is progressing well. Detailed feedback will be updated after the next assessment.`}
+        resources={resources.slice(0, 3)}
+        onBack={() => setSelectedSubject(null)}
+      />
+    );
   }
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-10 duration-1000 pb-24 text-left font-sans">
-      
-      {/* ─── HEADER ─── */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-10 mb-16 px-4">
-        <div>
-           <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-2">Institutional Outcome Portal</p>
-           <h1 className="text-6xl font-black text-slate-900 tracking-tighter leading-none italic uppercase">Performance</h1>
+    <div className="animate-in fade-in duration-500 pb-20">
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
+        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Result of click: "Performance"</p>
+      </div>
+
+      {/* Overall Performance */}
+      <div className="bg-white border border-slate-100 rounded-2xl p-6 mb-5 shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <h2 className="text-lg font-bold text-slate-800">Overall Performance</h2>
+            <p className="text-sm text-slate-400 mt-0.5">Based on all assessments this term</p>
+          </div>
+          <div className="flex items-center gap-8 md:gap-12 md:border-l border-slate-100 md:pl-10">
+            <div className="text-center">
+              <p className="text-4xl font-bold text-emerald-500">{overallStats.grade}</p>
+              <p className="text-xs text-slate-400 mt-1">Current Grade</p>
+            </div>
+            <div className="text-center">
+              <p className="text-4xl font-bold text-slate-800">{overallStats.avg > 0 ? `${overallStats.avg}%` : "—"}</p>
+              <p className="text-xs text-slate-400 mt-1">Average Score</p>
+            </div>
+            <div className="text-center">
+              <div className="flex items-center gap-1 justify-center">
+                <ArrowUp className="w-4 h-4 text-emerald-500" />
+                <p className="text-2xl font-bold text-emerald-500">{overallStats.trend}</p>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">vs last term</p>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* ─── OVERALL PERFORMANCE CARD ─── */}
-      <div className="bg-white border border-slate-100 rounded-[3.5rem] p-12 mb-12 shadow-sm flex flex-col md:flex-row items-center justify-between gap-10">
-         <div className="flex-1">
-            <h2 className="text-3xl font-black text-slate-900 tracking-tighter mb-2 italic">Overall Performance</h2>
-            <p className="text-slate-400 font-bold">Based on all assessments this term for {studentData?.name}</p>
-         </div>
-         
-         <div className="flex items-center gap-12 md:gap-20 border-t md:border-t-0 md:border-l border-slate-50 pt-10 md:pt-0 md:pl-20 w-full md:w-auto justify-between md:justify-start">
-            <div className="text-center">
-               <p className="text-6xl font-black text-emerald-500 tracking-tighter mb-1">{overallStats.grade}</p>
-               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Grade</p>
-            </div>
-            <div className="text-center">
-               <p className="text-6xl font-black text-slate-900 tracking-tighter mb-1">{overallStats.avg}%</p>
-               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Average Score</p>
-            </div>
-            <div className="text-center">
-               <div className="flex items-center justify-center gap-2 text-emerald-500 mb-1">
-                  <ArrowUpRight className="w-8 h-8 font-black" />
-                  <p className="text-4xl font-black tracking-tighter">{overallStats.trend}</p>
-               </div>
-               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-nowrap">vs last term</p>
-            </div>
-         </div>
-      </div>
-
-      {/* ─── SUBJECT REGISTRY GRID ─── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
-         {loading ? <div className="col-span-full py-20 text-center text-slate-300 font-black uppercase tracking-widest animate-pulse">Synchronizing Analytics...</div> : 
-          subjects.map((s, i) => (
-            <div 
-               key={i} 
-               onClick={() => setSelectedSubject(s.name)}
-               className="bg-white border border-slate-100 rounded-[3rem] p-10 shadow-sm hover:shadow-2xl transition-all cursor-pointer group hover:-translate-y-2">
-               <div className="flex items-start justify-between mb-8">
-                  <div className="flex items-center gap-5">
-                     <div className="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center text-[#1e3a8a] shadow-inner group-hover:rotate-12 transition-transform">
-                        {React.createElement(getSubIcon(s.name), { size: 24 })}
-                     </div>
-                     <h3 className="text-xl font-black text-slate-900 tracking-tight italic uppercase">{s.name}</h3>
+      {/* Subject Cards */}
+      {loading ? (
+        <div className="py-24 flex flex-col items-center gap-3 text-slate-300">
+          <Loader2 className="w-8 h-8 animate-spin" />
+          <p className="text-sm">Loading performance data...</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
+          {subjects.map((s, i) => {
+            const Icon = getSubIcon(s.name);
+            const gradeColor = s.progress >= 75 ? "text-emerald-600 bg-emerald-50" : s.progress >= 60 ? "text-amber-600 bg-amber-50" : "text-rose-600 bg-rose-50";
+            const statusIcon = s.trendDir === "up" ? <ArrowUp className="w-3.5 h-3.5" /> : s.trendDir === "down" ? <ArrowDown className="w-3.5 h-3.5" /> : <Minus className="w-3.5 h-3.5" />;
+            const statusColor = s.trendDir === "up" ? "text-emerald-500" : s.trendDir === "down" ? "text-rose-500" : "text-slate-400";
+            return (
+              <div
+                key={i}
+                onClick={() => setSelectedSubject(s.name)}
+                className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm hover:shadow-md cursor-pointer transition-all hover:-translate-y-0.5"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500">
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-800">{s.name}</h3>
                   </div>
-                  <span className={`text-xl font-black ${s.progress >= 80 ? 'text-emerald-500' : 'text-amber-500'} italic`}>{s.grade}</span>
-               </div>
+                  <span className={`text-xs font-bold px-2 py-1 rounded-lg ${gradeColor}`}>{s.grade}</span>
+                </div>
 
-               <div className="space-y-4 mb-8">
-                  <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                     <span>Progress</span>
-                     <span>{s.progress}%</span>
+                <div className="mb-3">
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-xs text-slate-400">Progress</span>
+                    <span className="text-xs font-bold text-slate-700">{s.progress}%</span>
                   </div>
-                  <div className="h-3 w-full bg-slate-50 rounded-full overflow-hidden border border-slate-100 shadow-inner">
-                     <div className={`h-full ${s.color} rounded-full transition-all duration-1000 shadow-lg`} style={{ width: `${s.progress}%` }} />
+                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div className={`h-full ${s.barColor} rounded-full transition-all duration-700`} style={{ width: `${s.progress}%` }} />
                   </div>
-               </div>
+                </div>
 
-               <div className="flex items-center gap-2 text-emerald-500">
-                  {s.trendDir === 'up' ? <TrendingUp size={16} /> : <TrendingUp size={16} className="rotate-180 text-rose-500" />}
-                  <span className={`text-[10px] font-black uppercase tracking-widest ${s.trendDir === 'up' ? 'text-emerald-500' : 'text-rose-500'}`}>{s.status}</span>
-               </div>
-            </div>
-         ))}
-      </div>
+                <div className={`flex items-center gap-1 text-xs font-medium ${statusColor}`}>
+                  {statusIcon}
+                  <span>{s.status}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-      {/* ─── PERFORMANCE TREND ─── */}
-      <div className="bg-white border border-slate-100 rounded-[4rem] p-12 shadow-sm">
-         <h3 className="text-sm font-black text-slate-900 uppercase tracking-[0.3em] mb-12 italic border-l-4 border-[#1e3a8a] pl-6 leading-none">Performance Trend</h3>
-         <div className="h-[400px] w-full">
+      {/* Performance Trend */}
+      {!loading && trendData.length > 0 && (
+        <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
+          <h3 className="text-base font-bold text-slate-800 mb-6">Performance Trend</h3>
+          <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
-               <LineChart data={trendData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} fontSize={10} fontWeight="black" stroke="#94a3b8" />
-                  <YAxis axisLine={false} tickLine={false} fontSize={10} fontWeight="black" stroke="#94a3b8" domain={[0, 100]} />
-                  <Tooltip 
-                     contentStyle={{ borderRadius: '2rem', border: 'none', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.1)', fontWeight: 'black', textTransform: 'uppercase', fontSize: '10px' }}
-                     cursor={{ stroke: '#1e3a8a', strokeWidth: 2 }}
-                  />
-                  <Legend iconType="circle" wrapperStyle={{ paddingTop: '40px', fontSize: '10px', fontWeight: 'black', textTransform: 'uppercase' }} />
-                  {subjects.map((s, i) => (
-                     <Line 
-                        key={i} 
-                        type="monotone" 
-                        dataKey={s.name} 
-                        stroke={i === 0 ? "#1e3a8a" : i === 1 ? "#10b981" : i === 2 ? "#f59e0b" : "#6366f1"} 
-                        strokeWidth={4} 
-                        dot={{ r: 6, strokeWidth: 2, fill: '#fff' }} 
-                        activeDot={{ r: 8, strokeWidth: 0 }} 
-                     />
-                  ))}
-               </LineChart>
+              <LineChart data={trendData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="month" axisLine={false} tickLine={false} fontSize={12} stroke="#94a3b8" />
+                <YAxis axisLine={false} tickLine={false} fontSize={12} stroke="#94a3b8" domain={[60, 100]} />
+                <Tooltip contentStyle={{ borderRadius: "12px", border: "1px solid #f1f5f9", boxShadow: "0 4px 20px rgba(0,0,0,0.08)", fontSize: "12px" }} cursor={{ stroke: "#e2e8f0", strokeWidth: 2 }} />
+                <Legend wrapperStyle={{ paddingTop: "16px", fontSize: "12px" }} />
+                {subjects.map((s, i) => (
+                  <Line key={i} type="monotone" dataKey={s.name} stroke={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={2.5} dot={{ r: 4, strokeWidth: 2, fill: "#fff" }} activeDot={{ r: 6 }} connectNulls />
+                ))}
+              </LineChart>
             </ResponsiveContainer>
-         </div>
-      </div>
-
+          </div>
+        </div>
+      )}
     </div>
   );
 };
