@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 
-type DayStatus = "present" | "absent" | "late" | "weekend" | "empty";
+type DayStatus = "present" | "absent" | "late" | "weekend" | "forgotten" | "empty";
 
 const AttendancePage = () => {
   const { studentData } = useAuth();
@@ -56,9 +56,20 @@ const AttendancePage = () => {
 
   const getDayStatus = (day: number): DayStatus => {
     const d = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day);
+    // Weekend check first — always weekend regardless of records
+    if (d.getDay() === 0 || d.getDay() === 6) return "weekend";
+
     const dateStr = d.toLocaleDateString("en-CA");
     const logs = attendanceLogs.filter(l => l.date === dateStr);
-    if (!logs.length) return d.getDay() === 0 || d.getDay() === 6 ? "weekend" : "empty";
+
+    if (logs.length === 0) {
+      // No records for this day — check if it's a past weekday (teacher forgot)
+      const todayMidnight = new Date();
+      todayMidnight.setHours(0, 0, 0, 0);
+      if (d.getTime() < todayMidnight.getTime()) return "forgotten";
+      return "empty"; // today or future
+    }
+
     if (logs.some(l => l.status === "absent")) return "absent";
     if (logs.some(l => l.status === "late")) return "late";
     if (logs.some(l => l.status === "present")) return "present";
@@ -153,10 +164,11 @@ const AttendancePage = () => {
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" /><span className="text-xs text-slate-500">Present</span></div>
               <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-rose-500 inline-block" /><span className="text-xs text-slate-500">Absent</span></div>
               <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-amber-400 inline-block" /><span className="text-xs text-slate-500">Late</span></div>
+              <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-slate-300 inline-block" /><span className="text-xs text-slate-500">Not Marked</span></div>
             </div>
           </div>
 
@@ -180,6 +192,7 @@ const AttendancePage = () => {
                   status === "absent" ? "bg-rose-500 text-white" :
                   status === "late" ? "bg-amber-400 text-white" :
                   status === "weekend" ? "text-slate-300" :
+                  status === "forgotten" ? "bg-slate-200 text-slate-400" :
                   "text-slate-600 hover:bg-slate-50";
                 return (
                   <div key={day} className={`aspect-square rounded-xl flex items-center justify-center text-sm font-semibold transition-all ${cellStyle}`}>
