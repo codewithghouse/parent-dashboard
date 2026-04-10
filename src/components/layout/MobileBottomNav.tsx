@@ -1,5 +1,5 @@
 import { useLocation, Link } from "react-router-dom";
-import { Home, TrendingUp, Bell, MessageSquare, Menu } from "lucide-react";
+import { Home, TrendingUp, Bell, MessageSquare, Menu, FileText } from "lucide-react";
 
 interface MobileBottomNavProps {
   onMenuClick: () => void;
@@ -7,6 +7,7 @@ interface MobileBottomNavProps {
 
 const bottomNavItems = [
   { icon: Home, label: "Home", path: "/" },
+  { icon: FileText, label: "Tests", path: "/tests" },
   { icon: TrendingUp, label: "Progress", path: "/performance" },
   { icon: Bell, label: "Alerts", path: "/alerts", badge: 3 },
   { icon: MessageSquare, label: "Messages", path: "/teacher-notes" },

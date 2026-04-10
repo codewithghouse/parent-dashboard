@@ -6,6 +6,7 @@ import {
 import { useAuth } from "@/lib/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, limit } from "firebase/firestore";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 const TestsPage = () => {
   const { studentData } = useAuth();
@@ -101,31 +102,40 @@ const TestsPage = () => {
   const nextTest = upcomingTests[0];
 
   return (
-    <div className="animate-in fade-in duration-500 pb-20">
+    <div className="animate-in fade-in duration-500">
+      <PageHeader
+        title="Tests & Examinations"
+        subtitle="Track upcoming assessments and latest outcomes"
+        badge={stats.totalTaken > 0 ? `${stats.totalTaken} Completed` : ""}
+      />
 
-      {/* Header */}
-      <div className="mb-6">
-        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Result of click: "Tests &amp; Exams"</p>
-      </div>
-
-      {/* Upcoming Banner */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-6 mb-6 text-white flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-            <Calendar className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-blue-100">Upcoming:</p>
-            <p className="text-lg font-bold">{nextTest?.testName || "No upcoming tests"}</p>
-            <p className="text-sm text-blue-200">{nextTest?.date ? formatDate(nextTest.date) : "--"} • 9:00 AM</p>
-          </div>
+      {/* Upcoming Banner - Optimized for mobile */}
+      <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-5 md:p-8 mb-6 text-white relative overflow-hidden shadow-xl shadow-blue-900/10">
+        <div className="absolute top-0 right-0 opacity-10 scale-150 transform translate-x-1/4 -translate-y-1/4">
+          <GraduationCap size={150} />
         </div>
-        {nextTest && (
-          <div className="text-right">
-            <p className="text-5xl font-bold">{getDayDiff(nextTest.date)}</p>
-            <p className="text-sm text-blue-200">Days Left</p>
+        
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-6 relative z-10">
+          <div className="flex items-center text-center sm:text-left flex-col sm:flex-row gap-5">
+            <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-inner">
+              <Calendar className="w-8 h-8 text-white" />
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-100 mb-1">Coming Up Next</p>
+              <h2 className="text-2xl md:text-3xl font-black mb-1">{nextTest?.testName || "No upcoming tests"}</h2>
+              <p className="text-sm text-blue-100 font-bold opacity-80">
+                {nextTest?.date ? formatDate(nextTest.date) : "—"} • {nextTest?.time || "9:00 AM"}
+              </p>
+            </div>
           </div>
-        )}
+          
+          {nextTest && (
+            <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl px-8 py-4 text-center min-w-[120px]">
+              <p className="text-4xl md:text-5xl font-black leading-none mb-1 text-white">{getDayDiff(nextTest.date)}</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-blue-100">Days Left</p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Two-column: Upcoming + Recent */}
