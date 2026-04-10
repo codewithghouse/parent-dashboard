@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0B1F3A"/>
+  <!-- Graduation cap diamond -->
+  <polygon points="256,108 420,192 256,276 92,192" fill="#FFFFFF"/>
+  <!-- Cap body -->
+  <path d="M176 220 L176 320 Q176 360 256 375 Q336 360 336 320 L336 220 L256 264 Z" fill="#FFFFFF"/>
+  <!-- Tassel pole -->
+  <rect x="402" y="192" width="12" height="88" rx="6" fill="#F59E0B"/>
+  <!-- Tassel ball -->
+  <circle cx="408" cy="292" r="16" fill="#F59E0B"/>
+  <!-- Small star accent -->
+  <circle cx="256" cy="460" r="10" fill="#F59E0B"/>
+  <circle cx="220" cy="448" r="7" fill="#F59E0B"/>
+  <circle cx="292" cy="448" r="7" fill="#F59E0B"/>
+</svg>
