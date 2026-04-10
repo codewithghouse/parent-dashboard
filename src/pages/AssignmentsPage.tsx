@@ -5,6 +5,7 @@ import { db, storage } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, Unsubscribe } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 
 const tabs = ["Pending", "Completed", "Overdue"];
@@ -132,30 +133,40 @@ const AssignmentsPage = () => {
   };
 
   return (
-      <div className="space-y-10 animate-in fade-in duration-500 pb-20 text-left">
-        {/* STATS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-           {[
-             { label: 'Completion Rate', value: '93%', color: 'text-emerald-500', bg: 'bg-emerald-500', icon: Target },
-             { label: 'On-Time Submission', value: '96%', color: 'text-blue-500', bg: 'bg-blue-500', icon: BarChart3 },
-             { label: 'Average Score', value: '82%', color: 'text-indigo-500', bg: 'bg-indigo-500', icon: Trophy },
-           ].map((stat, i) => (
-             <div key={i} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col gap-6">
-                <div className="flex items-center justify-between"><p className="text-sm font-black text-slate-400 uppercase tracking-widest leading-none">{stat.label}</p><stat.icon className={`w-5 h-5 ${stat.color}`} /></div>
-                <h4 className={`text-4xl font-black ${stat.color}`}>{stat.value}</h4>
-                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden"><div className={`${stat.bg} h-full transition-all duration-1000`} style={{ width: stat.value }} /></div>
-             </div>
-           ))}
-        </div>
+    <div className="animate-in fade-in duration-500">
+      <PageHeader
+        title="Assignments & Coursework"
+        subtitle="Manage submissions and track academic tasks"
+        badge={assignments.length > 0 ? `${assignments.length} Total` : ""}
+      />
 
-        {/* TABS */}
-        <div className="flex bg-white p-2 rounded-[2rem] border border-slate-100 shadow-sm w-fit">
+      {/* STATS - Scrollable on mobile */}
+      <div className="flex overflow-x-auto pb-4 gap-4 scrollbar-none no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 mb-6 font-bold">
+        {[
+          { label: 'Completion', value: '93%', color: 'text-emerald-500', icon: Target },
+          { label: 'On-Time', value: '96%', color: 'text-blue-500', icon: BarChart3 },
+          { label: 'Avg Score', value: '82%', color: 'text-indigo-500', icon: Trophy },
+        ].map((stat, i) => (
+          <div key={i} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-3 min-w-[160px] flex-1">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">{stat.label}</p>
+              <stat.icon className={`w-4 h-4 ${stat.color}`} />
+            </div>
+            <h4 className={`text-2xl font-black ${stat.color}`}>{stat.value}</h4>
+          </div>
+        ))}
+      </div>
+
+      {/* TABS - Scrollable on mobile */}
+      <div className="flex overflow-x-auto pb-2 mb-6 gap-2 scrollbar-none no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="flex bg-white p-1.5 rounded-2xl border border-slate-100 shadow-sm w-full sm:w-fit">
           {tabs.map((tab, i) => (
-            <button key={tab} onClick={() => setActiveTab(i)} className={`px-8 py-4 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest transition-all ${i === activeTab ? "bg-slate-900 text-white shadow-xl" : "text-slate-400"}`}>
+            <button key={tab} onClick={() => setActiveTab(i)} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${i === activeTab ? "bg-slate-900 text-white shadow-lg" : "text-slate-400"}`}>
               {tab} ({i === 0 ? assignments.filter(a => !getSub(a.id)).length : i === 1 ? submissions.length : 0})
             </button>
           ))}
         </div>
+      </div>
 
         {/* LIST */}
         <div className="space-y-6">
@@ -164,45 +175,45 @@ const AssignmentsPage = () => {
           ) : filteredAssignments.length === 0 ? (
              <div className="py-24 bg-white border border-dashed border-slate-200 rounded-[3.5rem] text-center"><FileCheck className="w-12 h-12 text-slate-200 mx-auto mb-6" /><h3 className="text-xl font-black text-slate-800 uppercase">No Curriculums Found</h3></div>
           ) : (
-            filteredAssignments.map((a) => {
-              const mySub = getSub(a.id);
-              return (
-                <div key={a.id} className="bg-white rounded-[3rem] border border-slate-100 p-8 shadow-sm hover:shadow-xl transition-all flex flex-col md:flex-row items-center gap-8 text-left">
-                  <div className={`w-24 h-24 rounded-[2.2rem] flex items-center justify-center border-2 shrink-0 bg-slate-50 border-slate-100`}>
-                     {getSubjectIcon(a.title)}
-                  </div>
-                  <div className="flex-1 space-y-3">
-                    <div className="flex items-center gap-4">
-                       <h3 className="text-2xl font-black text-slate-800 tracking-tight">{a.title}</h3>
-                       <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${mySub ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
-                          {mySub ? 'Handed In' : 'Outstanding'}
-                       </span>
-                    </div>
-                    <p className="text-sm font-bold text-slate-400 line-clamp-2">{a.description}</p>
-                    <div className="flex items-center gap-6 pt-2">
-                       <div className="flex items-center gap-2"><User className="w-4 h-4 text-slate-300"/><span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">{a.teacherName || "Institutional Faculty"}</span></div>
-                       <div className="flex items-center gap-2 text-rose-400"><Clock className="w-4 h-4"/><span className="text-[11px] font-black uppercase tracking-widest leading-none">Due Mar 28, 2026</span></div>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-3 min-w-[180px]">
-                     {mySub ? (
-                        <div className="bg-emerald-50 text-emerald-600 p-4 rounded-2xl border border-emerald-100 text-center flex flex-col items-center">
-                           <CheckCircle2 className="w-5 h-5 mb-1" />
-                           <p className="text-[10px] font-black uppercase tracking-widest">Marked Submited</p>
-                        </div>
-                     ) : (
-                        <button 
-                          onClick={() => { setSelectedTask(a); setIsSubmitOpen(true); }}
-                          className="w-full px-8 py-5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-slate-800 shadow-xl transition-all active:scale-95"
-                        >
-                          Submit Online
-                        </button>
-                     )}
-                     {a.pdfUrl && <a href={a.pdfUrl} target="_blank" rel="noreferrer" className="px-6 py-3 border border-slate-100 rounded-2xl text-[9px] font-black text-slate-400 uppercase tracking-widest hover:bg-slate-50 transition-all text-center">View Blueprint</a>}
-                  </div>
-                </div>
-              )
-            })
+             filteredAssignments.map((a) => {
+               const mySub = getSub(a.id);
+               return (
+                 <div key={a.id} className="bg-white rounded-3xl border border-slate-100 p-5 md:p-8 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row items-center gap-6 md:gap-8">
+                   <div className="w-20 h-20 md:w-24 md:h-24 rounded-3xl flex items-center justify-center border-2 shrink-0 bg-slate-50 border-slate-100 shadow-inner">
+                      {getSubjectIcon(a.title)}
+                   </div>
+                   <div className="flex-1 space-y-3 w-full font-bold">
+                     <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                        <h3 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight leading-tight">{a.title}</h3>
+                        <span className={`w-fit px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${mySub ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                           {mySub ? 'Handed In' : 'Outstanding'}
+                        </span>
+                     </div>
+                     <p className="text-sm font-bold text-slate-400 line-clamp-2">{a.description}</p>
+                     <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-1 font-bold">
+                        <div className="flex items-center gap-2"><User className="w-4 h-4 text-slate-300"/><span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{a.teacherName || "Institutional Faculty"}</span></div>
+                        <div className="flex items-center gap-2 text-rose-500"><Clock className="w-4 h-4"/><span className="text-[10px] font-black uppercase tracking-widest">Due Mar 28</span></div>
+                     </div>
+                   </div>
+                   <div className="flex flex-col gap-3 w-full md:w-[200px]">
+                      {mySub ? (
+                         <div className="bg-emerald-50 text-emerald-600 p-4 rounded-2xl border border-emerald-100 text-center flex flex-col items-center shadow-sm">
+                            <CheckCircle2 className="w-5 h-5 mb-1" />
+                            <p className="text-[10px] font-black uppercase tracking-widest">Handed In</p>
+                         </div>
+                      ) : (
+                         <button 
+                           onClick={() => { setSelectedTask(a); setIsSubmitOpen(true); }}
+                           className="w-full px-6 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-slate-800 shadow-lg active:scale-95 transition-all"
+                         >
+                           Submit Online
+                         </button>
+                      )}
+                      {a.pdfUrl && <a href={a.pdfUrl} target="_blank" rel="noreferrer" className="w-full px-6 py-3 border border-slate-100 rounded-2xl text-[9px] font-black text-slate-400 uppercase tracking-widest hover:bg-slate-50 transition-all text-center">View Blueprint</a>}
+                   </div>
+                 </div>
+               )
+             })
           )}
         </div>
 

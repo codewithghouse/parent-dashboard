@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { db } from "@/lib/firebase";
 import {
   collection, query, where, onSnapshot,
@@ -403,37 +404,39 @@ const AlertsPage = () => {
   }[c] || "bg-slate-100 text-slate-500");
 
   return (
-    <div className="animate-in fade-in duration-500 pb-20">
-
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
-          Result of click: "Alerts &amp; Reminders"
-        </p>
+    <div className="animate-in fade-in duration-500">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 md:mb-8">
+        <PageHeader
+          title="Alerts & Notifications"
+          subtitle="Stay updated with your child's activities"
+          badge={allAlerts.length > 0 ? `${allAlerts.length} New` : ""}
+        />
         <button
           onClick={markAllRead}
-          className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-xl text-sm text-slate-500 hover:bg-slate-50 transition-all"
+          className="flex items-center justify-center gap-2 px-6 py-3 border border-slate-200 bg-white rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm active:scale-95"
         >
           <CheckCircle className="w-4 h-4" />
           Mark All Read
         </button>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex flex-wrap gap-2 mb-6">
-        {filterTabs.map((tab, i) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(i)}
-            className={`px-4 py-2 rounded-full text-sm font-semibold border transition-all ${
-              i === activeTab
-                ? "bg-[#1e3a8a] text-white border-[#1e3a8a]"
-                : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
-            }`}
-          >
-            {tab} ({getTabCount(tab)})
-          </button>
-        ))}
+      {/* Filter Tabs - Scrollable on mobile */}
+      <div className="flex overflow-x-auto pb-4 mb-4 gap-2 scrollbar-none no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="flex gap-2 min-w-max">
+          {filterTabs.map((tab, i) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(i)}
+              className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest border transition-all ${
+                i === activeTab
+                  ? "bg-[#1e3a8a] text-white border-[#1e3a8a] shadow-lg shadow-blue-900/10"
+                  : "bg-white text-slate-500 border-slate-200 hover:border-slate-300"
+              }`}
+            >
+              {tab} ({getTabCount(tab)})
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Alert List */}
@@ -455,22 +458,22 @@ const AlertsPage = () => {
             return (
               <div
                 key={alert.id}
-                className={`bg-white border border-slate-100 border-l-4 ${getBorderColor(alert.priority)} rounded-2xl p-5 shadow-sm hover:shadow-md transition-all`}
+                className={`bg-white border border-slate-100 border-l-4 ${getBorderColor(alert.priority)} rounded-2xl p-4 md:p-5 shadow-sm hover:shadow-md transition-all`}
               >
-                <div className="flex items-start gap-4">
+                <div className="flex items-start gap-3">
                   {/* Icon */}
-                  <div className={`w-10 h-10 rounded-full ${iconStyle.bg} ${iconStyle.color} flex items-center justify-center shrink-0 mt-0.5`}>
+                  <div className={`w-9 h-9 md:w-10 md:h-10 rounded-full ${iconStyle.bg} ${iconStyle.color} flex items-center justify-center shrink-0 mt-0.5`}>
                     {iconStyle.icon}
                   </div>
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                      <h3 className="text-base font-bold text-slate-800">{alert.title}</h3>
-                      <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${getPriorityBadge(alert.priority)}`}>
+                      <h3 className="text-sm md:text-base font-bold text-slate-800">{alert.title}</h3>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${getPriorityBadge(alert.priority)}`}>
                         {alert.priority}
                       </span>
-                      <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${getCategoryBadge(alert.category)}`}>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${getCategoryBadge(alert.category)}`}>
                         {alert.category}
                       </span>
                     </div>
@@ -478,7 +481,7 @@ const AlertsPage = () => {
                     <p className="text-sm text-slate-500 leading-relaxed mb-3">{alert.description}</p>
 
                     {/* Metadata */}
-                    <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400">
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
                       {alert.date ? (
                         <>
                           <span className="flex items-center gap-1.5">
@@ -506,55 +509,55 @@ const AlertsPage = () => {
                       )}
                     </div>
                   </div>
+                </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex flex-col gap-2 shrink-0 min-w-[120px]">
-                    {alert.category === "Attendance" && alert.priority !== "High Priority" ? (
+                {/* Action Buttons — full width below on mobile, inline on sm+ */}
+                <div className="flex flex-wrap gap-2 mt-3 sm:justify-end">
+                  {alert.category === "Attendance" && alert.priority !== "High Priority" ? (
+                    <button
+                      onClick={() => dismissAlert(alert)}
+                      className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-all"
+                    >
+                      Acknowledge
+                    </button>
+                  ) : alert.category === "General" ? (
+                    <>
                       <button
                         onClick={() => dismissAlert(alert)}
-                        className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-all"
+                        className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition-all"
                       >
-                        Acknowledge
+                        Confirm
                       </button>
-                    ) : alert.category === "General" ? (
-                      <>
-                        <button
-                          onClick={() => dismissAlert(alert)}
-                          className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition-all"
-                        >
-                          Confirm
-                        </button>
-                        <button
-                          onClick={() => dismissAlert(alert)}
-                          className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-all"
-                        >
-                          Reschedule
-                        </button>
-                      </>
-                    ) : alert.priority === "Good News" ? (
                       <button
-                        onClick={() => navigate("/performance")}
-                        className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition-all"
+                        onClick={() => dismissAlert(alert)}
+                        className="flex-1 sm:flex-none px-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-all"
+                      >
+                        Reschedule
+                      </button>
+                    </>
+                  ) : alert.priority === "Good News" ? (
+                    <button
+                      onClick={() => navigate("/performance")}
+                      className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition-all"
+                    >
+                      View Details
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => navigate("/teacher-notes")}
+                        className="flex-1 sm:flex-none px-4 py-2 bg-[#1e3a8a] text-white rounded-xl text-sm font-semibold hover:bg-blue-900 transition-all"
                       >
                         View Details
                       </button>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => navigate("/teacher-notes")}
-                          className="px-4 py-2 bg-[#1e3a8a] text-white rounded-xl text-sm font-semibold hover:bg-blue-900 transition-all"
-                        >
-                          View Details
-                        </button>
-                        <button
-                          onClick={() => dismissAlert(alert)}
-                          className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-all"
-                        >
-                          Dismiss
-                        </button>
-                      </>
-                    )}
-                  </div>
+                      <button
+                        onClick={() => dismissAlert(alert)}
+                        className="flex-1 sm:flex-none px-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-all"
+                      >
+                        Dismiss
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             );

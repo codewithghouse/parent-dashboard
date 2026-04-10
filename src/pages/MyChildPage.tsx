@@ -5,6 +5,7 @@ import {
   Mail, CheckSquare, FileText, Star, Edit, X, Save, Loader2, Users
 } from "lucide-react";
 import { useAuth } from "../lib/AuthContext";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { db } from "../lib/firebase";
 import { collection, query, where, onSnapshot, getDocs, doc, updateDoc } from "firebase/firestore";
 import { toast } from "sonner";
@@ -130,40 +131,37 @@ const MyChildPage = () => {
   const studentInitials = getInitials(studentData?.name || "AS");
 
   return (
-    <div className="animate-in fade-in duration-500 pb-20">
-
-      {/* Top Bar */}
-      <div className="flex justify-between items-center mb-8">
-        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Result of click: "My Child"</p>
+    <div className="animate-in fade-in duration-500">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 md:mb-8">
+        <PageHeader
+          title="Student Profile"
+          badge="Active"
+        />
         <button
           onClick={() => setIsEditModalOpen(true)}
-          className="flex items-center gap-2 px-5 py-2.5 bg-[#1e3a8a] text-white rounded-xl text-sm font-semibold hover:bg-blue-900 transition-all shadow-md"
+          className="flex items-center justify-center gap-2 px-6 py-3 bg-[#1e3a8a] text-white rounded-xl text-sm font-bold hover:bg-blue-900 transition-all shadow-md active:scale-95"
         >
           <Edit className="w-4 h-4" /> Edit Profile
         </button>
       </div>
 
       {/* Profile Card */}
-      <div className="bg-white border border-slate-100 rounded-2xl p-6 mb-5 shadow-sm">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 pb-6 border-b border-slate-100 mb-6">
-          <div className="w-20 h-20 rounded-2xl bg-[#1e3a8a] text-white flex items-center justify-center text-2xl font-bold flex-shrink-0">
+      <div className="bg-white border border-slate-100 rounded-2xl p-5 md:p-6 mb-5 shadow-sm">
+        <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-5 pb-6 border-b border-slate-100 mb-6">
+          <div className="w-24 h-24 rounded-2xl bg-[#1e3a8a] text-white flex items-center justify-center text-3xl font-black flex-shrink-0 shadow-lg shadow-blue-900/10">
             {studentInitials}
           </div>
           <div className="flex-1">
-            <div className="flex flex-wrap items-center gap-3 mb-1">
-              <h1 className="text-2xl font-bold text-slate-900">{studentData?.name || "Student"}</h1>
-              <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-xs font-semibold rounded-full border border-emerald-100">Active</span>
-              <span className="px-3 py-1 bg-slate-100 text-slate-500 text-xs font-semibold rounded-full">2025-26</span>
+            <h1 className="text-2xl md:text-3xl font-black text-slate-900 mb-2">{studentData?.name || "Student"}</h1>
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+              <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black rounded-full border border-emerald-100 uppercase tracking-widest">Active</span>
+              <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-black rounded-full border border-blue-100 uppercase tracking-widest">2025-26</span>
+              <span className="px-3 py-1 bg-slate-50 text-slate-500 text-[10px] font-black rounded-full border border-slate-200 uppercase tracking-widest">Grade {enrollmentInfo.className}</span>
             </div>
-            <p className="text-sm text-slate-400">
-              {enrollmentInfo.className !== "—" ? `Grade ${enrollmentInfo.className}` : studentData?.grade ? `Grade ${studentData.grade}` : ""}
-              {enrollmentInfo.section ? ` • Section ${enrollmentInfo.section}` : ""}
-              {enrollmentInfo.rollNo !== "—" ? ` • Roll Number ${enrollmentInfo.rollNo}` : ""}
-            </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           {[
             { icon: Calendar, label: "Date of Birth", value: formData.dob || "Not set" },
             { icon: HeartPulse, label: "Blood Group", value: formData.bloodGroup || "Not set" },

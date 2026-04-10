@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
-import { CheckCircle, XCircle, Clock, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { CheckCircle, XCircle, Clock, ChevronLeft, ChevronRight, Loader2, Calendar as CalendarIcon } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 
@@ -80,71 +81,68 @@ const AttendancePage = () => {
   const recentAbsences = attendanceLogs.filter(a => a.status !== "present").slice(0, 5);
 
   return (
-    <div className="animate-in fade-in duration-500 pb-20">
-
-      {/* Header */}
-      <div className="mb-8">
-        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Result of click: "Attendance"</p>
-      </div>
+    <div className="animate-in fade-in duration-500">
+      <PageHeader
+        title="Attendance Tracking"
+        badge={`${stats.percentage}% Avg`}
+        subtitle="Monitor daily presence and monthly patterns"
+      />
 
       {/* 4 Stat Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-5">
         {/* Overall */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
+        <div className="bg-white border border-slate-100 rounded-2xl p-4 md:p-5 shadow-sm">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
-              <CheckCircle className="w-5 h-5 text-emerald-500" />
+            <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+              <CheckCircle className="w-4 h-4 md:w-5 md:h-5 text-emerald-500" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-800">{stats.percentage}%</p>
-              <p className="text-xs text-slate-400">Overall</p>
+              <p className="text-xl md:text-2xl font-bold text-slate-800">{stats.percentage}%</p>
+              <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">Overall</p>
             </div>
           </div>
-          <p className={`text-xs font-semibold ${stats.percentage >= 85 ? "text-emerald-500" : "text-rose-500"}`}>
-            {stats.percentage >= 85 ? "Good Standing" : "Below Threshold"}
-          </p>
+          <div className={`h-1 w-full rounded-full overflow-hidden bg-slate-100`}>
+            <div className={`h-full ${stats.percentage >= 85 ? "bg-emerald-500" : "bg-rose-500"}`} style={{ width: `${stats.percentage}%` }} />
+          </div>
         </div>
 
         {/* Present */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
-              <CheckCircle className="w-5 h-5 text-emerald-500" />
+        <div className="bg-white border border-slate-100 rounded-2xl p-4 md:p-5 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+              <CheckCircle className="w-4 h-4 md:w-5 md:h-5 text-emerald-500" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-800">{monthStats.present}</p>
-              <p className="text-xs text-slate-400">Present</p>
+              <p className="text-xl md:text-2xl font-bold text-slate-800">{monthStats.present}</p>
+              <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">Present</p>
             </div>
           </div>
-          <p className="text-xs text-slate-400">This month</p>
         </div>
 
         {/* Absent */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center">
-              <XCircle className="w-5 h-5 text-rose-500" />
+        <div className="bg-white border border-slate-100 rounded-2xl p-4 md:p-5 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className={`w-9 h-9 md:w-10 md:h-10 rounded-xl ${monthStats.absent > 0 ? "bg-rose-50" : "bg-slate-50"} flex items-center justify-center`}>
+              <XCircle className={`w-4 h-4 md:w-5 md:h-5 ${monthStats.absent > 0 ? "text-rose-500" : "text-slate-300"}`} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-800">{monthStats.absent}</p>
-              <p className="text-xs text-slate-400">Absent</p>
+              <p className={`text-xl md:text-2xl font-bold ${monthStats.absent > 0 ? "text-rose-500" : "text-slate-800"}`}>{monthStats.absent}</p>
+              <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">Absent</p>
             </div>
           </div>
-          <p className="text-xs text-slate-400">This month</p>
         </div>
 
         {/* Late */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
-              <Clock className="w-5 h-5 text-amber-500" />
+        <div className="bg-white border border-slate-100 rounded-2xl p-4 md:p-5 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className={`w-9 h-9 md:w-10 md:h-10 rounded-xl ${monthStats.late > 0 ? "bg-amber-50" : "bg-slate-50"} flex items-center justify-center`}>
+              <Clock className={`w-4 h-4 md:w-5 md:h-5 ${monthStats.late > 0 ? "text-amber-500" : "text-slate-300"}`} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-800">{monthStats.late}</p>
-              <p className="text-xs text-slate-400">Late</p>
+              <p className={`text-xl md:text-2xl font-bold ${monthStats.late > 0 ? "text-amber-600" : "text-slate-800"}`}>{monthStats.late}</p>
+              <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">Late</p>
             </div>
           </div>
-          <p className="text-xs text-slate-400">This month</p>
         </div>
       </div>
 
@@ -154,30 +152,33 @@ const AttendancePage = () => {
         {/* Calendar */}
         <div className="lg:col-span-3 bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
           {/* Calendar Header */}
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-3">
-              <button onClick={handlePrevMonth} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-500 transition-all">
-                <ChevronLeft className="w-4 h-4" />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div className="flex items-center gap-2">
+              <button onClick={handlePrevMonth} className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 transition-all shadow-sm">
+                <ChevronLeft className="w-5 h-5" />
               </button>
-              <h2 className="text-lg font-bold text-slate-800 min-w-[140px] text-center">{monthName}</h2>
-              <button onClick={handleNextMonth} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-500 transition-all">
-                <ChevronRight className="w-4 h-4" />
+              <div className="px-4 py-1.5 bg-slate-50 rounded-xl border border-slate-100 font-bold text-slate-800 flex items-center gap-2">
+                <CalendarIcon className="w-4 h-4 text-primary" />
+                <span className="min-w-[124px] text-center">{monthName}</span>
+              </div>
+              <button onClick={handleNextMonth} className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 transition-all shadow-sm">
+                <ChevronRight className="w-5 h-5" />
               </button>
             </div>
-            <div className="flex items-center gap-4 flex-wrap">
-              <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" /><span className="text-xs text-slate-500">Present</span></div>
-              <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-rose-500 inline-block" /><span className="text-xs text-slate-500">Absent</span></div>
-              <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-amber-400 inline-block" /><span className="text-xs text-slate-500">Late</span></div>
-              <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-slate-300 inline-block" /><span className="text-xs text-slate-500">Not Marked</span></div>
+            <div className="flex items-center gap-x-4 gap-y-2 flex-wrap">
+              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" /><span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Present</span></div>
+              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-rose-500" /><span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Absent</span></div>
+              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400" /><span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Late</span></div>
             </div>
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-20 text-slate-300">
-              <Loader2 className="w-8 h-8 animate-spin" />
+            <div className="flex flex-col items-center justify-center py-24 text-slate-300 gap-3">
+              <Loader2 className="w-10 h-10 animate-spin opacity-50" />
+              <p className="text-sm font-medium">Syncing logs...</p>
             </div>
           ) : (
-            <div className="grid grid-cols-7 gap-1.5">
+            <div className="grid grid-cols-7 gap-1 md:gap-2">
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => (
                 <div key={d} className="text-center text-xs text-slate-400 font-medium py-1">{d}</div>
               ))}
@@ -187,15 +188,19 @@ const AttendancePage = () => {
               {Array.from({ length: daysInMonth(selectedDate) }).map((_, i) => {
                 const day = i + 1;
                 const status = getDayStatus(day);
-                const cellStyle =
-                  status === "present" ? "bg-emerald-500 text-white" :
-                  status === "absent" ? "bg-rose-500 text-white" :
-                  status === "late" ? "bg-amber-400 text-white" :
-                  status === "weekend" ? "text-slate-300" :
-                  status === "forgotten" ? "bg-slate-200 text-slate-400" :
-                  "text-slate-600 hover:bg-slate-50";
+                const cellStyle = (() => {
+                  switch (status) {
+                    case "present": return "bg-emerald-500 text-white shadow-md shadow-emerald-500/20";
+                    case "absent": return "bg-rose-500 text-white shadow-md shadow-rose-500/20";
+                    case "late": return "bg-amber-400 text-white shadow-md shadow-amber-400/20";
+                    case "weekend": return "bg-slate-50 text-slate-300 border-dashed border border-slate-200";
+                    case "forgotten": return "bg-slate-100 text-slate-400 opacity-60";
+                    case "empty": return "bg-white text-slate-700 hover:bg-slate-50 border border-slate-100";
+                    default: return "bg-white text-slate-700";
+                  }
+                })();
                 return (
-                  <div key={day} className={`aspect-square rounded-xl flex items-center justify-center text-sm font-semibold transition-all ${cellStyle}`}>
+                  <div key={day} className={`aspect-square rounded-lg md:rounded-xl flex items-center justify-center text-xs md:text-sm font-bold transition-all ${cellStyle}`}>
                     {day}
                   </div>
                 );

@@ -3,8 +3,13 @@ import { useAuth } from "../../lib/AuthContext";
 import {
   Home, User, TrendingUp, CalendarCheck, ClipboardList,
   FileText, Brain, SmilePlus, StickyNote,
-  Bell, Settings, GraduationCap, LogOut, CreditCard, CalendarDays, School
+  Bell, Settings, GraduationCap, LogOut, CreditCard, CalendarDays, School, X
 } from "lucide-react";
+
+interface ParentSidebarProps {
+  open: boolean;
+  onClose: () => void;
+}
 
 const navItems = [
   { title: "Dashboard", path: "/", icon: Home },
@@ -25,21 +30,33 @@ const navItems = [
   { title: "Settings", path: "/settings", icon: Settings },
 ];
 
-export const ParentSidebar = () => {
+export const ParentSidebar = ({ open, onClose }: ParentSidebarProps) => {
   const location = useLocation();
   const { studentData, user, logout } = useAuth();
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-[280px] bg-primary flex flex-col z-50">
-      {/* Logo */}
+    <aside
+      className={`fixed left-0 top-0 h-screen w-[280px] bg-primary flex flex-col z-50 transition-transform duration-300 ease-in-out ${
+        open ? "translate-x-0" : "-translate-x-full"
+      } lg:translate-x-0`}
+    >
+      {/* Logo + close button (mobile) */}
       <div className="flex items-center gap-3 px-6 py-5">
-        <div className="w-8 h-8 bg-primary-foreground rounded-lg flex items-center justify-center">
+        <div className="w-8 h-8 bg-primary-foreground rounded-lg flex items-center justify-center flex-shrink-0">
           <GraduationCap className="w-5 h-5 text-primary" />
         </div>
-        <div className="flex flex-col leading-none">
+        <div className="flex flex-col leading-none flex-1 min-w-0">
           <span className="text-primary-foreground font-bold text-lg tracking-wide uppercase">EDUINTELLECT</span>
           <span className="text-[10px] font-bold text-primary-foreground/60 uppercase tracking-widest mt-1">Parent Portal</span>
         </div>
+        {/* Close button — mobile only */}
+        <button
+          onClick={onClose}
+          className="lg:hidden w-8 h-8 rounded-full flex items-center justify-center text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-all flex-shrink-0"
+          aria-label="Close menu"
+        >
+          <X className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Navigation */}
@@ -50,6 +67,7 @@ export const ParentSidebar = () => {
             <Link
               key={item.path}
               to={item.path}
+              onClick={onClose}
               className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all relative ${
                 isActive
                   ? "bg-primary-foreground text-primary shadow-md"
@@ -59,9 +77,7 @@ export const ParentSidebar = () => {
               <item.icon className="w-5 h-5 flex-shrink-0" />
               <span>{item.title}</span>
               {item.badge && (
-                <span className={`absolute right-3 min-w-[20px] h-5 flex items-center justify-center rounded-full text-xs font-bold ${
-                  isActive ? "bg-red-500 text-white" : "bg-red-500 text-white"
-                }`}>
+                <span className="absolute right-3 min-w-[20px] h-5 flex items-center justify-center rounded-full text-xs font-bold bg-red-500 text-white">
                   {item.badge}
                 </span>
               )}
@@ -73,7 +89,7 @@ export const ParentSidebar = () => {
       {/* Profile & Logout */}
       <div className="p-4 border-t border-primary-foreground/10 space-y-3">
         <div className="flex items-center gap-3 px-2">
-          <div className="w-9 h-9 rounded-full bg-primary-foreground flex items-center justify-center text-primary text-sm font-black shadow-lg">
+          <div className="w-9 h-9 rounded-full bg-primary-foreground flex items-center justify-center text-primary text-sm font-black shadow-lg flex-shrink-0">
             {studentData?.name?.[0] || user?.displayName?.[0] || "P"}
           </div>
           <div className="overflow-hidden">
@@ -83,7 +99,7 @@ export const ParentSidebar = () => {
             </p>
           </div>
         </div>
-        <button 
+        <button
           onClick={logout}
           className="w-full h-12 flex items-center gap-3 px-4 rounded-xl text-sm font-bold text-rose-200 hover:bg-rose-500 hover:text-white transition-all group"
         >

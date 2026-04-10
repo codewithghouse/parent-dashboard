@@ -6,6 +6,7 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { SubjectPerformanceDetail } from "@/components/performance/SubjectPerformanceDetail";
 import { useAuth } from "@/lib/AuthContext";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, getDocs } from "firebase/firestore";
 
@@ -182,35 +183,36 @@ const PerformancePage = () => {
   }
 
   return (
-    <div className="animate-in fade-in duration-500 pb-20">
-
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Result of click: "Performance"</p>
-      </div>
+    <div className="animate-in fade-in duration-500">
+      <PageHeader
+        title="Performance Analytics"
+        subtitle="Detailed breakdown of academic progress"
+        badge={overallStats.grade}
+      />
 
       {/* Overall Performance */}
-      <div className="bg-white border border-slate-100 rounded-2xl p-6 mb-5 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="bg-white border border-slate-100 rounded-2xl p-5 md:p-6 mb-5 shadow-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div>
             <h2 className="text-lg font-bold text-slate-800">Overall Performance</h2>
             <p className="text-sm text-slate-400 mt-0.5">Based on all assessments this term</p>
           </div>
-          <div className="flex items-center gap-8 md:gap-12 md:border-l border-slate-100 md:pl-10">
-            <div className="text-center">
-              <p className="text-4xl font-bold text-emerald-500">{overallStats.grade}</p>
-              <p className="text-xs text-slate-400 mt-1">Current Grade</p>
+          
+          <div className="grid grid-cols-3 gap-3 sm:gap-8 lg:border-l border-slate-100 lg:pl-10">
+            <div className="text-center p-2 rounded-xl bg-slate-50 lg:bg-transparent">
+              <p className="text-2xl md:text-4xl font-black text-emerald-500">{overallStats.grade}</p>
+              <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Grade</p>
             </div>
-            <div className="text-center">
-              <p className="text-4xl font-bold text-slate-800">{overallStats.avg > 0 ? `${overallStats.avg}%` : "—"}</p>
-              <p className="text-xs text-slate-400 mt-1">Average Score</p>
+            <div className="text-center p-2 rounded-xl bg-slate-50 lg:bg-transparent">
+              <p className="text-2xl md:text-4xl font-black text-slate-800">{overallStats.avg > 0 ? `${overallStats.avg}%` : "—"}</p>
+              <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Average</p>
             </div>
-            <div className="text-center">
+            <div className="text-center p-2 rounded-xl bg-slate-50 lg:bg-transparent">
               <div className="flex items-center gap-1 justify-center">
                 <ArrowUp className="w-4 h-4 text-emerald-500" />
-                <p className="text-2xl font-bold text-emerald-500">{overallStats.trend}</p>
+                <p className="text-xl md:text-2xl font-black text-emerald-500">{overallStats.trend}</p>
               </div>
-              <p className="text-xs text-slate-400 mt-1">vs last term</p>
+              <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Trend</p>
             </div>
           </div>
         </div>

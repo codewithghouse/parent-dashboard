@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/lib/AuthContext";
-import { CheckCircle, AlertCircle, Calendar, Star, ArrowUp, Clock, Loader2, Bell, ShieldCheck, BrainCircuit, Sparkles } from "lucide-react";
+import { CheckCircle, AlertCircle, Calendar, Star, ArrowUp, Clock, Loader2, Bell, ShieldCheck, BrainCircuit, Sparkles, TrendingUp } from "lucide-react";
 import { ParentAIController } from "../ai/controller/ai-controller";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, getDocs, Timestamp } from "firebase/firestore";
 
@@ -158,66 +159,56 @@ const DashboardPage = () => {
   const studentInitials = getInitials(studentData?.name || "AS");
 
   return (
-    <div className="animate-in fade-in duration-500 pb-20">
+    <div className="animate-in fade-in duration-500">
+      <PageHeader
+        title={`${greeting}, ${parentFirstName}! 👋`}
+        subtitle={`Here's how ${childFirstName} is doing today`}
+      />
 
-      {/* Top Bar */}
-      <div className="flex justify-between items-center mb-8">
-        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Result of click: "Dashboard"</p>
-        <div className="flex items-center gap-3">
-          <button className="relative w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center transition-all">
-            <Bell className="w-4 h-4 text-slate-500" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
-          </button>
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-[#1e3a8a] text-white flex items-center justify-center text-xs font-bold">{userInitials}</div>
-            <div className="hidden sm:block">
-              <p className="text-sm font-semibold text-slate-800 leading-none">{user?.displayName || "Parent"}</p>
-              <p className="text-xs text-slate-400 mt-0.5">Parent</p>
+      {/* Academic Health */}
+      <div className="bg-white border border-slate-100 rounded-2xl p-5 md:p-6 mb-5 shadow-sm overflow-hidden relative">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50/50 rounded-full -mr-16 -mt-16 blur-3xl" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+          <div>
+            <h3 className="text-lg font-bold text-slate-800">Academic Health</h3>
+            <p className="text-sm text-slate-400 mt-0.5">Overall performance indicator</p>
+            <div className="flex items-center gap-2 text-emerald-500 font-bold text-sm mt-4 bg-emerald-50 w-fit px-3 py-1 rounded-full">
+              <TrendingUp className="w-4 h-4" />
+              <span>Improved by {liveStats.trendPct}%</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 sm:gap-6 bg-slate-50/50 rounded-2xl p-3 sm:bg-transparent sm:p-0">
+            <div className="text-right">
+              <p className="text-3xl md:text-4xl font-bold text-emerald-500">{liveStats.avgScore > 0 ? `${liveStats.avgScore}%` : "—"}</p>
+              <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider mt-1">
+                {liveStats.avgScore >= 75 ? "Good Standing" : liveStats.avgScore > 0 ? "Needs Attention" : "No data yet"}
+              </p>
+            </div>
+            <div className="relative shrink-0 scale-90 md:scale-100">
+              <ProgressRing pct={liveStats.avgScore} />
+              <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-400">
+                GOAL
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Greeting */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900">{greeting}, {parentFirstName}! 👋</h1>
-        <p className="text-slate-500 mt-1">Here's how {childFirstName} is doing today</p>
-      </div>
-
-      {/* Academic Health */}
-      <div className="bg-white border border-slate-100 rounded-2xl p-6 mb-5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <h3 className="text-lg font-bold text-slate-800">Academic Health</h3>
-          <p className="text-sm text-slate-400 mt-0.5">Overall performance indicator</p>
-          <div className="flex items-center gap-2 text-emerald-500 font-semibold text-sm mt-4">
-            <ArrowUp className="w-4 h-4" />
-            <span>Improved by {liveStats.trendPct}% from last month</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <p className="text-4xl font-bold text-emerald-500">{liveStats.avgScore > 0 ? `${liveStats.avgScore}%` : "—"}</p>
-            <p className="text-xs text-slate-400 mt-1">{liveStats.avgScore >= 75 ? "Good Standing" : liveStats.avgScore > 0 ? "Needs Attention" : "No data yet"}</p>
-          </div>
-          <ProgressRing pct={liveStats.avgScore} />
-        </div>
-      </div>
-
       {/* 4 Stat Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-5">
         {[
           { icon: CheckCircle, colorCls: "bg-emerald-50 text-emerald-600", tagCls: "text-emerald-600", label: "Attendance", value: `${liveStats.attendance}%`, tag: liveStats.attendance >= 85 ? "On track" : "Below target" },
           { icon: AlertCircle, colorCls: "bg-amber-50 text-amber-600", tagCls: "text-amber-500", label: "Pending Work", value: liveStats.pending.toString(), tag: "Due this week" },
           { icon: Calendar, colorCls: "bg-indigo-50 text-indigo-600", tagCls: "text-slate-400", label: "Upcoming Tests", value: liveStats.tests.toString(), tag: "Next 7 days" },
           { icon: Star, colorCls: "bg-emerald-50 text-emerald-600", tagCls: "text-emerald-600", label: "Recent Grade", value: liveStats.recentGrade, tag: liveStats.recentSubject },
         ].map(({ icon: Icon, colorCls, tagCls, label, value, tag }) => (
-          <div key={label} className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${colorCls}`}>
-              <Icon className="w-5 h-5" />
+          <div key={label} className="bg-white border border-slate-100 rounded-2xl p-4 md:p-5 shadow-sm hover:shadow-md transition-all group">
+            <div className={`w-9 h-9 md:w-10 md:h-10 rounded-xl flex items-center justify-center mb-3 md:mb-4 group-hover:scale-110 transition-transform ${colorCls}`}>
+              <Icon className="w-4 h-4 md:w-5 md:h-5" />
             </div>
-            <p className="text-xs text-slate-400 mb-1">{label}</p>
-            <p className="text-2xl font-bold text-slate-800">{value}</p>
-            <p className={`text-xs font-medium mt-1 ${tagCls}`}>{tag}</p>
+            <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{label}</p>
+            <p className="text-xl md:text-2xl font-bold text-slate-800">{value}</p>
+            <p className={`text-[10px] md:text-xs font-semibold mt-1 truncate ${tagCls}`}>{tag}</p>
           </div>
         ))}
       </div>
@@ -225,12 +216,12 @@ const DashboardPage = () => {
       {/* Student Profile + Alerts */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-5">
         <div className="lg:col-span-3 bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
-          <div className="flex items-center gap-4 mb-5">
-            <div className="w-16 h-16 rounded-2xl bg-[#1e3a8a] text-white flex items-center justify-center text-xl font-bold flex-shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-5">
+            <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-[#1e3a8a] text-white flex items-center justify-center text-lg md:text-xl font-bold flex-shrink-0">
               {studentInitials}
             </div>
             <div>
-              <h3 className="text-xl font-bold text-slate-800">{studentData?.name || "Student"}</h3>
+              <h3 className="text-lg md:text-xl font-bold text-slate-800">{studentData?.name || "Student"}</h3>
               <p className="text-sm text-slate-400 mt-0.5">
                 {studentMeta.className !== "—" ? `Grade ${studentMeta.className}` : studentData?.grade ? `Grade ${studentData.grade}` : ""}
                 {studentMeta.rollNo !== "—" ? ` • Roll ${studentMeta.rollNo}` : ""}
@@ -239,11 +230,11 @@ const DashboardPage = () => {
           </div>
           <div className="grid grid-cols-2 gap-4 border-t border-slate-50 pt-5">
             <div>
-              <p className="text-xs text-slate-400 mb-1">Class Teacher</p>
-              <p className="text-sm font-semibold text-slate-700">{teacherInfo.name}</p>
+              <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-1">Class Teacher</p>
+              <p className="text-sm font-semibold text-slate-700 truncate">{teacherInfo.name}</p>
             </div>
             <div>
-              <p className="text-xs text-slate-400 mb-1">Academic Year</p>
+              <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-1">Academic Year</p>
               <p className="text-sm font-semibold text-slate-700">2025-26</p>
             </div>
           </div>
@@ -273,16 +264,16 @@ const DashboardPage = () => {
       </div>
 
       {/* AI Insights */}
-      <div className="bg-slate-900 rounded-2xl p-7 text-white relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
-          <BrainCircuit className="w-48 h-48" />
+      <div className="bg-slate-900 rounded-2xl p-6 md:p-8 text-white relative overflow-hidden group">
+        <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none group-hover:scale-110 transition-transform duration-1000">
+          <BrainCircuit className="w-40 h-40 md:w-48 md:h-48" />
         </div>
         <div className="relative z-10">
           <div className="flex items-center gap-2 mb-4">
-            <Sparkles className="w-4 h-4 text-amber-400" />
-            <span className="text-xs font-semibold uppercase tracking-widest text-slate-300">AI Insight</span>
+            <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">EduIntellect AI Insight</span>
           </div>
-          <p className="text-base font-medium text-slate-100 leading-relaxed max-w-2xl">
+          <p className="text-sm md:text-base font-medium text-slate-100 leading-relaxed max-w-2xl">
             "{aiInsights?.child_summary_narrative || `${childFirstName} is meeting academic expectations. A detailed summary will appear once more activity data is available.`}"
           </p>
         </div>

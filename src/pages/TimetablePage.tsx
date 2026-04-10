@@ -89,7 +89,7 @@ const TimetablePage = () => {
   return (
     <div className="space-y-8 pb-10">
       {/* Header */}
-      <div className="bg-gradient-to-br from-purple-600 to-indigo-700 rounded-[3rem] p-12 text-white relative overflow-hidden">
+      <div className="bg-gradient-to-br from-purple-600 to-indigo-700 rounded-[2rem] md:rounded-[3rem] p-6 sm:p-8 md:p-12 text-white relative overflow-hidden">
         <div className="absolute top-0 right-0 opacity-10 scale-150"><CalendarDays size={200} /></div>
         <div className="relative z-10">
           <p className="text-[10px] font-black uppercase tracking-[0.4em] text-purple-200 mb-3">Weekly Schedule</p>
@@ -122,9 +122,9 @@ const TimetablePage = () => {
       </div>
 
       {/* Schedule for selected day */}
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-        <div className="px-10 py-7 border-b border-slate-100 flex items-center justify-between">
-          <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter">{DAYS[selectedDay]}</h2>
+      <div className="bg-white rounded-[1.5rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+        <div className="px-4 sm:px-6 md:px-10 py-4 md:py-7 border-b border-slate-100 flex items-center justify-between">
+          <h2 className="text-lg md:text-xl font-black text-slate-900 uppercase tracking-tighter">{DAYS[selectedDay]}</h2>
           <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{todaySlots.length} Periods</span>
         </div>
 
@@ -154,33 +154,33 @@ const TimetablePage = () => {
             {todaySlots.map((slot: any, i: number) => {
               const colorClass = getSubjectColor(slot.subject);
               return (
-                <div key={slot.id || i} className="px-10 py-7 flex items-center gap-6 hover:bg-slate-50/50 transition-all">
-                  <div className="text-center w-16 shrink-0">
-                    <p className="text-2xl font-black text-slate-200">{String(slot.period || i + 1).padStart(2, '0')}</p>
-                    <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Period</p>
+                <div key={slot.id || i} className="px-4 sm:px-6 md:px-10 py-4 md:py-6 flex items-center gap-3 md:gap-6 hover:bg-slate-50/50 transition-all">
+                  <div className="text-center w-10 md:w-16 shrink-0">
+                    <p className="text-xl md:text-2xl font-black text-slate-200">{String(slot.period || i + 1).padStart(2, '0')}</p>
+                    <p className="text-[8px] md:text-[9px] font-black text-slate-300 uppercase tracking-widest hidden sm:block">Period</p>
                   </div>
-                  <div className={`w-14 h-14 rounded-[1.5rem] flex items-center justify-center border shrink-0 ${colorClass}`}>
-                    <BookOpen className="w-6 h-6" />
+                  <div className={`w-10 h-10 md:w-14 md:h-14 rounded-[1rem] md:rounded-[1.5rem] flex items-center justify-center border shrink-0 ${colorClass}`}>
+                    <BookOpen className="w-5 h-5 md:w-6 md:h-6" />
                   </div>
-                  <div className="flex-1">
-                    <p className="font-black text-slate-900 text-xl uppercase tracking-tight leading-none mb-2">{slot.subject}</p>
-                    <div className="flex items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-black text-slate-900 text-base md:text-xl uppercase tracking-tight leading-none mb-1 md:mb-2 truncate">{slot.subject}</p>
+                    <div className="flex flex-wrap items-center gap-2 md:gap-4">
                       {slot.teacherName && (
-                        <span className="flex items-center gap-1.5 text-xs font-bold text-slate-400">
-                          <User className="w-3.5 h-3.5" /> {slot.teacherName}
+                        <span className="flex items-center gap-1 text-xs font-bold text-slate-400">
+                          <User className="w-3 h-3 md:w-3.5 md:h-3.5" /> <span className="truncate max-w-[100px] md:max-w-none">{slot.teacherName}</span>
                         </span>
                       )}
                       {slot.time && (
-                        <span className="flex items-center gap-1.5 text-xs font-bold text-slate-400">
-                          <Clock className="w-3.5 h-3.5" /> {slot.time}
+                        <span className="flex items-center gap-1 text-xs font-bold text-slate-400">
+                          <Clock className="w-3 h-3 md:w-3.5 md:h-3.5" /> {slot.time}
                         </span>
                       )}
                       {slot.room && (
-                        <span className="text-xs font-bold text-slate-400">Room {slot.room}</span>
+                        <span className="text-xs font-bold text-slate-400 hidden sm:block">Room {slot.room}</span>
                       )}
                     </div>
                   </div>
-                  <div className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${colorClass}`}>
+                  <div className={`px-2 py-1 md:px-4 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest border ${colorClass} shrink-0`}>
                     {slot.subject?.substring(0, 3)}
                   </div>
                 </div>

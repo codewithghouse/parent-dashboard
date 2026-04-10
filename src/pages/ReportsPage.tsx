@@ -87,23 +87,23 @@ const ReportsPage = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700 pb-12 text-left font-sans">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-6 pb-2">
         <div className="space-y-1">
-          <h1 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3 italic">
-            Academic Reports <FileText className="w-8 h-8 text-indigo-600" />
+          <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3 italic">
+            Academic Reports <FileText className="w-6 h-6 md:w-8 md:h-8 text-indigo-600" />
           </h1>
-          <p className="text-slate-400 font-bold uppercase tracking-widest text-[11px]">Authorized academic intelligence & documentation pipeline</p>
+          <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] md:text-[11px]">Authorized academic intelligence & documentation pipeline</p>
         </div>
-        
-        <div className="flex items-center gap-3">
-           <div className="relative group">
+
+        <div className="flex items-center gap-3 w-full md:w-auto">
+           <div className="relative group flex-1 md:flex-none">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-hover:text-indigo-400 transition-colors" />
-              <input 
-                type="text" 
-                placeholder="Search documents..." 
+              <input
+                type="text"
+                placeholder="Search documents..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-12 pr-6 py-4 bg-white border-2 border-slate-50 rounded-2xl text-[10px] font-black uppercase tracking-widest outline-none focus:border-indigo-100 transition-all w-64 shadow-sm"
+                className="pl-12 pr-6 py-4 bg-white border-2 border-slate-50 rounded-2xl text-[10px] font-black uppercase tracking-widest outline-none focus:border-indigo-100 transition-all w-full md:w-64 shadow-sm"
               />
            </div>
         </div>

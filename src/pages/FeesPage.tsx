@@ -50,7 +50,7 @@ const FeesPage = () => {
   return (
     <div className="space-y-8 pb-10">
       {/* Header */}
-      <div className="bg-gradient-to-br from-[#1e294b] to-[#1e3a8a] rounded-[3rem] p-12 text-white relative overflow-hidden">
+      <div className="bg-gradient-to-br from-[#1e294b] to-[#1e3a8a] rounded-[2rem] md:rounded-[3rem] p-6 sm:p-8 md:p-12 text-white relative overflow-hidden">
         <div className="absolute top-0 right-0 opacity-10 scale-150"><CreditCard size={200} /></div>
         <div className="relative z-10">
           <p className="text-[10px] font-black uppercase tracking-[0.4em] text-blue-300 mb-3">Payment Center</p>
@@ -60,34 +60,34 @@ const FeesPage = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
+        <div className="bg-white rounded-[1.5rem] md:rounded-[2rem] p-5 md:p-8 border border-slate-100 shadow-sm">
           <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Total Paid</p>
           <div className="flex items-center gap-2">
             <IndianRupee className="w-6 h-6 text-emerald-500" />
             <h3 className="text-4xl font-black text-emerald-500">{totalPaid.toLocaleString()}</h3>
           </div>
         </div>
-        <div className="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-sm">
+        <div className="bg-white rounded-[1.5rem] md:rounded-[2rem] p-5 md:p-8 border border-slate-100 shadow-sm">
           <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Total Pending</p>
           <div className="flex items-center gap-2">
             <IndianRupee className="w-6 h-6 text-amber-500" />
-            <h3 className="text-4xl font-black text-amber-500">{totalPending.toLocaleString()}</h3>
+            <h3 className="text-3xl md:text-4xl font-black text-amber-500">{totalPending.toLocaleString()}</h3>
           </div>
         </div>
-        <div className="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-sm">
+        <div className="bg-white rounded-[1.5rem] md:rounded-[2rem] p-5 md:p-8 border border-slate-100 shadow-sm">
           <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Overdue Dues</p>
           <div className="flex items-center gap-2">
             <AlertCircle className="w-6 h-6 text-red-500" />
-            <h3 className="text-4xl font-black text-red-500">{overdue.length}</h3>
+            <h3 className="text-3xl md:text-4xl font-black text-red-500">{overdue.length}</h3>
           </div>
         </div>
       </div>
 
       {/* Fee Records */}
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-        <div className="px-10 py-7 border-b border-slate-100">
-          <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Payment Records</h2>
+      <div className="bg-white rounded-[1.5rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+        <div className="px-5 md:px-10 py-5 md:py-7 border-b border-slate-100">
+          <h2 className="text-lg md:text-xl font-black text-slate-900 uppercase tracking-tighter">Payment Records</h2>
         </div>
 
         {loading ? (
@@ -109,24 +109,24 @@ const FeesPage = () => {
               const { bg, text, border, label, icon: StatusIcon } = getStatusStyle(fee.status, fee.dueDate);
               const dueDate = fee.dueDate?.toDate ? fee.dueDate.toDate() : new Date(fee.dueDate || 0);
               return (
-                <div key={fee.id} className="px-10 py-7 flex items-center justify-between hover:bg-slate-50/50 transition-all">
-                  <div className="flex items-center gap-6">
-                    <div className={`w-14 h-14 rounded-[1.5rem] ${bg} ${text} flex items-center justify-center border ${border}`}>
-                      <StatusIcon className="w-6 h-6" />
+                <div key={fee.id} className="px-4 sm:px-6 md:px-10 py-4 md:py-7 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/50 transition-all">
+                  <div className="flex items-center gap-4 md:gap-6">
+                    <div className={`w-11 h-11 md:w-14 md:h-14 rounded-[1rem] md:rounded-[1.5rem] ${bg} ${text} flex items-center justify-center border ${border} flex-shrink-0`}>
+                      <StatusIcon className="w-5 h-5 md:w-6 md:h-6" />
                     </div>
                     <div>
-                      <p className="font-black text-slate-900 text-lg uppercase tracking-tight leading-none mb-1">{fee.title || fee.type || "School Fee"}</p>
+                      <p className="font-black text-slate-900 text-base md:text-lg uppercase tracking-tight leading-none mb-1">{fee.title || fee.type || "School Fee"}</p>
                       <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
                         Due: {isNaN(dueDate.getTime()) ? "N/A" : dueDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                       </p>
                     </div>
                   </div>
-                  <div className="text-right flex flex-col items-end gap-2">
-                    <div className="flex items-center gap-1 text-2xl font-black text-slate-800">
-                      <IndianRupee className="w-5 h-5" />
+                  <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2">
+                    <div className="flex items-center gap-1 text-xl md:text-2xl font-black text-slate-800">
+                      <IndianRupee className="w-4 h-4 md:w-5 md:h-5" />
                       {(fee.amount || 0).toLocaleString()}
                     </div>
-                    <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${bg} ${text} ${border}`}>{label}</span>
+                    <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${bg} ${text} ${border}`}>{label}</span>
                   </div>
                 </div>
               );
