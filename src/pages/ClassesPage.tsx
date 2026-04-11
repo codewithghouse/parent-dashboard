@@ -53,19 +53,12 @@ const ClassesPage = () => {
   useEffect(() => {
     if (!studentData?.id) return;
     setLoading(true);
-    const studentEmail = studentData.email?.toLowerCase() || "";
+    const schoolId = studentData.schoolId;
 
-    let snap1: any = null;
-    let snap2: any = null;
+    const processEnrollments = async (snap: any) => {
+      const raw = snap.docs.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
 
-    const processEnrollments = async () => {
-      const docs = [...(snap1?.docs || []), ...(snap2?.docs || [])];
-      const seenIds = new Set();
-      const raw = docs
-        .filter(d => { if (!seenIds.has(d.id)) { seenIds.add(d.id); return true; } return false; })
-        .map(d => ({ id: d.id, ...(d.data() as any) }));
-
-      const enriched = await Promise.all(raw.map(async (en) => {
+      const enriched = await Promise.all(raw.map(async (en: any) => {
         let teacherName = en.teacherName || "Faculty";
         if (en.teacherId) {
           try {
@@ -81,13 +74,14 @@ const ClassesPage = () => {
       setLoading(false);
     };
 
-    const unsub1 = onSnapshot(query(collection(db, "enrollments"), where("studentId", "==", studentData.id)), s => { snap1 = s; processEnrollments(); });
-    const unsub2 = studentEmail
-      ? onSnapshot(query(collection(db, "enrollments"), where("studentEmail", "==", studentEmail)), s => { snap2 = s; processEnrollments(); })
-      : () => {};
+    // Single scoped query — prevents cross-school data access
+    const enrollQ = schoolId
+      ? query(collection(db, "enrollments"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id))
+      : query(collection(db, "enrollments"), where("studentId", "==", studentData.id));
+    const unsub = onSnapshot(enrollQ, s => processEnrollments(s));
 
-    return () => { unsub1(); unsub2(); };
-  }, [studentData?.id]);
+    return () => unsub();
+  }, [studentData?.id, studentData?.schoolId]);
 
   return (
     <div className="animate-in fade-in duration-500 pb-28 font-montserrat">

@@ -1,0 +1,21 @@
+{
+  "indexes": [
+    { "collectionGroup": "attendance",                  "queryScope": "COLLECTION", "fields": [{ "fieldPath": "schoolId", "order": "ASCENDING" }, { "fieldPath": "studentId", "order": "ASCENDING" }] },
+    { "collectionGroup": "attendance",                  "queryScope": "COLLECTION", "fields": [{ "fieldPath": "schoolId", "order": "ASCENDING" }, { "fieldPath": "studentId", "order": "ASCENDING" }, { "fieldPath": "date", "order": "ASCENDING" }] },
+    { "collectionGroup": "enrollments",                 "queryScope": "COLLECTION", "fields": [{ "fieldPath": "schoolId", "order": "ASCENDING" }, { "fieldPath": "studentId", "order": "ASCENDING" }] },
+    { "collectionGroup": "results",                     "queryScope": "COLLECTION", "fields": [{ "fieldPath": "schoolId", "order": "ASCENDING" }, { "fieldPath": "studentId", "order": "ASCENDING" }] },
+    { "collectionGroup": "test_scores",                 "queryScope": "COLLECTION", "fields": [{ "fieldPath": "schoolId", "order": "ASCENDING" }, { "fieldPath": "studentId", "order": "ASCENDING" }] },
+    { "collectionGroup": "gradebook_scores",            "queryScope": "COLLECTION", "fields": [{ "fieldPath": "schoolId", "order": "ASCENDING" }, { "fieldPath": "studentId", "order": "ASCENDING" }] },
+    { "collectionGroup": "risks",                       "queryScope": "COLLECTION", "fields": [{ "fieldPath": "schoolId", "order": "ASCENDING" }, { "fieldPath": "studentId", "order": "ASCENDING" }] },
+    { "collectionGroup": "parent_notes",                "queryScope": "COLLECTION", "fields": [{ "fieldPath": "schoolId", "order": "ASCENDING" }, { "fieldPath": "studentId", "order": "ASCENDING" }] },
+    { "collectionGroup": "submissions",                 "queryScope": "COLLECTION", "fields": [{ "fieldPath": "schoolId", "order": "ASCENDING" }, { "fieldPath": "studentId", "order": "ASCENDING" }] },
+    { "collectionGroup": "student_smart_alerts",        "queryScope": "COLLECTION", "fields": [{ "fieldPath": "schoolId", "order": "ASCENDING" }, { "fieldPath": "studentId", "order": "ASCENDING" }] },
+    { "collectionGroup": "performance_feedback",        "queryScope": "COLLECTION", "fields": [{ "fieldPath": "schoolId", "order": "ASCENDING" }, { "fieldPath": "studentId", "order": "ASCENDING" }] },
+    { "collectionGroup": "fees",                        "queryScope": "COLLECTION", "fields": [{ "fieldPath": "schoolId", "order": "ASCENDING" }, { "fieldPath": "studentId", "order": "ASCENDING" }] },
+    { "collectionGroup": "reports",                     "queryScope": "COLLECTION", "fields": [{ "fieldPath": "schoolId", "order": "ASCENDING" }, { "fieldPath": "studentId", "order": "ASCENDING" }] },
+    { "collectionGroup": "principal_to_parent_notes",   "queryScope": "COLLECTION", "fields": [{ "fieldPath": "schoolId", "order": "ASCENDING" }, { "fieldPath": "studentId", "order": "ASCENDING" }] },
+    { "collectionGroup": "assignments",                 "queryScope": "COLLECTION", "fields": [{ "fieldPath": "schoolId", "order": "ASCENDING" }, { "fieldPath": "classId",   "order": "ASCENDING" }] },
+    { "collectionGroup": "tests",                       "queryScope": "COLLECTION", "fields": [{ "fieldPath": "schoolId", "order": "ASCENDING" }, { "fieldPath": "classId",   "order": "ASCENDING" }] }
+  ],
+  "fieldOverrides": []
+}

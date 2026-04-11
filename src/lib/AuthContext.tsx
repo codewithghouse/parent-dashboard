@@ -1,8 +1,8 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { 
-  onAuthStateChanged, 
-  signInWithPopup, 
-  GoogleAuthProvider, 
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import {
+  onAuthStateChanged,
+  signInWithPopup,
+  GoogleAuthProvider,
   signOut,
   User
 } from 'firebase/auth';
@@ -25,9 +25,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [studentData, setStudentData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Track student listener so we can clean it up when auth changes
+  const unsubStudentRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      // Always clean up previous student listener first
+      if (unsubStudentRef.current) { unsubStudentRef.current(); unsubStudentRef.current = null; }
       setLoading(true);
       if (currentUser && currentUser.email) {
         try {
@@ -37,12 +41,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           if (!querySnapshot.empty) {
             const studentId = querySnapshot.docs[0].id;
-            
-            // Set up Real-Time Listener
+
+            // Set up Real-Time Listener and store it for cleanup
             const unsubStudent = onSnapshot(doc(db, "students", studentId), async (docSnap) => {
               if (docSnap.exists()) {
                 const data = docSnap.data();
-                
+
                 if (data.status === "Invited") {
                    updateDoc(doc(db, "students", studentId), { status: "Active" });
                 }
@@ -60,8 +64,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setLoading(false);
               }
             });
-
-            // Note: In a production app, the unsubStudent would be tracked in a ref
+            unsubStudentRef.current = unsubStudent;
           } else {
             // Not in whitelist
             await signOut(auth);
@@ -83,7 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => { unsubscribe(); if (unsubStudentRef.current) { unsubStudentRef.current(); unsubStudentRef.current = null; } };
   }, []);
 
   const loginWithGoogle = async () => {

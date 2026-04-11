@@ -35,25 +35,23 @@ const TeacherNotesPage = () => {
   useEffect(() => {
     if (!studentData?.id) return;
     setLoading(true);
-    const sEmail = studentData.email?.toLowerCase() || "";
-    const sId    = studentData.id;
+    const sId     = studentData.id;
+    const schoolId = studentData.schoolId;
 
-    const process = (snapArray: any[]) => {
-      const combined = snapArray.flatMap(s =>
-        (s?.docs || []).map((d: any) => ({ id: d.id, ...d.data() }))
-      );
-      const seen = new Set<string>();
-      const data = combined.filter(d => { if (seen.has(d.id)) return false; seen.add(d.id); return true; });
-      data.sort((a: any, b: any) => (a.createdAt?.toMillis?.() || 0) - (b.createdAt?.toMillis?.() || 0));
+    // Single scoped query — prevents cross-school data access
+    const q = schoolId
+      ? query(collection(db, "parent_notes"), where("schoolId", "==", schoolId), where("studentId", "==", sId))
+      : query(collection(db, "parent_notes"), where("studentId", "==", sId));
+
+    const u1 = onSnapshot(q, snap => {
+      const data = snap.docs
+        .map((d: any) => ({ id: d.id, ...d.data() }))
+        .sort((a: any, b: any) => (a.createdAt?.toMillis?.() || 0) - (b.createdAt?.toMillis?.() || 0));
       setAllNotes(data);
       setLoading(false);
-    };
-
-    let s1: any = [], s2: any = [];
-    const u1 = onSnapshot(query(collection(db, "parent_notes"), where("studentId",    "==", sId)),    snap => { s1 = snap; process([s1, s2]); });
-    const u2 = onSnapshot(query(collection(db, "parent_notes"), where("studentEmail", "==", sEmail)), snap => { s2 = snap; process([s1, s2]); });
-    return () => { u1(); u2(); };
-  }, [studentData?.id]);
+    });
+    return () => u1();
+  }, [studentData?.id, studentData?.schoolId]);
 
   // Fetch available teachers for "New Message"
   useEffect(() => {
@@ -125,7 +123,7 @@ const TeacherNotesPage = () => {
   const stats = useMemo(() => ({
     total:    allNotes.length,
     teachers: teacherConversations.length,
-    unread:   allNotes.filter(n => n.from === "teacher").length,
+    unread:   allNotes.filter(n => n.from === "teacher" && n.read !== true).length,
   }), [allNotes, teacherConversations]);
 
   const handleSend = async () => {
@@ -192,7 +190,7 @@ const TeacherNotesPage = () => {
   }, [chatMessages]);
 
   return (
-    <div className="h-screen flex flex-col -mt-6" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+    <div className="flex-1 flex flex-col -m-3 md:-m-6 -mb-28 lg:-mb-8" style={{ fontFamily: "'Montserrat', sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap');
         .wa-scroll::-webkit-scrollbar { width: 6px; }

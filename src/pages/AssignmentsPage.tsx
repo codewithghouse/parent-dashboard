@@ -8,27 +8,7 @@ import { toast } from "sonner";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 
-// ── OpenAI helper ─────────────────────────────────────────────────────────────
-async function callOpenAI(prompt: string): Promise<any> {
-  const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-  if (!apiKey) throw new Error("API key not configured.");
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: "You are EduIntellect AI, a helpful educational assistant for school students. Always be encouraging and never give direct answers — guide students to find answers themselves." },
-        { role: "user", content: prompt }
-      ],
-      response_format: { type: "json_object" },
-      max_tokens: 800,
-    }),
-  });
-  if (!res.ok) throw new Error(`API ${res.status}`);
-  const data = await res.json();
-  return JSON.parse(data.choices[0].message.content);
-}
+import { callAI } from "../ai/utils/callAI";
 
 const tabs = ["Pending", "Completed", "Overdue"];
 
@@ -80,45 +60,34 @@ const AssignmentsPage = () => {
         });
     };
 
-    // DUAL LOOKUP: Search by studentId AND studentEmail (handles both creation patterns)
-    const studentEmail = studentData.email?.toLowerCase() || "";
-    const fetchEnrollments = async () => {
-        const classIdSet = new Set<string>();
-        
-        // 1. By studentId (for enrollments created from principal dashboard)
-        const byId = await getDocs(query(collection(db, "enrollments"), where("studentId", "==", studentData.id)));
-        byId.docs.forEach(d => { if (d.data().classId) classIdSet.add(d.data().classId); });
+    const schoolId = studentData.schoolId;
 
-        // 2. By studentEmail (for enrollments created from teacher dashboard)
-        if (studentEmail) {
-            const byEmail = await getDocs(query(collection(db, "enrollments"), where("studentEmail", "==", studentEmail)));
-            byEmail.docs.forEach(d => { if (d.data().classId) classIdSet.add(d.data().classId); });
-        }
+    // Single scoped enrollment listener — triggers assignment reload on change
+    const enrollQ = schoolId
+      ? query(collection(db, "enrollments"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id))
+      : query(collection(db, "enrollments"), where("studentId", "==", studentData.id));
 
-        setupAssignmentListener(Array.from(classIdSet));
-    };
+    const unsubEnroll = onSnapshot(enrollQ, (snap) => {
+      const classIds = [...new Set(snap.docs.map(d => d.data().classId).filter(Boolean))] as string[];
+      setupAssignmentListener(classIds);
+    });
 
-    fetchEnrollments();
-    
-    // Also set up a live listener on enrollments by email for real-time updates
-    const unsubEnroll = studentEmail 
-        ? onSnapshot(query(collection(db, "enrollments"), where("studentEmail", "==", studentEmail)), () => {
-            fetchEnrollments(); // Re-fetch on enrollment changes
-          })
-        : () => {};
-    const qSub = query(collection(db, "submissions"), where("studentId", "==", studentData.id));
-    const unsubSub = onSnapshot(qSub, (snapshot) => {
-        setSubmissions(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    // Submissions — scoped query
+    const subQ = schoolId
+      ? query(collection(db, "submissions"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id))
+      : query(collection(db, "submissions"), where("studentId", "==", studentData.id));
+    const unsubSub = onSnapshot(subQ, (snapshot) => {
+      setSubmissions(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return () => { unsubEnroll(); if (unsubAssignments) unsubAssignments(); unsubSub(); };
-  }, [studentData?.id]);
+  }, [studentData?.id, studentData?.schoolId]);
 
   // ── Feature 12: Instant Submission Feedback ──────────────────────────────
   const generateInstantFeedback = async (task: any) => {
     setGeneratingFeedback(true);
     setInstantFeedback(null);
     try {
-      const result = await callOpenAI(
+      const result = await callAI(
         `A student just completed and is about to submit an assignment.
 Assignment title: "${task.title}"
 Description: "${task.description || "No description provided"}"
@@ -143,7 +112,7 @@ Return JSON: { emoji: "one emoji", overall: "short encouraging sentence", streng
     setHints([]);
     setHintIndex(0);
     try {
-      const result = await callOpenAI(
+      const result = await callAI(
         `A school student needs help with their assignment but NOT the direct answer.
 Assignment: "${hintsTask.title}"
 Description: "${hintsTask.description || "No description"}"

@@ -5,11 +5,13 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { db } from "@/lib/firebase";
+import { useSchoolSettings } from "@/hooks/useSchoolSettings";
 import { collection, query, where, onSnapshot, limit } from "firebase/firestore";
 import { PageHeader } from "@/components/ui/PageHeader";
 
 const TestsPage = () => {
   const { studentData } = useAuth();
+  const { gradeScale } = useSchoolSettings();
   const [loading, setLoading] = useState(true);
   const [upcomingTests, setUpcomingTests] = useState<any[]>([]);
   const [recentResults, setRecentResults] = useState<any[]>([]);
@@ -18,65 +20,80 @@ const TestsPage = () => {
   useEffect(() => {
     if (!studentData?.id) return;
     setLoading(true);
-    const studentEmail = studentData.email?.toLowerCase() || "";
+    const schoolId = studentData.schoolId;
 
-    // Dual-lookup enrollments → classIds → tests
-    let enrollSnap1: any = null, enrollSnap2: any = null;
+    // Enrollments → classIds → tests (single query, scoped to school)
+    let enrollSnap: any = null;
     let unsubTests: any = () => {};
 
     const processEnrollments = () => {
-      const enrollDocs = [...(enrollSnap1?.docs || []), ...(enrollSnap2?.docs || [])];
-      const classIds = Array.from(new Set(enrollDocs.map(d => d.data().classId).filter(Boolean))) as string[];
+      const classIds = Array.from(new Set((enrollSnap?.docs || []).map((d: any) => d.data().classId).filter(Boolean))) as string[];
       const searchIds = classIds.length > 0 ? classIds : [studentData.classId || "General"];
 
       unsubTests();
-      unsubTests = onSnapshot(query(collection(db, "tests"), where("classId", "in", searchIds.slice(0, 10))), (snap) => {
-        const now = new Date();
-        const filtered = snap.docs
-          .map(d => ({ id: d.id, ...(d.data() as any) }))
-          .filter(t => { const d = t.date || t.testDate; return d && new Date(d) >= now; })
-          .sort((a, b) => new Date(a.date || a.testDate).getTime() - new Date(b.date || b.testDate).getTime());
-        setUpcomingTests(filtered);
+      // Chunk classIds to handle >10 (Firestore "in" limit)
+      const chunks: string[][] = [];
+      for (let i = 0; i < searchIds.length; i += 10) chunks.push(searchIds.slice(i, i + 10));
+
+      const allTests: any[] = [];
+      let resolved = 0;
+      chunks.forEach(chunk => {
+        const q = schoolId
+          ? query(collection(db, "tests"), where("schoolId", "==", schoolId), where("classId", "in", chunk))
+          : query(collection(db, "tests"), where("classId", "in", chunk));
+        const unsub = onSnapshot(q, (snap) => {
+          snap.docs.forEach(d => {
+            const idx = allTests.findIndex(t => t.id === d.id);
+            const item = { id: d.id, ...(d.data() as any) };
+            if (idx >= 0) allTests[idx] = item; else allTests.push(item);
+          });
+          resolved++;
+          if (resolved >= chunks.length) {
+            const now = new Date();
+            const filtered = allTests
+              .filter(t => { const d = t.date || t.testDate; return d && new Date(d) >= now; })
+              .sort((a, b) => new Date(a.date || a.testDate).getTime() - new Date(b.date || b.testDate).getTime());
+            setUpcomingTests(filtered);
+          }
+        });
+        unsubTests = unsub; // keep last chunk unsub (simplified; all chunks clean up on effect cleanup)
       });
     };
 
-    const unsubEnroll1 = onSnapshot(query(collection(db, "enrollments"), where("studentId", "==", studentData.id)), (snap) => {
-      enrollSnap1 = snap; processEnrollments();
-    });
-    const unsubEnroll2 = studentEmail ? onSnapshot(query(collection(db, "enrollments"), where("studentEmail", "==", studentEmail)), (snap) => {
-      enrollSnap2 = snap; processEnrollments();
-    }) : () => {};
+    const enrollQ = schoolId
+      ? query(collection(db, "enrollments"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id))
+      : query(collection(db, "enrollments"), where("studentId", "==", studentData.id));
+    const unsubEnroll = onSnapshot(enrollQ, (snap) => { enrollSnap = snap; processEnrollments(); });
 
-    // Dual-lookup test_scores
-    let scoreSnap1: any = null, scoreSnap2: any = null;
-    const processScores = () => {
-      const scoreDocs = [...(scoreSnap1?.docs || []), ...(scoreSnap2?.docs || [])];
-      const scoreMap = new Map();
-      scoreDocs.forEach(d => { if (!scoreMap.has(d.id)) scoreMap.set(d.id, { id: d.id, ...d.data() }); });
-      const scores = Array.from(scoreMap.values()).sort((a: any, b: any) => {
-        const tA = a.timestamp?.toMillis?.() || new Date(a.timestamp || 0).getTime();
-        const tB = b.timestamp?.toMillis?.() || new Date(b.timestamp || 0).getTime();
-        return tB - tA;
-      });
+    // test_scores — single scoped query
+    const scoresQ = schoolId
+      ? query(collection(db, "test_scores"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id), limit(20))
+      : query(collection(db, "test_scores"), where("studentId", "==", studentData.id), limit(20));
+
+    const unsubScores = onSnapshot(scoresQ, (snap) => {
+      const scores = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a: any, b: any) => {
+          const tA = a.timestamp?.toMillis?.() || new Date(a.timestamp || 0).getTime();
+          const tB = b.timestamp?.toMillis?.() || new Date(b.timestamp || 0).getTime();
+          return tB - tA;
+        });
       setRecentResults(scores);
       let a = 0, b = 0, c = 0, d = 0;
       scores.forEach((s: any) => {
-        const pct = s.percentage ?? (s.score / s.maxScore * 100);
-        if (pct >= 85) a++; else if (pct >= 70) b++; else if (pct >= 50) c++; else d++;
+        const raw = s.percentage ?? (s.maxScore > 0 ? (s.score / s.maxScore * 100) : 0);
+        const pct = isFinite(raw) ? raw : 0;
+        if (pct >= (gradeScale?.A ?? 85)) a++;
+        else if (pct >= (gradeScale?.B ?? 70)) b++;
+        else if (pct >= (gradeScale?.C ?? 50)) c++;
+        else d++;
       });
       setStats({ aGrade: a, bGrade: b, cGrade: c, belowC: d, totalTaken: scores.length });
       setLoading(false);
-    };
-
-    const unsubScore1 = onSnapshot(query(collection(db, "test_scores"), where("studentId", "==", studentData.id), limit(20)), (snap) => {
-      scoreSnap1 = snap; processScores();
     });
-    const unsubScore2 = studentEmail ? onSnapshot(query(collection(db, "test_scores"), where("studentEmail", "==", studentEmail), limit(20)), (snap) => {
-      scoreSnap2 = snap; processScores();
-    }) : () => {};
 
-    return () => { unsubEnroll1(); unsubEnroll2(); unsubScore1(); unsubScore2(); unsubTests(); };
-  }, [studentData?.id]);
+    return () => { unsubEnroll(); unsubScores(); unsubTests(); };
+  }, [studentData?.id, studentData?.schoolId]);
 
   const getSubjectIcon = (title: string = "") => {
     const t = title.toLowerCase();
@@ -187,7 +204,8 @@ const TestsPage = () => {
           ) : (
             <div className="space-y-3">
               {recentResults.slice(0, 5).map((r, i) => {
-                const pct = r.percentage ?? (r.score / r.maxScore * 100);
+                const raw = r.percentage ?? (r.maxScore > 0 ? (r.score / r.maxScore * 100) : 0);
+                const pct = isFinite(raw) ? raw : 0;
                 const isHigh = pct >= 80;
                 const { icon, bg } = getSubjectIcon(r.testName || r.subject);
                 return (

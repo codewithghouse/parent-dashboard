@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { CheckCircle, XCircle, Clock, ChevronLeft, ChevronRight, Loader2, Calendar as CalendarIcon } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { useSchoolSettings } from "@/hooks/useSchoolSettings";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 
@@ -9,21 +10,24 @@ type DayStatus = "present" | "absent" | "late" | "weekend" | "forgotten" | "empt
 
 const AttendancePage = () => {
   const { studentData } = useAuth();
+  const { attendanceThreshold } = useSchoolSettings();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [attendanceLogs, setAttendanceLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ present: 0, absent: 0, late: 0, percentage: 0 });
   const [monthStats, setMonthStats] = useState({ present: 0, absent: 0, late: 0 });
 
+  const mountedRef = useRef(true);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
+
   useEffect(() => {
     if (!studentData?.id) return;
     setLoading(true);
-    const studentEmail = (studentData.email || "").toLowerCase();
+    const schoolId = studentData.schoolId;
 
-    let snap1: any = null, snap2: any = null;
-    const processLogs = () => {
-      const combined = [...(snap1?.docs || []), ...(snap2?.docs || [])];
-      const uniqueLogs = Array.from(new Map(combined.map((d: any) => [d.id, { id: d.id, ...d.data() as any }])).values())
+    const processLogs = (snap: any) => {
+      if (!mountedRef.current) return;
+      const uniqueLogs = Array.from(new Map(snap.docs.map((d: any) => [d.id, { id: d.id, ...d.data() as any }])).values())
         .sort((a: any, b: any) => b.date.localeCompare(a.date));
       setAttendanceLogs(uniqueLogs);
 
@@ -33,7 +37,6 @@ const AttendancePage = () => {
       const total = pCount + aCount + lCount;
       setStats({ present: pCount, absent: aCount, late: lCount, percentage: total === 0 ? 100 : Math.round(((pCount + lCount) / total) * 100) });
 
-      // This month stats
       const now = new Date();
       const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
       const thisMonth = uniqueLogs.filter((l: any) => l.date?.startsWith(ym));
@@ -45,10 +48,20 @@ const AttendancePage = () => {
       setLoading(false);
     };
 
-    const u1 = onSnapshot(query(collection(db, "attendance"), where("studentId", "==", studentData.id)), s => { snap1 = s; processLogs(); });
-    const u2 = studentEmail ? onSnapshot(query(collection(db, "attendance"), where("studentEmail", "==", studentEmail)), s => { snap2 = s; processLogs(); }) : () => {};
-    return () => { u1(); u2(); };
-  }, [studentData?.id, studentData?.email]);
+    // Limit to current academic year — avoids fetching 4+ years of history (500+ docs → ~200 docs)
+    // Academic year: June of this year if after June, else June of last year
+    const now = new Date();
+    const yearStart = now.getMonth() >= 5
+      ? `${now.getFullYear()}-06-01`
+      : `${now.getFullYear() - 1}-06-01`;
+
+    // Single query scoped to this school + current academic year — prevents cross-school reads
+    const q = schoolId
+      ? query(collection(db, "attendance"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id), where("date", ">=", yearStart))
+      : query(collection(db, "attendance"), where("studentId", "==", studentData.id), where("date", ">=", yearStart));
+    const u1 = onSnapshot(q, s => processLogs(s));
+    return () => { u1(); };
+  }, [studentData?.id, studentData?.schoolId]);
 
   const daysInMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
   const firstDayOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1).getDay();
@@ -102,7 +115,7 @@ const AttendancePage = () => {
             </div>
           </div>
           <div className={`h-1 w-full rounded-full overflow-hidden bg-slate-100`}>
-            <div className={`h-full ${stats.percentage >= 85 ? "bg-emerald-500" : "bg-rose-500"}`} style={{ width: `${stats.percentage}%` }} />
+            <div className={`h-full ${stats.percentage >= attendanceThreshold ? "bg-emerald-500" : "bg-rose-500"}`} style={{ width: `${stats.percentage}%` }} />
           </div>
         </div>
 
@@ -255,11 +268,11 @@ const AttendancePage = () => {
           <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 shadow-sm">
             <h4 className="text-sm font-bold text-slate-700 mb-2">Attendance Policy</h4>
             <p className="text-xs text-slate-500 mb-3 leading-relaxed">
-              Minimum 85% attendance required for exam eligibility.
+              Minimum {attendanceThreshold}% attendance required for exam eligibility.
             </p>
-            <div className={`flex items-center gap-2 text-sm font-semibold ${stats.percentage >= 85 ? "text-emerald-600" : "text-rose-600"}`}>
+            <div className={`flex items-center gap-2 text-sm font-semibold ${stats.percentage >= attendanceThreshold ? "text-emerald-600" : "text-rose-600"}`}>
               <CheckCircle className="w-4 h-4" />
-              <span>{studentData?.name?.split(" ")[0] || "Student"} is {stats.percentage >= 85 ? "above the threshold" : "below the requirement"}</span>
+              <span>{studentData?.name?.split(" ")[0] || "Student"} is {stats.percentage >= attendanceThreshold ? "above the threshold" : "below the requirement"}</span>
             </div>
           </div>
         </div>

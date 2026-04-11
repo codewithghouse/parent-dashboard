@@ -35,8 +35,10 @@ const AlertsPage = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(true);
+  // Key scoped per user — prevents Parent A's dismissed list leaking to Parent B
+  const dismissKey = `dismissed_alerts_${studentData?.id || "anon"}`;
   const [dismissed, setDismissed] = useState<Set<string>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem("dismissed_alerts") || "[]")); }
+    try { return new Set(JSON.parse(localStorage.getItem(`dismissed_alerts_${studentData?.id || "anon"}`) || "[]")); }
     catch { return new Set(); }
   });
 
@@ -53,108 +55,100 @@ const AlertsPage = () => {
     if (!studentData?.id) return;
     setLoading(true);
     const sid = studentData.id;
-    const email = studentData.email?.toLowerCase() || "";
+    const schoolId = studentData.schoolId;
 
     const unsubs: (() => void)[] = [];
     let loaded = 0;
-    const total = 7; // number of collections
+    const total = 6; // collections: risks, attendance, test_scores, notes, smartAlerts, submissions (enrollments→assignments handled separately)
 
-    const done = () => {
-      loaded++;
-      if (loaded >= total) setLoading(false);
-    };
+    const done = () => { loaded++; if (loaded >= total) setLoading(false); };
 
-    // Helper: merge two snapshots by id
-    const merge = (s1: any, s2: any) => {
-      const m = new Map();
-      [...(s1?.docs || []), ...(s2?.docs || [])].forEach((d: any) => {
-        if (!m.has(d.id)) m.set(d.id, { id: d.id, ...d.data() });
-      });
-      return Array.from(m.values());
-    };
-
-    // Dual snapshot helper
-    const dualSnap = (
-      collName: string,
-      setter: (docs: any[]) => void,
-    ) => {
-      let s1: any = null, s2: any = null;
-      const process = () => setter(merge(s1, s2));
-
-      const q1 = query(collection(db, collName), where("studentId", "==", sid));
-      const q2 = email
-        ? query(collection(db, collName), where("studentEmail", "==", email))
-        : null;
-
-      const u1 = onSnapshot(q1, s => { s1 = s; process(); done(); });
-      unsubs.push(u1);
-      if (q2) {
-        const u2 = onSnapshot(q2, s => { s2 = s; process(); });
-        unsubs.push(u2);
-      } else {
+    // Single scoped query helper — one listener per collection, filtered by schoolId when available
+    const scopedSnap = (collName: string, setter: (docs: any[]) => void) => {
+      const q = schoolId
+        ? query(collection(db, collName), where("schoolId", "==", schoolId), where("studentId", "==", sid))
+        : query(collection(db, collName), where("studentId", "==", sid));
+      const u = onSnapshot(q, snap => {
+        setter(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         done();
-      }
+      });
+      unsubs.push(u);
     };
 
-    // 1. risks — teacher-created student risk flags
-    dualSnap("risks", setRisks);
+    // 1. risks
+    scopedSnap("risks", setRisks);
 
     // 2. attendance
-    dualSnap("attendance", setAttendance);
+    scopedSnap("attendance", setAttendance);
 
     // 3. test_scores + gradebook_scores merged
-    let scoreSnap1: any = null, scoreSnap2: any = null;
-    let gbSnap1: any = null, gbSnap2: any = null;
+    let tsSnap: any = null, gbSnap: any = null;
     const processScores = () => {
-      const ts = merge(scoreSnap1, scoreSnap2);
-      const gb = merge(gbSnap1, gbSnap2).map(d => ({
-        ...d, testName: d.columnName || "Class Assessment",
-        score: d.mark, maxScore: d.maxMarks || 100
+      const ts = (tsSnap?.docs || []).map((d: any) => ({ id: d.id, ...d.data() }));
+      const gb = (gbSnap?.docs || []).map((d: any) => ({
+        id: d.id, ...d.data(),
+        testName: d.data().columnName || "Class Assessment",
+        score: d.data().mark, maxScore: d.data().maxMarks || 100
       }));
       const all = new Map();
       [...ts, ...gb].forEach(d => { if (!all.has(d.id)) all.set(d.id, d); });
       setScores(Array.from(all.values()));
     };
-    const us1 = onSnapshot(query(collection(db, "test_scores"), where("studentId", "==", sid)), s => { scoreSnap1 = s; processScores(); done(); });
-    const us2 = email ? onSnapshot(query(collection(db, "test_scores"), where("studentEmail", "==", email)), s => { scoreSnap2 = s; processScores(); }) : null;
-    const ug1 = onSnapshot(query(collection(db, "gradebook_scores"), where("studentId", "==", sid)), s => { gbSnap1 = s; processScores(); });
-    const ug2 = email ? onSnapshot(query(collection(db, "gradebook_scores"), where("studentEmail", "==", email)), s => { gbSnap2 = s; processScores(); }) : null;
-    unsubs.push(us1, ug1);
-    if (us2) unsubs.push(us2);
-    if (ug2) unsubs.push(ug2);
+    const tsQ = schoolId
+      ? query(collection(db, "test_scores"), where("schoolId", "==", schoolId), where("studentId", "==", sid))
+      : query(collection(db, "test_scores"), where("studentId", "==", sid));
+    const gbQ = schoolId
+      ? query(collection(db, "gradebook_scores"), where("schoolId", "==", schoolId), where("studentId", "==", sid))
+      : query(collection(db, "gradebook_scores"), where("studentId", "==", sid));
+    unsubs.push(
+      onSnapshot(tsQ, s => { tsSnap = s; processScores(); done(); }),
+      onSnapshot(gbQ, s => { gbSnap = s; processScores(); })
+    );
 
-    // 4. parent_notes (teacher notes to parent)
-    dualSnap("parent_notes", setNotes);
+    // 4. parent_notes
+    scopedSnap("parent_notes", setNotes);
 
-    // 5. student_smart_alerts (AI-generated)
-    dualSnap("student_smart_alerts", setSmartAlerts);
+    // 5. student_smart_alerts
+    scopedSnap("student_smart_alerts", setSmartAlerts);
 
-    // 6. submissions (to detect overdue assignments)
-    dualSnap("submissions", setSubmissions);
+    // 6. submissions
+    scopedSnap("submissions", setSubmissions);
 
     // 7. enrollments → classIds → assignments
-    let enrollSnap1: any = null, enrollSnap2: any = null;
-    let unsubAssign: (() => void) | null = null;
+    // Uses chunked "in" queries to handle >10 classIds (Firestore limit)
+    let enrollSnap: any = null;
+    const assignUnsubs: (() => void)[] = [];
     const processEnrollments = () => {
-      const enrolls = merge(enrollSnap1, enrollSnap2);
-      const classIds = [...new Set(enrolls.map((e: any) => e.classId).filter(Boolean))] as string[];
-      if (unsubAssign) { unsubAssign(); unsubAssign = null; }
-      if (classIds.length === 0) { done(); return; }
-      unsubAssign = onSnapshot(
-        query(collection(db, "assignments"), where("classId", "in", classIds.slice(0, 10))),
-        s => { setAssignments(s.docs.map(d => ({ id: d.id, ...d.data() }))); done(); }
-      );
+      const classIds = [...new Set((enrollSnap?.docs || []).map((d: any) => d.data().classId).filter(Boolean))] as string[];
+      assignUnsubs.forEach(u => u());
+      assignUnsubs.length = 0;
+      if (classIds.length === 0) return;
+
+      const chunks: string[][] = [];
+      for (let i = 0; i < classIds.length; i += 10) chunks.push(classIds.slice(i, i + 10));
+
+      const allAssignments: Map<string, any> = new Map();
+      chunks.forEach(chunk => {
+        const q = schoolId
+          ? query(collection(db, "assignments"), where("schoolId", "==", schoolId), where("classId", "in", chunk))
+          : query(collection(db, "assignments"), where("classId", "in", chunk));
+        const u = onSnapshot(q, snap => {
+          snap.docs.forEach(d => allAssignments.set(d.id, { id: d.id, ...d.data() }));
+          setAssignments(Array.from(allAssignments.values()));
+        });
+        assignUnsubs.push(u);
+      });
     };
-    const ue1 = onSnapshot(query(collection(db, "enrollments"), where("studentId", "==", sid)), s => { enrollSnap1 = s; processEnrollments(); });
-    const ue2 = email ? onSnapshot(query(collection(db, "enrollments"), where("studentEmail", "==", email)), s => { enrollSnap2 = s; processEnrollments(); }) : null;
-    unsubs.push(ue1);
-    if (ue2) unsubs.push(ue2);
+    const enrollQ = schoolId
+      ? query(collection(db, "enrollments"), where("schoolId", "==", schoolId), where("studentId", "==", sid))
+      : query(collection(db, "enrollments"), where("studentId", "==", sid));
+    unsubs.push(onSnapshot(enrollQ, s => { enrollSnap = s; processEnrollments(); }));
 
     return () => {
       unsubs.forEach(u => u());
-      if (unsubAssign) unsubAssign();
+      assignUnsubs.forEach(u => u());
     };
-  }, [studentData?.id]);
+  }, [studentData?.id, studentData?.schoolId]);
 
   // Build parsed alerts from all sources
   const buildAlerts = (): ParsedAlert[] => {
@@ -373,7 +367,7 @@ const AlertsPage = () => {
     const next = new Set(dismissed);
     next.add(alert.id);
     setDismissed(next);
-    localStorage.setItem("dismissed_alerts", JSON.stringify([...next]));
+    localStorage.setItem(dismissKey, JSON.stringify([...next]));
 
     // If it came from a Firestore-writable source, persist it
     if (alert.source === "student_smart_alerts" && alert.sourceId) {
@@ -393,7 +387,7 @@ const AlertsPage = () => {
     const next = new Set(dismissed);
     allAlerts.forEach(a => next.add(a.id));
     setDismissed(next);
-    localStorage.setItem("dismissed_alerts", JSON.stringify([...next]));
+    localStorage.setItem(dismissKey, JSON.stringify([...next]));
     toast.success("All alerts dismissed.");
   };
 

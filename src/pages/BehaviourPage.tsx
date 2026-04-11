@@ -19,45 +19,31 @@ export default function BehaviourPage() {
   useEffect(() => {
     if (!studentData?.id) return;
     setLoading(true);
-    const studentEmail = studentData.email?.toLowerCase() || "";
-    
-    // 1. Dual-Lookup for Manual Rating from Enrollment
-    let enrollSnap1: any = null;
-    let enrollSnap2: any = null;
-    const processManualRating = () => {
-        const docs = [...(enrollSnap1?.docs || []), ...(enrollSnap2?.docs || [])];
-        const ratings = docs.map(d => d.data().manualBehaviourRating).filter(r => r !== undefined);
-        if (ratings.length > 0) setManualRating(Math.max(...ratings));
-    };
+    const schoolId = studentData.schoolId;
 
-    const unsubEnroll1 = onSnapshot(query(collection(db, "enrollments"), where("studentId", "==", studentData.id)), (snap) => {
-        enrollSnap1 = snap; processManualRating();
+    // 1. Enrollments — single scoped query for manual rating
+    const enrollQ = schoolId
+      ? query(collection(db, "enrollments"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id))
+      : query(collection(db, "enrollments"), where("studentId", "==", studentData.id));
+    const unsubEnroll = onSnapshot(enrollQ, (snap) => {
+      const ratings = snap.docs.map(d => d.data().manualBehaviourRating).filter(r => r !== undefined);
+      if (ratings.length > 0) setManualRating(Math.max(...ratings));
     });
-    const unsubEnroll2 = studentEmail ? onSnapshot(query(collection(db, "enrollments"), where("studentEmail", "==", studentEmail)), (snap) => {
-        enrollSnap2 = snap; processManualRating();
-    }) : () => {};
 
-    // 2. Dual-Lookup for Behavioural Notes
-    let notesSnap1: any = null;
-    let notesSnap2: any = null;
-    const processNotes = () => {
-        const docs = [...(notesSnap1?.docs || []), ...(notesSnap2?.docs || [])];
-        const seenIds = new Set();
-        const notes = docs.filter(d => { if(!seenIds.has(d.id)) { seenIds.add(d.id); return true; } return false; }).map(d => ({ id: d.id, ...d.data() as any }));
-        notes.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
-        setTeacherNotes(notes);
-        setLoading(false);
-    };
-
-    const unsubNotes1 = onSnapshot(query(collection(db, "parent_notes"), where("studentId", "==", studentData.id), limit(40)), (snap) => {
-        notesSnap1 = snap; processNotes();
+    // 2. Behavioural notes — single scoped query
+    const notesQ = schoolId
+      ? query(collection(db, "parent_notes"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id), limit(40))
+      : query(collection(db, "parent_notes"), where("studentId", "==", studentData.id), limit(40));
+    const unsubNotes = onSnapshot(notesQ, (snap) => {
+      const notes = snap.docs
+        .map(d => ({ id: d.id, ...d.data() as any }))
+        .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+      setTeacherNotes(notes);
+      setLoading(false);
     });
-    const unsubNotes2 = studentEmail ? onSnapshot(query(collection(db, "parent_notes"), where("studentEmail", "==", studentEmail), limit(40)), (snap) => {
-        notesSnap2 = snap; processNotes();
-    }) : () => {};
 
-    return () => { unsubEnroll1(); unsubEnroll2(); unsubNotes1(); unsubNotes2(); };
-  }, [studentData?.id]);
+    return () => { unsubEnroll(); unsubNotes(); };
+  }, [studentData?.id, studentData?.schoolId]);
 
   // Determine positive vs improvement notes heuristics
   const classifyNote = (note: any) => {

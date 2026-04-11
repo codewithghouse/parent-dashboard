@@ -13,10 +13,10 @@ const FeesPage = () => {
     if (!studentData?.id) return;
     setLoading(true);
 
-    const q = query(
-      collection(db, "fees"),
-      where("studentId", "==", studentData.id)
-    );
+    const schoolId = studentData.schoolId;
+    const q = schoolId
+      ? query(collection(db, "fees"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id))
+      : query(collection(db, "fees"), where("studentId", "==", studentData.id));
 
     const unsub = onSnapshot(q, (snap) => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));

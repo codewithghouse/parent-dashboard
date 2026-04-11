@@ -15,8 +15,11 @@ const PrincipalNotesPage = () => {
   useEffect(() => {
     if (!studentData?.id) return;
     setLoading(true);
-    const unsub = onSnapshot(
-      query(collection(db, "principal_to_parent_notes"), where("studentId", "==", studentData.id)),
+    const schoolId = studentData.schoolId;
+    const notesQ = schoolId
+      ? query(collection(db, "principal_to_parent_notes"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id))
+      : query(collection(db, "principal_to_parent_notes"), where("studentId", "==", studentData.id));
+    const unsub = onSnapshot(notesQ,
       async snap => {
         const data = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
         data.sort((a, b) => (a.timestamp?.toMillis?.() || 0) - (b.timestamp?.toMillis?.() || 0));

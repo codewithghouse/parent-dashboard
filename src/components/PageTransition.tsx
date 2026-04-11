@@ -24,7 +24,7 @@ export const PageTransition = ({ children }: PageTransitionProps) => {
   }, [pathname]);
 
   return (
-    <div ref={ref} className="page-enter w-full">
+    <div ref={ref} className="page-enter w-full flex-1 flex flex-col">
       {children}
     </div>
   );

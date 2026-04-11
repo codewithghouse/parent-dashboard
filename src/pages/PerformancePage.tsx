@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   ArrowUp, ArrowDown, Minus, Loader2,
   Calculator, FlaskConical, Languages, Globe, Monitor, Palette, BookOpen,
@@ -34,14 +34,15 @@ const PerformancePage = () => {
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [goalSubject, setGoalSubject] = useState<string>("");
   const [goalTarget, setGoalTarget] = useState<number>(80);
+  const mountedRef = useRef(true);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
 
   useEffect(() => {
     if (!studentData?.id) return;
     setLoading(true);
-    const studentEmail = studentData.email?.toLowerCase() || "";
-
     let snap1Cache: any = null, snap2Cache: any = null;
     const processScores = () => {
+      if (!mountedRef.current) return;
       const scoreMap = new Map();
       [...(snap1Cache?.docs || []), ...(snap2Cache?.docs || [])].forEach((d: any) => {
         if (!scoreMap.has(d.id)) scoreMap.set(d.id, { id: d.id, ...d.data() });
@@ -53,7 +54,7 @@ const PerformancePage = () => {
         const sub = s.subject || "General";
         if (!subMap.has(sub)) subMap.set(sub, { name: sub, total: 0, count: 0, scores: [] });
         const curr = subMap.get(sub);
-        curr.total += (s.percentage || 0);
+        curr.total += (parseFloat(s.percentage) || 0);
         curr.count += 1;
         curr.scores.push(s);
       });
@@ -91,7 +92,7 @@ const PerformancePage = () => {
         const mm = scoresByMonth.get(month)!;
         if (!mm.has(sub)) mm.set(sub, { total: 0, count: 0 });
         const curr = mm.get(sub)!;
-        curr.total += (s.percentage || 0);
+        curr.total += (parseFloat(s.percentage) || 0);
         curr.count += 1;
       });
       const currMonth = new Date().getMonth();
@@ -109,26 +110,26 @@ const PerformancePage = () => {
       setLoading(false);
     };
 
-    const u1 = onSnapshot(query(collection(db, "test_scores"), where("studentId", "==", studentData.id)), s => { snap1Cache = s; processScores(); });
-    const u2 = studentEmail ? onSnapshot(query(collection(db, "test_scores"), where("studentEmail", "==", studentEmail)), s => { snap2Cache = s; processScores(); }) : () => {};
+    const schoolId = studentData.schoolId;
 
-    // Feedback
-    const feedMap = new Map();
-    const mergeFeedback = (docs: any[]) => {
-      docs.forEach(d => { if (!feedMap.has(d.id)) feedMap.set(d.id, { id: d.id, ...d.data() }); });
+    // Single query scoped to this school — prevents cross-school data access
+    const scoresQ = schoolId
+      ? query(collection(db, "test_scores"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id))
+      : query(collection(db, "test_scores"), where("studentId", "==", studentData.id));
+    const u1 = onSnapshot(scoresQ, s => { snap1Cache = s; processScores(); });
+
+    // Feedback — single scoped query
+    const feedbackQ = schoolId
+      ? query(collection(db, "performance_feedback"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id))
+      : query(collection(db, "performance_feedback"), where("studentId", "==", studentData.id));
+    const u2 = onSnapshot(feedbackQ, snap => {
+      if (!mountedRef.current) return;
+      const feedMap = new Map(snap.docs.map(d => [d.id, { id: d.id, ...d.data() }]));
       setFeedbacks(Array.from(feedMap.values()));
-    };
-    const u3 = onSnapshot(query(collection(db, "performance_feedback"), where("studentId", "==", studentData.id)), snap => {
-      if (studentEmail) {
-        getDocs(query(collection(db, "performance_feedback"), where("studentEmail", "==", studentEmail)))
-          .then(s2 => mergeFeedback([...snap.docs, ...s2.docs]));
-      } else {
-        mergeFeedback(snap.docs);
-      }
     });
 
-    return () => { u1(); u2(); u3(); };
-  }, [studentData?.id]);
+    return () => { u1(); u2(); };
+  }, [studentData?.id, studentData?.schoolId]);
 
   // ── AI helpers ──────────────────────────────────────────────────────────────
   const studentName = studentData?.name?.split(" ")[0] || "Your child";
@@ -182,12 +183,12 @@ const PerformancePage = () => {
       topics.forEach((t: string) => {
         if (!topicMasteryMap.has(t)) topicMasteryMap.set(t, { total: 0, count: 0 });
         const curr = topicMasteryMap.get(t);
-        curr.total += (score.percentage || 0);
+        curr.total += (parseFloat(score.percentage) || 0);
         curr.count += 1;
       });
     });
     const processedTopics = Array.from(topicMasteryMap.entries())
-      .map(([name, data]: any) => ({ name, score: Math.round(data.total / data.count) }))
+      .map(([name, data]: any) => ({ name, score: data.count > 0 ? Math.round(data.total / data.count) : 0 }))
       .sort((a, b) => b.score - a.score);
 
     const subFeedback = feedbacks

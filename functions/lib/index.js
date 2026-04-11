@@ -1,23 +1,28 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getParentAITutor = void 0;
+exports.parentAIProxy = exports.getParentAITutor = void 0;
 const functions = require("firebase-functions");
+const params_1 = require("firebase-functions/params");
 const admin = require("firebase-admin");
 const openai_1 = require("openai");
 const axios_1 = require("axios");
 const pdf = require('pdf-parse');
 admin.initializeApp();
-const openai = new openai_1.default({
-    apiKey: "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"
-});
-exports.getParentAITutor = functions.https.onCall(async (data, context) => {
+// ── Secret Manager — key stored securely, never in source code ───────────────
+// To set: firebase secrets:set OPENAI_API_KEY
+// Then deploy: firebase deploy --only functions
+const openaiApiKey = (0, params_1.defineSecret)("OPENAI_API_KEY");
+// ── Original tutor function (kept for backward compatibility) ─────────────────
+exports.getParentAITutor = functions
+    .runWith({ secrets: [openaiApiKey], timeoutSeconds: 60, memory: "512MB" })
+    .https.onCall(async (data, context) => {
     try {
         const { pdfUrl, title, description, question, type, topic, target_class, students_count } = data;
+        const openai = new openai_1.default({ apiKey: openaiApiKey.value() });
         console.log("AI Request Type:", type || "tutor");
         let pdfText = "";
         if (pdfUrl) {
             try {
-                console.log("Downloading PDF:", pdfUrl);
                 const response = await axios_1.default.get(pdfUrl, { responseType: 'arraybuffer' });
                 const buffer = Buffer.from(response.data);
                 const pdfData = await pdf(buffer);
@@ -46,6 +51,50 @@ exports.getParentAITutor = functions.https.onCall(async (data, context) => {
     catch (error) {
         console.error("AI Function Error:", error);
         return { status: "error", message: error.message };
+    }
+});
+// ── Universal AI proxy — replaces all client-side OpenAI calls ────────────────
+// Accepts: { prompt, systemPrompt?, jsonMode?, imageBase64?, model? }
+// Returns: { content: string } — caller parses JSON if needed
+exports.parentAIProxy = functions
+    .runWith({ secrets: [openaiApiKey], timeoutSeconds: 60, memory: "512MB" })
+    .https.onCall(async (data, context) => {
+    // Auth gate — only logged-in parents can call
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "Login required.");
+    }
+    const openai = new openai_1.default({ apiKey: openaiApiKey.value() });
+    const { prompt, systemPrompt = "You are EduIntellect AI, a friendly educational assistant for school students and their parents. Always respond in simple, encouraging language.", jsonMode = true, imageBase64, model, } = data;
+    if (!prompt) {
+        throw new functions.https.HttpsError("invalid-argument", "prompt is required.");
+    }
+    try {
+        const messages = [{ role: "system", content: systemPrompt }];
+        if (imageBase64) {
+            messages.push({
+                role: "user",
+                content: [
+                    { type: "image_url", image_url: { url: `data:image/jpeg;base64,${imageBase64}` } },
+                    { type: "text", text: prompt },
+                ],
+            });
+        }
+        else {
+            messages.push({ role: "user", content: prompt });
+        }
+        const resolvedModel = imageBase64 ? "gpt-4o" : (model || "gpt-4o-mini");
+        const completion = await openai.chat.completions.create({
+            model: resolvedModel,
+            messages,
+            max_tokens: 1500,
+            ...(jsonMode && !imageBase64 ? { response_format: { type: "json_object" } } : {}),
+        });
+        const content = completion.choices[0]?.message?.content ?? "";
+        return { content };
+    }
+    catch (error) {
+        console.error("parentAIProxy error:", error);
+        throw new functions.https.HttpsError("internal", error.message || "AI call failed");
     }
 });
 //# sourceMappingURL=index.js.map

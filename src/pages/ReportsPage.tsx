@@ -18,33 +18,25 @@ const ReportsPage = () => {
   useEffect(() => {
     if (!studentData?.id) return;
     setLoading(true);
-    const studentEmail = studentData.email?.toLowerCase() || "";
+    const schoolId = studentData.schoolId;
 
-    let snap1: any = null;
-    let snap2: any = null;
+    // Single scoped query — "all" grade-level reports + personal reports
+    const reportsQ = schoolId
+      ? query(collection(db, "reports"), where("schoolId", "==", schoolId), where("studentId", "in", [studentData.id, "all"]))
+      : query(collection(db, "reports"), where("studentId", "in", [studentData.id, "all"]));
 
-    const processReports = () => {
-        const docs = [...(snap1?.docs || []), ...(snap2?.docs || [])];
-        const seenIds = new Set();
-        const data = docs.filter(d => { if(!seenIds.has(d.id)) { seenIds.add(d.id); return true; } return false; }).map(doc => ({ id: doc.id, ...doc.data() as any }));
-        const filtered = data
-          .filter(r => (r.grade === studentData.grade || r.studentId === studentData.id || r.studentEmail?.toLowerCase() === studentEmail || r.studentId === "all") && 
-                      (r.status === "Sent" || r.status === "Sent & Reported" || r.publishedToParent === true))
-          .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
-
-        setReports(filtered);
-        setLoading(false);
-    };
-
-    const unsub1 = onSnapshot(query(collection(db, "reports"), where("studentId", "in", [studentData.id, "all"])), (snap) => {
-        snap1 = snap; processReports();
+    const unsub = onSnapshot(reportsQ, (snap) => {
+      const filtered = snap.docs
+        .map(d => ({ id: d.id, ...d.data() as any }))
+        .filter(r => (r.grade === studentData.grade || r.studentId === studentData.id || r.studentId === "all") &&
+                     (r.status === "Sent" || r.status === "Sent & Reported" || r.publishedToParent === true))
+        .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+      setReports(filtered);
+      setLoading(false);
     });
-    const unsub2 = studentEmail ? onSnapshot(query(collection(db, "reports"), where("studentEmail", "==", studentEmail)), (snap) => {
-        snap2 = snap; processReports();
-    }) : () => {};
 
-    return () => { unsub1(); unsub2(); };
-  }, [studentData?.id]);
+    return () => unsub();
+  }, [studentData?.id, studentData?.schoolId]);
 
   const filteredReports = reports.filter(r => 
     r.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||

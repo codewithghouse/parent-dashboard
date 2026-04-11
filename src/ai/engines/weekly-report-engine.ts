@@ -1,3 +1,5 @@
+import { callAI } from "../utils/callAI";
+
 export async function generateWeeklyReport(data: {
   child_name: string;
   grade: string;
@@ -9,9 +11,6 @@ export async function generateWeeklyReport(data: {
   overall_avg: number;
   recent_alerts: string[];
 }): Promise<any> {
-  const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-  if (!apiKey) throw new Error("OpenAI API Key not configured.");
-
   const prompt = `You are an expert school counselor AI generating a Weekly Progress Report for a parent.
 
 Student: ${data.child_name} (Grade ${data.grade})
@@ -38,9 +37,9 @@ RECENT ALERTS: ${data.recent_alerts.length > 0 ? data.recent_alerts.join(", ") :
 
 Generate a warm, parent-friendly Weekly Report JSON with this exact format:
 {
-  "message": "A 3–4 sentence friendly chat-style message to the parent summarizing the week — mention attendance, performance, and one specific highlight or concern.",
+  "message": "A 3–4 sentence friendly chat-style message to the parent summarizing the week.",
   "attendance_summary": "1-sentence verdict on this week's attendance with context.",
-  "test_analysis": "1–2 sentence analysis of test performance this week. If no tests, say so warmly.",
+  "test_analysis": "1–2 sentence analysis of test performance this week.",
   "assignment_status": "1 sentence on assignment completion rate.",
   "overall_performance": {
     "verdict": "Excellent / Good / Needs Attention / Critical",
@@ -55,32 +54,5 @@ Generate a warm, parent-friendly Weekly Report JSON with this exact format:
 
 Tone: Warm, supportive, like a school counselor talking to a caring parent.`;
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: "gpt-4.1-mini",
-      input: prompt,
-      text: { format: { type: "json_object" } }
-    })
-  });
-
-  if (!response.ok) throw new Error(`API Error: ${response.status}`);
-
-  const result = await response.json();
-  let textContent: string | null = null;
-
-  if (Array.isArray(result.output)) {
-    for (const item of result.output) {
-      if (item.type === "message" && Array.isArray(item.content)) {
-        const textItem = item.content.find((c: any) => c.type === "output_text");
-        if (textItem?.text) { textContent = textItem.text; break; }
-      }
-    }
-  }
-  if (!textContent && typeof result.text === "string") textContent = result.text;
-  if (!textContent) return null;
-
-  const clean = textContent.replace(/```json/gi, "").replace(/```/g, "").trim();
-  return JSON.parse(clean);
+  return callAI(prompt);
 }

@@ -155,7 +155,7 @@ const DashboardPage = () => {
     avgScore: 0,
     recentGrade: "N/A",
     recentSubject: "General",
-    trendPct: 5,
+    trendPct: 0,
   });
   const [recentAlerts, setRecentAlerts] = useState<any[]>([]);
   const [teacherInfo, setTeacherInfo] = useState({ name: "—" });
@@ -176,50 +176,59 @@ const DashboardPage = () => {
 
   useEffect(() => {
     if (!studentData?.id) return;
-    const email = (studentData.email || "").toLowerCase();
+    const schoolId = studentData.schoolId;
 
-    let attSnap1: any = null, attSnap2: any = null;
-    const processAtt = () => {
-      const combined = [...(attSnap1?.docs || []), ...(attSnap2?.docs || [])];
-      const unique = Array.from(new Map(combined.map(d => [d.id, d.data()])).values());
-      const present = unique.filter((r: any) => r.status === "present" || r.status === "late").length;
-      const pct = unique.length === 0 ? 100 : Math.round((present / unique.length) * 100);
+    // Helper: build a scoped query (schoolId filter when available prevents cross-school reads)
+    const sq = (collName: string, field = "studentId", value = studentData.id) =>
+      schoolId
+        ? query(collection(db, collName), where("schoolId", "==", schoolId), where(field, "==", value))
+        : query(collection(db, collName), where(field, "==", value));
+
+    // 1. Attendance — single listener (was 2)
+    const u1 = onSnapshot(sq("attendance"), snap => {
+      const records = snap.docs.map(d => d.data());
+      const present = records.filter((r: any) => r.status === "present" || r.status === "late").length;
+      const pct = records.length === 0 ? 100 : Math.round((present / records.length) * 100);
       setLiveStats(prev => ({ ...prev, attendance: pct }));
-    };
-    const u1 = onSnapshot(query(collection(db, "attendance"), where("studentId", "==", studentData.id)), s => { attSnap1 = s; processAtt(); });
-    const u2 = email ? onSnapshot(query(collection(db, "attendance"), where("studentEmail", "==", email)), s => { attSnap2 = s; processAtt(); }) : () => {};
+    });
 
-    let enSnap1: any = null, enSnap2: any = null;
+    // 2. Enrollments → assignments + tests (single listener, was 2 + unbounded classIds)
+    let enSnap: any = null;
     const processEnroll = async () => {
-      const docs = [...(enSnap1?.docs || []), ...(enSnap2?.docs || [])];
+      const docs = enSnap?.docs || [];
       if (!docs.length) { setDataLoading(false); return; }
       const first = docs[0].data();
       setTeacherInfo({ name: first.teacherName || "Class Teacher" });
       setStudentMeta({ className: first.className || studentData?.grade || "—", rollNo: first.rollNo || studentData?.rollNo || "—" });
-      const classIds = [...new Set(docs.map(d => d.data().classId).filter(Boolean))] as string[];
+      const classIds = [...new Set(docs.map((d: any) => d.data().classId).filter(Boolean))] as string[];
       if (!classIds.length) { setDataLoading(false); return; }
 
-      const [aSnap, tSnap, s1, s2] = await Promise.all([
-        getDocs(query(collection(db, "assignments"), where("classId", "in", classIds))),
-        getDocs(query(collection(db, "tests"), where("classId", "in", classIds))),
-        getDocs(query(collection(db, "submissions"), where("studentId", "==", studentData.id))),
-        email ? getDocs(query(collection(db, "submissions"), where("studentEmail", "==", email))) : Promise.resolve({ docs: [] as any[] }),
+      // Chunk classIds to handle >10 (Firestore "in" operator limit)
+      const chunks: string[][] = [];
+      for (let i = 0; i < classIds.length; i += 10) chunks.push(classIds.slice(i, i + 10));
+
+      const [aSnaps, tSnaps, subSnap] = await Promise.all([
+        Promise.all(chunks.map(c => getDocs(query(collection(db, "assignments"), where("classId", "in", c))))),
+        Promise.all(chunks.map(c => getDocs(query(collection(db, "tests"), where("classId", "in", c))))),
+        getDocs(sq("submissions")),
       ]);
-      const subIds = new Set([...s1.docs, ...(s2 as any).docs].flatMap(d => [d.data().homeworkId, d.data().assignmentId].filter(Boolean)));
-      const pending = aSnap.docs.filter(d => !subIds.has(d.id)).length;
+      const allAssignments = aSnaps.flatMap(s => s.docs);
+      const allTests = tSnaps.flatMap(s => s.docs);
+      const subIds = new Set(subSnap.docs.flatMap(d => [d.data().homeworkId, d.data().assignmentId].filter(Boolean)));
+      const pending = allAssignments.filter(d => !subIds.has(d.id)).length;
       const today = new Date().toISOString().split("T")[0];
       const nw = new Date(); nw.setDate(nw.getDate() + 7);
-      const tests = tSnap.docs.filter(d => { const dt = d.data().date; return dt >= today && dt <= nw.toISOString().split("T")[0]; }).length;
+      const tests = allTests.filter(d => { const dt = d.data().date; return dt >= today && dt <= nw.toISOString().split("T")[0]; }).length;
       setLiveStats(prev => ({ ...prev, pending, tests }));
       setDataLoading(false);
     };
-    const u3 = onSnapshot(query(collection(db, "enrollments"), where("studentId", "==", studentData.id)), s => { enSnap1 = s; processEnroll(); });
-    const u4 = email ? onSnapshot(query(collection(db, "enrollments"), where("studentEmail", "==", email)), s => { enSnap2 = s; processEnroll(); }) : () => {};
+    const u2 = onSnapshot(sq("enrollments"), s => { enSnap = s; processEnroll(); });
 
-    let rSnap1: any = null, rSnap2: any = null, gSnap1: any = null, gSnap2: any = null;
+    // 3. Results + gradebook — single listener each (was 4)
+    let rSnap: any = null, gSnap: any = null;
     const processResults = () => {
-      const testRes = [...(rSnap1?.docs || []), ...(rSnap2?.docs || [])].map(d => ({ id: d.id, ...d.data() as any }));
-      const gbRes = [...(gSnap1?.docs || []), ...(gSnap2?.docs || [])].map(d => {
+      const testRes = (rSnap?.docs || []).map((d: any) => ({ id: d.id, ...d.data() as any }));
+      const gbRes = (gSnap?.docs || []).map((d: any) => {
         const data = d.data();
         return { id: d.id, ...data, score: (data.mark / (data.maxMarks || 100)) * 100, subject: data.subject || data.className || "General", timestamp: data.updatedAt ? Timestamp.fromMillis(data.updatedAt) : Timestamp.now() };
       });
@@ -229,25 +238,30 @@ const DashboardPage = () => {
       const avg = all.reduce((s, r) => s + (parseFloat(r.score) || 0), 0) / all.length;
       const latest = all[0];
       const grade = (s: number) => s >= 90 ? "A+" : s >= 80 ? "A" : s >= 70 ? "A-" : s >= 60 ? "B" : "C";
-      setLiveStats(prev => ({ ...prev, avgScore: Math.round(avg), recentGrade: grade(parseFloat(latest.score) || 0), recentSubject: latest.className || latest.subject || "General" }));
+      const scores = all.map(r => parseFloat(r.score) || 0);
+      const recent3 = scores.slice(0, 3);
+      const prev3 = scores.slice(3, 6);
+      let trendPct = 0;
+      if (recent3.length > 0 && prev3.length > 0) {
+        const recentAvg = recent3.reduce((a, b) => a + b, 0) / recent3.length;
+        const prevAvg = prev3.reduce((a, b) => a + b, 0) / prev3.length;
+        trendPct = Math.round(recentAvg - prevAvg);
+      }
+      setLiveStats(prev => ({ ...prev, avgScore: Math.round(avg), recentGrade: grade(parseFloat(latest.score) || 0), recentSubject: latest.className || latest.subject || "General", trendPct }));
     };
-    const u5 = onSnapshot(query(collection(db, "results"), where("studentId", "==", studentData.id)), s => { rSnap1 = s; processResults(); });
-    const u6 = email ? onSnapshot(query(collection(db, "results"), where("studentEmail", "==", email)), s => { rSnap2 = s; processResults(); }) : () => {};
-    const u7 = onSnapshot(query(collection(db, "gradebook_scores"), where("studentId", "==", studentData.id)), s => { gSnap1 = s; processResults(); });
-    const u8 = email ? onSnapshot(query(collection(db, "gradebook_scores"), where("studentEmail", "==", email)), s => { gSnap2 = s; processResults(); }) : () => {};
+    const u3 = onSnapshot(sq("results"), s => { rSnap = s; processResults(); });
+    const u4 = onSnapshot(sq("gradebook_scores"), s => { gSnap = s; processResults(); });
 
-    let rkSnap1: any = null, rkSnap2: any = null;
-    const processRisks = () => {
-      const combined = [...(rkSnap1?.docs || []), ...(rkSnap2?.docs || [])];
-      const unique = Array.from(new Map(combined.map(d => [d.id, { id: d.id, ...d.data() as any }])).values())
+    // 4. Risks — single listener (was 2)
+    const u5 = onSnapshot(sq("risks"), snap => {
+      const unique = snap.docs
+        .map(d => ({ id: d.id, ...d.data() as any }))
         .sort((a, b) => (b.timestamp?.toDate()?.getTime() || 0) - (a.timestamp?.toDate()?.getTime() || 0));
       setRecentAlerts(unique.slice(0, 3).map(d => ({ id: d.id, title: d.issue, time: d.timestamp?.toDate() || new Date(), urgent: d.severity === "Critical" })));
-    };
-    const u9 = onSnapshot(query(collection(db, "risks"), where("studentId", "==", studentData.id)), s => { rkSnap1 = s; processRisks(); });
-    const u10 = email ? onSnapshot(query(collection(db, "risks"), where("studentEmail", "==", email)), s => { rkSnap2 = s; processRisks(); }) : () => {};
+    });
 
-    return () => [u1, u2, u3, u4, u5, u6, u7, u8, u9, u10].forEach(u => u());
-  }, [studentData?.id]);
+    return () => [u1, u2, u3, u4, u5].forEach(u => u());
+  }, [studentData?.id, studentData?.schoolId]);
 
   useEffect(() => {
     if (dataLoading) return;
@@ -289,32 +303,33 @@ const DashboardPage = () => {
     if (!studentData?.id || weeklyLoading) return;
     setWeeklyLoading(true);
     try {
-      const email = (studentData.email || "").toLowerCase();
       const now = new Date();
       const weekStart = new Date(now); weekStart.setDate(now.getDate() - 6); weekStart.setHours(0, 0, 0, 0);
       const weekStartStr = weekStart.toISOString().split("T")[0];
       const weekEndStr = now.toISOString().split("T")[0];
       const { thisWeekKey: weekCacheKey } = getWeekConfig();
 
-      // Fetch this week's attendance (filter by date client-side to avoid composite index)
-      const [att1, att2] = await Promise.all([
-        getDocs(query(collection(db, "attendance"), where("studentId", "==", studentData.id))),
-        email ? getDocs(query(collection(db, "attendance"), where("studentEmail", "==", email))) : Promise.resolve({ docs: [] as any[] }),
-      ]);
-      const allAttDocs = Array.from(new Map([...att1.docs, ...(att2 as any).docs].map(d => [d.id, d.data()])).values());
-      const attDocs = allAttDocs.filter((d: any) => d.date >= weekStartStr);
+      const schoolId = studentData.schoolId;
+      // Scoped query helper for report fetches
+      const rq = (collName: string, extraFilters: any[] = []) => {
+        const base = schoolId
+          ? query(collection(db, collName), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id), ...extraFilters)
+          : query(collection(db, collName), where("studentId", "==", studentData.id), ...extraFilters);
+        return getDocs(base);
+      };
+
+      // Fetch only this week's attendance — date range filter avoids fetching years of history
+      const attSnap = await rq("attendance", [where("date", ">=", weekStartStr)]);
+      const attDocs = attSnap.docs.map(d => d.data());
       const attPresent = attDocs.filter((d: any) => d.status === "present").length;
       const attLate = attDocs.filter((d: any) => d.status === "late").length;
       const attAbsent = attDocs.filter((d: any) => d.status === "absent").length;
       const attTotal = attDocs.length;
       const attPct = attTotal === 0 ? 100 : Math.round(((attPresent + attLate) / attTotal) * 100);
 
-      // Fetch this week's test results (filter by date client-side)
-      const [res1, res2] = await Promise.all([
-        getDocs(query(collection(db, "results"), where("studentId", "==", studentData.id))),
-        email ? getDocs(query(collection(db, "results"), where("studentEmail", "==", email))) : Promise.resolve({ docs: [] as any[] }),
-      ]);
-      const resDocs = Array.from(new Map([...res1.docs, ...(res2 as any).docs].map(d => [d.id, d.data()])).values());
+      // Fetch this week's results (scoped, no full history scan)
+      const resSnap = await rq("results");
+      const resDocs = resSnap.docs.map(d => d.data());
       const weekTests = resDocs
         .filter((d: any) => { const dt = d.date || d.createdAt?.toDate?.()?.toISOString?.()?.split?.("T")?.[0] || ""; return dt >= weekStartStr; })
         .map((d: any) => {
@@ -450,9 +465,19 @@ const DashboardPage = () => {
           <div>
             <h3 className="text-lg font-bold text-slate-800">Academic Health</h3>
             <p className="text-sm text-slate-400 mt-0.5">Overall performance indicator</p>
-            <div className="flex items-center gap-2 text-emerald-500 font-bold text-sm mt-4 bg-emerald-50 w-fit px-3 py-1 rounded-full">
-              <TrendingUp className="w-4 h-4" />
-              <span>Improved by {liveStats.trendPct}%</span>
+            <div className={`flex items-center gap-2 font-bold text-sm mt-4 w-fit px-3 py-1 rounded-full ${
+              liveStats.trendPct >= 0
+                ? "text-emerald-500 bg-emerald-50"
+                : "text-red-500 bg-red-50"
+            }`}>
+              <TrendingUp className={`w-4 h-4 ${liveStats.trendPct < 0 ? "rotate-180" : ""}`} />
+              <span>
+                {liveStats.trendPct === 0
+                  ? "Stable performance"
+                  : liveStats.trendPct > 0
+                  ? `Improved by ${liveStats.trendPct}%`
+                  : `Declined by ${Math.abs(liveStats.trendPct)}%`}
+              </span>
             </div>
           </div>
           <div className="flex items-center gap-4 sm:gap-6 bg-slate-50/50 rounded-2xl p-3 sm:bg-transparent sm:p-0">

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import {
   CheckCircle2, CircleDashed, AlertCircle, Loader2, Lightbulb,
   Sparkles, CalendarDays, BookOpenText, FlaskConical,
@@ -14,45 +15,7 @@ import { db } from "../lib/firebase";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { ParentAIController } from "../ai/controller/ai-controller";
 
-// ── OpenAI helper ────────────────────────────────────────────────────────────
-async function callOpenAI(prompt: string, jsonMode = true, imageBase64?: string): Promise<any> {
-  const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-  if (!apiKey) throw new Error("API key not configured.");
-
-  const messages: any[] = [
-    { role: "system", content: "You are EduIntellect AI, a friendly educational assistant for school students and their parents. Always respond in simple, encouraging language." }
-  ];
-
-  if (imageBase64) {
-    messages.push({
-      role: "user",
-      content: [
-        { type: "image_url", image_url: { url: `data:image/jpeg;base64,${imageBase64}` } },
-        { type: "text", text: prompt }
-      ]
-    });
-  } else {
-    messages.push({ role: "user", content: prompt });
-  }
-
-  const body: any = {
-    model: imageBase64 ? "gpt-4o" : "gpt-4o-mini",
-    messages,
-    max_tokens: 1200,
-  };
-  if (jsonMode && !imageBase64) body.response_format = { type: "json_object" };
-
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`API ${res.status}`);
-  const data = await res.json();
-  const content = data.choices[0].message.content;
-  if (jsonMode && !imageBase64) return JSON.parse(content);
-  return content;
-}
+import { callAI } from "../ai/utils/callAI";
 
 // ── Feature tabs ─────────────────────────────────────────────────────────────
 type FeatureTab = "strengths" | "study-plan" | "explainer" | "practice" | "doubt";
@@ -321,7 +284,7 @@ const ConceptStrengthsPage = () => {
 Subject focus: ${activeSubject || "General"}
 Weak topics: ${weakTopics.slice(0, 4).join(", ") || "General revision"}
 Return JSON with keys "today" and "tomorrow", each an array of 3 objects with: slot ("Morning"/"Afternoon"/"Evening"), time, topic, activity, duration, reason.`;
-      const result = await callOpenAI(prompt);
+      const result = await callAI(prompt);
       setStudyPlan(result);
     } catch {
       setStudyPlan(makeStudyPlanFallback(weakTopics, activeSubject));
@@ -338,7 +301,7 @@ Return JSON with keys "today" and "tomorrow", each an array of 3 objects with: s
       const prompt = `Explain "${topic}" to a school student (age 10-16) in very simple language.
 Use a real-world example they can relate to.
 Return JSON: { simple_explanation: "...", real_world_example: "...", emoji: "one emoji", remember_points: ["point1", "point2", "point3"] }`;
-      const result = await callOpenAI(prompt);
+      const result = await callAI(prompt);
       setExplanation(result);
     } catch {
       setExplanation(makeExplanationFallback(topic));
@@ -355,7 +318,7 @@ Return JSON: { simple_explanation: "...", real_world_example: "...", emoji: "one
       const prompt = `Generate exactly 5 multiple-choice questions about "${topic}" for a school student.
 Make questions progressively harder (easy → medium → hard).
 Return JSON: { questions: [{ question: "...", options: ["A. ...", "B. ...", "C. ...", "D. ..."], correct: "A", explanation: "..." }] }`;
-      const result = await callOpenAI(prompt);
+      const result = await callAI(prompt);
       setQuestions(result.questions || []);
     } catch {
       setQuestions(makePracticeFallback(topic).questions);
@@ -370,14 +333,14 @@ Return JSON: { questions: [{ question: "...", options: ["A. ...", "B. ...", "C. 
     try {
       if (doubtImageB64) {
         const prompt = `This student has a homework or exam question. Guide them step by step WITHOUT directly solving it. Use the Socratic method — ask leading questions and give progressive hints. Format as numbered hints (1. ... 2. ... 3. ... 4. ... 5. ...)`;
-        const text = await callOpenAI(prompt, false, doubtImageB64);
+        const text = await callAI(prompt, { jsonMode: false, imageBase64: doubtImageB64 });
         const hints = text.split(/\n+/).filter((l: string) => /^\d+\./.test(l.trim())).map((l: string) => l.replace(/^\d+\.\s*/, ""));
         setDoubtHints(hints.length > 0 ? hints : [text]);
       } else {
         const prompt = `A school student has this doubt: "${doubtText}"
 Guide them step by step WITHOUT giving the final answer. Use progressive hints (Socratic method).
 Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5 (near solution)"] }`;
-        const result = await callOpenAI(prompt);
+        const result = await callAI(prompt);
         setDoubtHints(result.hints || []);
       }
     } catch {
@@ -388,6 +351,19 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // Reject files > 4MB — OpenAI token limit and network protection
+    const MAX_SIZE_MB = 4;
+    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+      toast.error(`Image too large. Please upload a photo under ${MAX_SIZE_MB}MB.`);
+      e.target.value = "";
+      return;
+    }
+    // Only allow image types
+    if (!file.type.startsWith("image/")) {
+      toast.error("Only image files are supported.");
+      e.target.value = "";
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (ev) => {
       const result = ev.target?.result as string;

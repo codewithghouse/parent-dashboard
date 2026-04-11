@@ -46,73 +46,80 @@ const MyChildPage = () => {
       admissionDate: studentData.admissionDate || "",
     });
 
-    // Enrollments → teachers + class info
-    let enSnap1: any = null, enSnap2: any = null;
-    const processEnrollments = () => {
-      const docs = [...(enSnap1?.docs || []), ...(enSnap2?.docs || [])];
+    const schoolId = studentData.schoolId;
+
+    // Enrollments → teachers + class info (single scoped query)
+    let enSnap: any = null;
+    const processEnrollments = async () => {
+      const docs = enSnap?.docs || [];
       const seen = new Set();
-      const unique = docs.filter(d => seen.has(d.id) ? false : (seen.add(d.id), true));
+      const unique = docs.filter((d: any) => seen.has(d.id) ? false : (seen.add(d.id), true));
       if (unique.length > 0) {
-        const first = unique[0].data();
+        const first = (unique[0] as any).data();
         setEnrollmentInfo({
           className: first.className || studentData?.grade || "—",
           section: first.section || "",
           rollNo: first.rollNo || studentData?.rollNo || "—",
         });
       }
-      setTeachers(unique.map(d => ({
+      setTeachers(unique.map((d: any) => ({
         id: d.id,
         name: d.data().teacherName || "Teacher",
         subject: d.data().subject || d.data().className || "General",
         initials: getInitials(d.data().teacherName || "T"),
       })));
+
+      // Assignments completion — now inside processEnrollments to avoid full collection scan
+      const classIds = [...new Set(unique.map((d: any) => d.data().classId).filter(Boolean))] as string[];
+      if (classIds.length > 0) {
+        const chunks: string[][] = [];
+        for (let i = 0; i < classIds.length; i += 10) chunks.push(classIds.slice(i, i + 10));
+        const aSnaps = await Promise.all(
+          chunks.map(chunk => getDocs(query(collection(db, "assignments"), where("classId", "in", chunk))))
+        );
+        const totalAssignments = aSnaps.reduce((sum, s) => sum + s.docs.length, 0);
+        const subSnap = await getDocs(
+          schoolId
+            ? query(collection(db, "submissions"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id))
+            : query(collection(db, "submissions"), where("studentId", "==", studentData.id))
+        );
+        const subIds = new Set(subSnap.docs.flatMap(d => [d.data().homeworkId, d.data().assignmentId].filter(Boolean)));
+        setOverview(prev => ({ ...prev, assignments: `${subIds.size}/${totalAssignments}` }));
+      }
+
       setLoading(false);
     };
-    const u1 = onSnapshot(query(collection(db, "enrollments"), where("studentId", "==", studentData.id)), s => { enSnap1 = s; processEnrollments(); });
-    const u2 = email ? onSnapshot(query(collection(db, "enrollments"), where("studentEmail", "==", email)), s => { enSnap2 = s; processEnrollments(); }) : () => {};
 
-    // Attendance
-    let attSnap1: any = null, attSnap2: any = null;
-    const processAtt = () => {
-      const combined = [...(attSnap1?.docs || []), ...(attSnap2?.docs || [])];
-      const seen = new Set();
-      const records = combined.filter(d => seen.has(d.id) ? false : (seen.add(d.id), true)).map(d => d.data());
+    const enrollQ = schoolId
+      ? query(collection(db, "enrollments"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id))
+      : query(collection(db, "enrollments"), where("studentId", "==", studentData.id));
+    const u1 = onSnapshot(enrollQ, s => { enSnap = s; processEnrollments(); });
+
+    // Attendance — single scoped query
+    const attQ = schoolId
+      ? query(collection(db, "attendance"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id))
+      : query(collection(db, "attendance"), where("studentId", "==", studentData.id));
+    const u2 = onSnapshot(attQ, snap => {
+      const records = snap.docs.map(d => d.data());
       const present = records.filter(r => r.status === "present" || r.status === "late").length;
       const pct = records.length === 0 ? 100 : Math.round((present / records.length) * 100);
       setOverview(prev => ({ ...prev, attendance: `${pct}%` }));
-    };
-    const u3 = onSnapshot(query(collection(db, "attendance"), where("studentId", "==", studentData.id)), s => { attSnap1 = s; processAtt(); });
-    const u4 = email ? onSnapshot(query(collection(db, "attendance"), where("studentEmail", "==", email)), s => { attSnap2 = s; processAtt(); }) : () => {};
-
-    // Assignments completion
-    const u5 = onSnapshot(collection(db, "assignments"), async (aSnap) => {
-      const docs = [...(enSnap1?.docs || []), ...(enSnap2?.docs || [])];
-      const classIds = new Set(docs.map(d => d.data().classId).filter(Boolean));
-      const myAssignments = aSnap.docs.filter(d => classIds.has(d.data().classId));
-      const [s1, s2] = await Promise.all([
-        getDocs(query(collection(db, "submissions"), where("studentId", "==", studentData.id))),
-        email ? getDocs(query(collection(db, "submissions"), where("studentEmail", "==", email))) : Promise.resolve({ docs: [] as any[] }),
-      ]);
-      const subIds = new Set([...s1.docs, ...(s2 as any).docs].flatMap(d => [d.data().homeworkId, d.data().assignmentId].filter(Boolean)));
-      setOverview(prev => ({ ...prev, assignments: `${subIds.size}/${myAssignments.length}` }));
     });
 
-    // Results
-    let rSnap1: any = null, rSnap2: any = null;
-    const processResults = () => {
-      const docs = [...(rSnap1?.docs || []), ...(rSnap2?.docs || [])];
-      const seen = new Set();
-      const results = docs.filter(d => seen.has(d.id) ? false : (seen.add(d.id), true)).map(d => d.data());
+    // Results — single scoped query
+    const resultsQ = schoolId
+      ? query(collection(db, "results"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id))
+      : query(collection(db, "results"), where("studentId", "==", studentData.id));
+    const u3 = onSnapshot(resultsQ, snap => {
+      const results = snap.docs.map(d => d.data());
       const avg = results.length > 0
         ? results.reduce((s, r) => s + (parseFloat(r.score) || 0), 0) / results.length : 0;
       const grade = (s: number) => s >= 90 ? "A+" : s >= 80 ? "A" : s >= 70 ? "B+" : s >= 60 ? "B" : "C";
       setOverview(prev => ({ ...prev, testsTaken: results.length, avgGrade: results.length > 0 ? grade(avg) : "—" }));
-    };
-    const u6 = onSnapshot(query(collection(db, "results"), where("studentId", "==", studentData.id)), s => { rSnap1 = s; processResults(); });
-    const u7 = email ? onSnapshot(query(collection(db, "results"), where("studentEmail", "==", email)), s => { rSnap2 = s; processResults(); }) : () => {};
+    });
 
-    return () => [u1, u2, u3, u4, u5, u6, u7].forEach(u => u());
-  }, [studentData?.id]);
+    return () => [u1, u2, u3].forEach(u => u());
+  }, [studentData?.id, studentData?.schoolId]);
 
   const handleSave = async () => {
     if (!studentData?.id) return;

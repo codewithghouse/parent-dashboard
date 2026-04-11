@@ -9,6 +9,7 @@ import { GraduationCap, Loader2 } from "lucide-react";
 import { ParentLayout } from "./components/layout/ParentLayout";
 import { InstallBanner } from "./components/InstallBanner";
 import { PWAUpdatePrompt } from "./components/PWAUpdatePrompt";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 // ── Lazy-loaded pages (code splitting) ──────────────────────────────────────
 const DashboardPage       = lazy(() => import("./pages/DashboardPage"));
@@ -81,7 +82,7 @@ const AppRoutes = () => {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
-        <Route element={<ParentLayout />}>
+        <Route element={<ErrorBoundary><ParentLayout /></ErrorBoundary>}>
           <Route path="/"              element={<DashboardPage />} />
           <Route path="/my-child"      element={<MyChildPage />} />
           <Route path="/classes"       element={<ClassesPage />} />
