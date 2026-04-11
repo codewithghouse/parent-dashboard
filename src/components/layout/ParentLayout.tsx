@@ -9,11 +9,9 @@ export const ParentLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div
-      className="flex min-h-screen w-full"
-      /* Prevent pull-to-refresh on the whole layout wrapper */
-      style={{ overscrollBehavior: 'none' }}
-    >
+    /* h-screen + overflow-hidden = fixed viewport shell, scroll lives in <main> */
+    <div className="flex h-screen w-full overflow-hidden">
+
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -24,20 +22,18 @@ export const ParentLayout = () => {
 
       <ParentSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div className="flex-1 flex flex-col lg:ml-[280px] min-w-0">
+      {/* Right column — topbar (fixed height) + scrollable main */}
+      <div className="flex-1 flex flex-col lg:ml-[280px] min-w-0 h-full overflow-hidden">
         <ParentTopbar onMenuClick={() => setSidebarOpen(true)} />
-        {/*
-          pb-28 on mobile = space for bottom nav (56px) + safe-area-inset-bottom
-          Adds -webkit-overflow-scrolling:touch for momentum on iOS
+
+        {/* ── Scrollable content area ─────────────────────────────────────
+            overflow-y-auto  → this is the ONE scroll container
+            pb-28            → space for fixed bottom nav on mobile
+            lg:pb-8          → no bottom nav on desktop
         */}
         <main
-          className="flex-1 p-3 md:p-6 overflow-x-hidden bg-slate-50/50 lg:pb-8"
-          style={{
-            WebkitOverflowScrolling: 'touch',
-            overscrollBehavior: 'none',
-            /* safe area aware bottom padding for mobile bottom nav */
-            paddingBottom: 'calc(env(safe-area-inset-bottom) + 7rem)',
-          }}
+          className="flex-1 overflow-y-auto overflow-x-hidden bg-slate-50/50 p-3 md:p-6 pb-28 lg:pb-8"
+          style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'none' }}
         >
           <PageTransition>
             <div className="max-w-7xl mx-auto w-full">
@@ -47,7 +43,7 @@ export const ParentLayout = () => {
         </main>
       </div>
 
-      {/* Bottom nav sits above safe area */}
+      {/* Fixed bottom nav — always above scroll area */}
       <MobileBottomNav onMenuClick={() => setSidebarOpen(true)} />
     </div>
   );

@@ -7,13 +7,14 @@
    NATIVE APP FEEL — Global overrides
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* 1. Prevent ALL zoom (pinch, double-tap) + pull-to-refresh */
+/* 1. Prevent pull-to-refresh rubber-banding (does NOT block scroll) */
 html, body {
   overscroll-behavior: none;
   overscroll-behavior-y: none;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  touch-action: pan-x pan-y;
+  /* touch-action intentionally omitted — setting it here breaks native scroll
+     on many Android browsers. overscroll-behavior alone handles pull-to-refresh. */
 }
 
 /* 2. Remove tap flash highlight everywhere */

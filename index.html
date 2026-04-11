@@ -63,13 +63,9 @@
         -webkit-overflow-scrolling: touch;
         -webkit-tap-highlight-color: transparent;
         -webkit-touch-callout: none;
-        touch-action: pan-y;
+        /* NOTE: touch-action intentionally NOT set here —
+           setting it on body blocks native scroll on some Android browsers */
         margin: 0;
-        /* Safe area for notched phones */
-        padding-top: env(safe-area-inset-top);
-        padding-bottom: env(safe-area-inset-bottom);
-        padding-left: env(safe-area-inset-left);
-        padding-right: env(safe-area-inset-right);
       }
       /* Splash screen: show app color while JS loads */
       #root:empty::before {

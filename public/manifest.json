@@ -24,6 +24,29 @@
     { "src": "/icons/icon-384x384.png", "sizes": "384x384", "type": "image/png" },
     { "src": "/icons/icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ],
+  "screenshots": [
+    {
+      "src": "/screenshots/screenshot-dashboard.png",
+      "sizes": "540x960",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Dashboard — Track your child's progress"
+    },
+    {
+      "src": "/screenshots/screenshot-attendance.png",
+      "sizes": "540x960",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Attendance — Daily attendance records"
+    },
+    {
+      "src": "/screenshots/screenshot-performance.png",
+      "sizes": "540x960",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Performance — Test scores and grades"
+    }
+  ],
   "shortcuts": [
     {
       "name": "Dashboard",
