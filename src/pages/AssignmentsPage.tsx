@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { User, Clock, CheckCircle2, Loader2, Download, Upload, FileCheck, X, FileText, Layout, Book, FlaskConical, Calculator, Languages, Palette, ChevronRight, BarChart3, Target, Trophy, Send, Paperclip } from "lucide-react";
+import { User, Clock, CheckCircle2, Loader2, Download, Upload, FileCheck, X, FileText, Layout, Book, FlaskConical, Calculator, Languages, Palette, ChevronRight, BarChart3, Target, Trophy, Send, Paperclip, Lightbulb, Sparkles, ChevronDown } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { db, storage } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, Unsubscribe } from "firebase/firestore";
@@ -7,6 +7,28 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+
+// ── OpenAI helper ─────────────────────────────────────────────────────────────
+async function callOpenAI(prompt: string): Promise<any> {
+  const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+  if (!apiKey) throw new Error("API key not configured.");
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "You are EduIntellect AI, a helpful educational assistant for school students. Always be encouraging and never give direct answers — guide students to find answers themselves." },
+        { role: "user", content: prompt }
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 800,
+    }),
+  });
+  if (!res.ok) throw new Error(`API ${res.status}`);
+  const data = await res.json();
+  return JSON.parse(data.choices[0].message.content);
+}
 
 const tabs = ["Pending", "Completed", "Overdue"];
 
@@ -23,7 +45,19 @@ const AssignmentsPage = () => {
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [studentNote, setStudentNote] = useState("");
-  
+
+  // AI — Instant Submission Feedback
+  const [instantFeedback, setInstantFeedback] = useState<any>(null);
+  const [generatingFeedback, setGeneratingFeedback] = useState(false);
+
+  // AI — Hints System
+  const [isHintsOpen, setIsHintsOpen] = useState(false);
+  const [hintsTask, setHintsTask] = useState<any>(null);
+  const [hintDoubt, setHintDoubt] = useState("");
+  const [hints, setHints] = useState<string[]>([]);
+  const [hintIndex, setHintIndex] = useState(0);
+  const [generatingHints, setGeneratingHints] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -78,6 +112,56 @@ const AssignmentsPage = () => {
     });
     return () => { unsubEnroll(); if (unsubAssignments) unsubAssignments(); unsubSub(); };
   }, [studentData?.id]);
+
+  // ── Feature 12: Instant Submission Feedback ──────────────────────────────
+  const generateInstantFeedback = async (task: any) => {
+    setGeneratingFeedback(true);
+    setInstantFeedback(null);
+    try {
+      const result = await callOpenAI(
+        `A student just completed and is about to submit an assignment.
+Assignment title: "${task.title}"
+Description: "${task.description || "No description provided"}"
+Give encouraging, constructive pre-submission feedback.
+Return JSON: { emoji: "one emoji", overall: "short encouraging sentence", strengths: ["s1","s2"], improvements: ["i1","i2"], tip: "one final tip" }`
+      );
+      setInstantFeedback(result);
+    } catch {
+      setInstantFeedback({
+        emoji: "✨", overall: "Great effort completing this assignment!",
+        strengths: ["Assignment completed and ready to submit", "Good initiative in getting it done"],
+        improvements: ["Review key points one final time", "Ensure all parts of the question are addressed"],
+        tip: "Take a quick final look before submitting — small checks make a big difference!"
+      });
+    } finally { setGeneratingFeedback(false); }
+  };
+
+  // ── Feature 11: AI Hints System ──────────────────────────────────────────
+  const handleGetHints = async () => {
+    if (!hintDoubt.trim() || !hintsTask) return;
+    setGeneratingHints(true);
+    setHints([]);
+    setHintIndex(0);
+    try {
+      const result = await callOpenAI(
+        `A school student needs help with their assignment but NOT the direct answer.
+Assignment: "${hintsTask.title}"
+Description: "${hintsTask.description || "No description"}"
+Student is stuck on: "${hintDoubt}"
+Give 4-5 progressive Socratic hints — nudges, not answers.
+Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (near solution — still no direct answer)"] }`
+      );
+      setHints(result.hints || []);
+    } catch {
+      setHints([
+        `Read the assignment question again: what is it really asking you to do?`,
+        `Identify the key words or numbers. What subject area does this connect to?`,
+        `Think about a similar example you've seen in class. How did that work?`,
+        `Try breaking the problem into smaller steps — what's the very first thing you'd do?`,
+        `Almost there! Write out your reasoning step by step and see if it leads you to an answer.`,
+      ]);
+    } finally { setGeneratingHints(false); }
+  };
 
   const handleOfficialSubmission = async () => {
     if (!uploadFile || !selectedTask) return toast.error("Please attach your homework artifact first!");
@@ -202,12 +286,20 @@ const AssignmentsPage = () => {
                             <p className="text-[10px] font-black uppercase tracking-widest">Handed In</p>
                          </div>
                       ) : (
-                         <button 
-                           onClick={() => { setSelectedTask(a); setIsSubmitOpen(true); }}
-                           className="w-full px-6 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-slate-800 shadow-lg active:scale-95 transition-all"
-                         >
-                           Submit Online
-                         </button>
+                         <>
+                           <button
+                             onClick={() => { setSelectedTask(a); setInstantFeedback(null); setUploadFile(null); setStudentNote(""); setIsSubmitOpen(true); }}
+                             className="w-full px-6 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-slate-800 shadow-lg active:scale-95 transition-all"
+                           >
+                             Submit Online
+                           </button>
+                           <button
+                             onClick={() => { setHintsTask(a); setHintDoubt(""); setHints([]); setHintIndex(0); setIsHintsOpen(true); }}
+                             className="w-full px-6 py-3 border border-amber-200 bg-amber-50 rounded-2xl text-[10px] font-black text-amber-600 uppercase tracking-widest hover:bg-amber-100 active:scale-95 transition-all flex items-center justify-center gap-2"
+                           >
+                             <Lightbulb className="w-3.5 h-3.5" /> AI Hints
+                           </button>
+                         </>
                       )}
                       {a.pdfUrl && <a href={a.pdfUrl} target="_blank" rel="noreferrer" className="w-full px-6 py-3 border border-slate-100 rounded-2xl text-[9px] font-black text-slate-400 uppercase tracking-widest hover:bg-slate-50 transition-all text-center">View Blueprint</a>}
                    </div>
@@ -216,6 +308,90 @@ const AssignmentsPage = () => {
              })
           )}
         </div>
+
+        {/* ── AI HINTS SHEET ── */}
+        <Sheet open={isHintsOpen} onOpenChange={v => { setIsHintsOpen(v); if (!v) { setHints([]); setHintIndex(0); setHintDoubt(""); } }}>
+          <SheetContent side="right" className="w-full sm:max-w-lg p-0 border-l border-slate-100 bg-white">
+            <div className="h-full flex flex-col">
+              {/* Header */}
+              <div className="p-8 pb-6" style={{ background: "linear-gradient(135deg, #f59e0b 0%, #f97316 100%)" }}>
+                <SheetHeader className="text-left">
+                  <SheetTitle className="text-white text-2xl font-black tracking-tight leading-none mb-1">AI Hints System</SheetTitle>
+                  <SheetDescription className="text-amber-100 font-semibold text-xs">Stuck? Get step-by-step clues — not the answer!</SheetDescription>
+                </SheetHeader>
+                <div className="mt-4 bg-white/20 rounded-2xl px-4 py-3">
+                  <p className="text-[9px] font-black text-white/70 uppercase tracking-widest mb-0.5">Assignment</p>
+                  <p className="text-sm font-bold text-white leading-tight">{hintsTask?.title}</p>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                {/* Doubt input */}
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">What are you stuck on?</label>
+                  <textarea
+                    value={hintDoubt}
+                    onChange={e => setHintDoubt(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleGetHints(); } }}
+                    rows={3}
+                    placeholder="Describe the part you don't understand... e.g. 'I don't know how to start question 2'"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none"
+                  />
+                  <button
+                    onClick={handleGetHints}
+                    disabled={generatingHints || !hintDoubt.trim()}
+                    className="mt-3 w-full h-11 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 transition-all"
+                  >
+                    {generatingHints ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                    {generatingHints ? "Thinking of hints..." : "Get Hints"}
+                  </button>
+                </div>
+
+                {/* Hints */}
+                {generatingHints && (
+                  <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                    <Loader2 className="w-4 h-4 text-amber-500 animate-spin flex-shrink-0" />
+                    <p className="text-xs text-amber-700 font-semibold">Preparing your hints...</p>
+                  </div>
+                )}
+
+                {hints.length > 0 && !generatingHints && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Lightbulb className="w-4 h-4 text-amber-500" />
+                      <p className="text-xs font-bold text-slate-600">Hints revealed: {Math.min(hintIndex + 1, hints.length)} / {hints.length}</p>
+                    </div>
+
+                    {hints.slice(0, hintIndex + 1).map((hint, i) => (
+                      <div key={i} className={`rounded-2xl p-4 border ${i === hintIndex ? "bg-amber-50 border-amber-200" : "bg-slate-50 border-slate-100"}`}>
+                        <div className="flex items-start gap-3">
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-black ${i === hintIndex ? "bg-amber-500 text-white" : "bg-slate-200 text-slate-500"}`}>
+                            {i + 1}
+                          </div>
+                          <p className="text-sm text-slate-700 leading-relaxed">{hint}</p>
+                        </div>
+                      </div>
+                    ))}
+
+                    {hintIndex < hints.length - 1 ? (
+                      <button
+                        onClick={() => setHintIndex(prev => prev + 1)}
+                        className="w-full h-11 rounded-2xl border-2 border-dashed border-amber-200 text-amber-600 text-sm font-bold flex items-center justify-center gap-2 hover:bg-amber-50 transition-all active:scale-95"
+                      >
+                        <ChevronDown className="w-4 h-4" /> Next Hint
+                      </button>
+                    ) : (
+                      <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-4 text-center">
+                        <p className="text-sm font-bold text-emerald-700">All hints shown! Now try solving it yourself.</p>
+                        <button onClick={() => { setHints([]); setHintIndex(0); setHintDoubt(""); }} className="mt-2 text-xs text-emerald-600 font-semibold underline">Ask about something else</button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
 
         {/* SUBMISSION CENTER PANEL */}
         <Sheet open={isSubmitOpen} onOpenChange={setIsSubmitOpen}>
@@ -242,7 +418,11 @@ const AssignmentsPage = () => {
                          onClick={() => fileInputRef.current?.click()}
                          className="w-full p-12 border-2 border-dashed border-slate-100 rounded-[2.5rem] bg-slate-50/50 hover:bg-slate-100 transition-all cursor-pointer flex flex-col items-center justify-center text-center group"
                        >
-                          <input type="file" ref={fileInputRef} className="hidden" accept=".pdf,.jpg,.png" onChange={(e) => setUploadFile(e.target.files?.[0] || null)} />
+                          <input type="file" ref={fileInputRef} className="hidden" accept=".pdf,.jpg,.png" onChange={(e) => {
+                            const file = e.target.files?.[0] || null;
+                            setUploadFile(file);
+                            if (file && selectedTask) generateInstantFeedback(selectedTask);
+                          }} />
                           {uploadFile ? (
                              <div className="flex items-center gap-4 bg-white p-4 rounded-2xl shadow-xl border border-slate-50 animate-in zoom-in-95">
                                 <FileText className="w-10 h-10 text-indigo-600" />
@@ -257,6 +437,55 @@ const AssignmentsPage = () => {
                           )}
                        </div>
                     </div>
+
+                    {/* ── AI Instant Feedback ── */}
+                    {(generatingFeedback || instantFeedback) && (
+                      <div className="rounded-3xl overflow-hidden border border-indigo-100">
+                        <div className="bg-gradient-to-r from-indigo-500 to-violet-500 px-5 py-3 flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-white" />
+                          <span className="text-[10px] font-black text-white uppercase tracking-widest">AI Pre-Submission Feedback</span>
+                        </div>
+                        {generatingFeedback ? (
+                          <div className="p-5 flex items-center gap-3 bg-indigo-50">
+                            <Loader2 className="w-4 h-4 text-indigo-500 animate-spin flex-shrink-0" />
+                            <p className="text-xs text-indigo-600 font-semibold">Analysing your submission...</p>
+                          </div>
+                        ) : instantFeedback && (
+                          <div className="p-5 space-y-4 bg-white">
+                            <div className="flex items-center gap-3">
+                              <span className="text-2xl">{instantFeedback.emoji || "✨"}</span>
+                              <p className="text-sm font-bold text-slate-800">{instantFeedback.overall}</p>
+                            </div>
+                            <div className="grid grid-cols-1 gap-3">
+                              <div className="bg-emerald-50 rounded-2xl p-4">
+                                <p className="text-[9px] font-black text-emerald-700 uppercase tracking-widest mb-2">Strengths</p>
+                                {(instantFeedback.strengths || []).map((s: string, i: number) => (
+                                  <div key={i} className="flex items-start gap-2 mb-1">
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                                    <p className="text-xs text-slate-600">{s}</p>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="bg-amber-50 rounded-2xl p-4">
+                                <p className="text-[9px] font-black text-amber-700 uppercase tracking-widest mb-2">Room to Improve</p>
+                                {(instantFeedback.improvements || []).map((s: string, i: number) => (
+                                  <div key={i} className="flex items-start gap-2 mb-1">
+                                    <ChevronDown className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
+                                    <p className="text-xs text-slate-600">{s}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            {instantFeedback.tip && (
+                              <div className="flex items-start gap-2 bg-slate-50 rounded-2xl p-3">
+                                <Lightbulb className="w-3.5 h-3.5 text-slate-500 flex-shrink-0 mt-0.5" />
+                                <p className="text-xs text-slate-500 italic">{instantFeedback.tip}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <div className="space-y-4 text-left">
                        <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Teacher Notes (Optional)</label>

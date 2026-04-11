@@ -37,9 +37,16 @@ const ERROR_MSG = "AI services briefly resting. Using latest cached logic.";
 
 // --- FALLBACK GENERATORS ---
 const generateDashboardFallback = (name: string) => ({
-  narrative_summary: `${name} is maintaining a steady performance this term.`,
-  weekly_digest: ["Consistent homework submission.", "Good participation."],
-  parenting_tips: ["Encourage a regular reading habit.", "Ensure 8 hours of sleep."]
+  child_summary_narrative: `${name} is maintaining a steady performance this term. Keep encouraging consistent effort at home.`,
+  weekly_digest: {
+    summary: `${name} has been putting in regular effort this week. Continue to support with timely homework completion and adequate rest.`,
+    highlights: ["Regular attendance maintained", "Assignments submitted on time"],
+    focus_areas: ["Review upcoming test topics", "Maintain a consistent sleep schedule"]
+  },
+  parenting_tips: [
+    { tip: "Encourage a daily reading habit of 20 minutes", reason: "Builds vocabulary and comprehension across all subjects." },
+    { tip: "Ensure 8–9 hours of sleep on school nights", reason: "Adequate sleep directly improves memory retention and focus in class." }
+  ]
 });
 
 const generatePerformanceFallback = (name: string) => ({
@@ -85,7 +92,7 @@ export const ParentAIController = {
       return { status: "success", data: insights, source: "live" };
     } catch {
       if (cached) return { status: "success", data: cached.data, source: "stale-cache" };
-      return { status: "success", data: generateDashboardFallback(data.student_name || "Student"), source: "fallback" };
+      return { status: "success", data: generateDashboardFallback(data.child_name || data.student_name || "Student"), source: "fallback" };
     }
   },
 

@@ -31,21 +31,28 @@ export async function generateParentDashboardInsights(data: any): Promise<any> {
   }
 
   const result = await response.json();
-  let outputData = result.output || result.text || result;
 
-  if (typeof outputData === 'object') {
-     return outputData;
+  // Extract text from OpenAI Responses API format: result.output is an array of message objects
+  let textContent: string | null = null;
+  if (Array.isArray(result.output)) {
+    for (const item of result.output) {
+      if (item.type === "message" && Array.isArray(item.content)) {
+        const textItem = item.content.find((c: any) => c.type === "output_text");
+        if (textItem?.text) { textContent = textItem.text; break; }
+      }
+    }
   }
+  // Fallback: some API versions return text directly
+  if (!textContent && typeof result.text === "string") textContent = result.text;
+  if (!textContent && typeof result.output === "string") textContent = result.output;
 
-  if (typeof outputData === 'string') {
-     let cleanText = outputData.replace(/```json/gi, "").replace(/```/g, "").trim();
-     try {
-       return JSON.parse(cleanText);
-     } catch (parseError) {
-       console.error("Dashboard Engine failed to parse JSON:", cleanText);
-       return null;
-     }
+  if (!textContent) return null;
+
+  const cleanText = textContent.replace(/```json/gi, "").replace(/```/g, "").trim();
+  try {
+    return JSON.parse(cleanText);
+  } catch (parseError) {
+    console.error("Dashboard Engine failed to parse JSON:", cleanText);
+    return null;
   }
-  
-  return null;
 }

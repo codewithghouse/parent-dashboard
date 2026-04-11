@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   AlertCircle, Clock, Trophy, Calendar, User,
-  Loader2, BellRing, CheckCircle, BookOpen, ShieldAlert
+  Loader2, BellRing, CheckCircle, BookOpen, ShieldAlert, Sparkles
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
@@ -188,12 +188,35 @@ const AlertsPage = () => {
       });
 
     // ── SOURCE 2: attendance (absent = High, late = Medium) ──
+    // Pre-compute attendance context for storytelling
+    const absentRecords = attendance.filter(a => a.status === "absent");
+    const totalAbsences = absentRecords.length;
+    const absentDayNums = absentRecords.map(a => {
+      const parts = (a.date || "").split("-");
+      return parts.length === 3 ? new Date(+parts[0], +parts[1] - 1, +parts[2]).getDay() : -1;
+    }).filter(d => d >= 0);
+    const dayTally = absentDayNums.reduce((acc, d) => { acc[d] = (acc[d] || 0) + 1; return acc; }, {} as Record<number, number>);
+    const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const topAbsentDays = Object.entries(dayTally).sort((a, b) => +b[1] - +a[1]).slice(0, 2).map(([d]) => DAYS[+d]);
+    const dayPattern = topAbsentDays.length > 0 ? ` (mostly ${topAbsentDays.join(" and ")})` : "";
+    const lowScoreSubjects = scores.filter(s => {
+      const pct = s.percentage ?? (s.maxScore > 0 ? s.score / s.maxScore * 100 : 0);
+      return pct < 60;
+    });
+    const academicImpact = lowScoreSubjects.length > 0
+      ? ` This is directly affecting grades — ${lowScoreSubjects.length} subject${lowScoreSubjects.length > 1 ? "s are" : " is"} currently below the passing threshold.`
+      : " Regular attendance is essential to stay on top of the curriculum.";
+    const totalLates = attendance.filter(a => a.status === "late").length;
+
     attendance.forEach(a => {
       if (a.status === "absent") {
+        const absenceStory = totalAbsences === 1
+          ? `${name} was absent on ${fmtDateStr(a.date)}. This is their first recorded absence this term — please ensure it doesn't become a pattern.`
+          : `${name} has been absent ${totalAbsences} time${totalAbsences > 1 ? "s" : ""} this term${dayPattern}.${academicImpact}`;
         result.push({
           id: `att_absent_${a.id}`,
-          title: "Absence Recorded",
-          description: `${name} was marked absent on ${fmtDateStr(a.date)}.`,
+          title: totalAbsences > 2 ? `Repeated Absences — ${totalAbsences} This Term` : "Absence Recorded",
+          description: absenceStory,
           category: "Attendance",
           priority: "High Priority",
           createdAt: a.createdAt || null,
@@ -202,10 +225,11 @@ const AlertsPage = () => {
           source: "attendance"
         });
       } else if (a.status === "late") {
+        const lateStory = `${name} arrived late on ${fmtDateStr(a.date)}${a.arrivalTime || a.time ? ` at ${a.arrivalTime || a.time}` : ""}. This is their ${totalLates === 1 ? "first" : `${totalLates}th`} late arrival this term — arriving on time ensures ${name.split(" ")[0]} doesn't miss the start of lessons.`;
         result.push({
           id: `att_late_${a.id}`,
           title: "Late Arrival Recorded",
-          description: `${name} arrived late on ${fmtDateStr(a.date)}.`,
+          description: lateStory,
           category: "Attendance",
           priority: "Medium Priority",
           createdAt: a.createdAt || null,
@@ -221,11 +245,19 @@ const AlertsPage = () => {
     const submittedIds = new Set(submissions.map(s => s.assignmentId));
     scores.forEach(s => {
       const pct = s.percentage ?? (s.maxScore > 0 ? (s.score / s.maxScore * 100) : 0);
+      const sub = s.subject || "a subject";
+      const testName = s.testName || "a test";
+
       if (pct >= 85) {
+        // Find how many tests in this subject scored high
+        const subjectHighScores = scores.filter(s2 => s2.subject === sub && (s2.percentage ?? (s2.maxScore > 0 ? s2.score/s2.maxScore*100 : 0)) >= 85).length;
+        const story = subjectHighScores > 1
+          ? `${name} scored ${Math.round(pct)}% in "${testName}" — their ${subjectHighScores === 2 ? "second" : `${subjectHighScores}th`} strong result in ${sub} this term. This consistent excellence is worth celebrating and encouraging at home!`
+          : `${name} scored an impressive ${Math.round(pct)}% in "${testName}" (${sub}). Hard work is clearly paying off — keep encouraging this momentum!`;
         result.push({
           id: `score_good_${s.id}`,
-          title: `Great Score in ${s.subject || "a Subject"}!`,
-          description: `${name} scored ${Math.round(pct)}% in ${s.testName || s.subject || "a test"}. Keep it up!`,
+          title: `Excellent in ${sub}! 🎉`,
+          description: story,
           category: "Academic",
           priority: "Good News",
           createdAt: s.timestamp || s.createdAt || null,
@@ -233,10 +265,16 @@ const AlertsPage = () => {
           source: "test_scores"
         });
       } else if (pct < 60 && pct > 0) {
+        // Calculate subject average and trend
+        const subScores = scores.filter(s2 => s2.subject === sub).map(s2 => s2.percentage ?? (s2.maxScore > 0 ? s2.score/s2.maxScore*100 : 0));
+        const subAvg = subScores.length > 0 ? Math.round(subScores.reduce((a, b) => a + b, 0) / subScores.length) : Math.round(pct);
+        const isTrending = subScores.length > 1 && subScores[subScores.length - 1] < subScores[0];
+        const trendNote = isTrending ? ` Performance in ${sub} has been declining — early intervention is key.` : ` Focused revision before the next assessment can make a significant difference.`;
+        const story = `${name} scored ${Math.round(pct)}% in "${testName}" (${sub}). The current subject average is ${subAvg}%.${trendNote}`;
         result.push({
           id: `score_low_${s.id}`,
-          title: `Low Score — ${s.subject || "Subject"}`,
-          description: `${name} scored ${Math.round(pct)}% in "${s.testName || "a test"}". Consider reviewing this topic.`,
+          title: `Below Passing — ${sub}`,
+          description: story,
           category: "Academic",
           priority: "High Priority",
           createdAt: s.timestamp || s.createdAt || null,
@@ -258,11 +296,12 @@ const AlertsPage = () => {
       const diffDays = Math.ceil(diffMs / (1000 * 3600 * 24));
 
       if (diffMs < 0) {
-        // Overdue
+        const daysOverdue = Math.abs(Math.ceil(diffMs / (1000 * 3600 * 24)));
+        const urgency = daysOverdue > 7 ? "This significantly impacts the term grade and requires immediate attention." : daysOverdue > 3 ? "Submitting it now — even late — is better than leaving it incomplete. Contact the teacher if an extension is needed." : "This was just missed — submitting it now with a brief apology note to the teacher may still earn partial credit.";
         result.push({
           id: `assign_overdue_${a.id}`,
-          title: "Assignment Overdue",
-          description: `"${a.title}" was due on ${fmtTs(a.dueDate)} and has not been submitted yet.`,
+          title: `Assignment Overdue — ${daysOverdue} Day${daysOverdue > 1 ? "s" : ""}`,
+          description: `"${a.title}" was due on ${fmtTs(a.dueDate)} and remains unsubmitted. ${urgency}`,
           category: "Academic",
           priority: "High Priority",
           createdAt: a.dueDate,
@@ -270,11 +309,11 @@ const AlertsPage = () => {
           source: "assignments"
         });
       } else if (diffDays <= 3) {
-        // Due soon
+        const urgency = diffDays === 1 ? "Due TOMORROW — action needed today." : `Due in ${diffDays} days — plan time tonight to complete it.`;
         result.push({
           id: `assign_soon_${a.id}`,
-          title: "Assignment Due Soon",
-          description: `"${a.title}" is due in ${diffDays} day${diffDays === 1 ? "" : "s"} (${fmtTs(a.dueDate)}). Please ensure ${name} submits it on time.`,
+          title: `Due ${diffDays === 1 ? "Tomorrow" : `in ${diffDays} Days`} — ${a.title}`,
+          description: `"${a.title}" is due on ${fmtTs(a.dueDate)}. ${urgency} Submitting on time keeps ${name.split(" ")[0]}'s completion record strong.`,
           category: "Academic",
           priority: "Medium Priority",
           createdAt: a.createdAt || null,
@@ -362,6 +401,66 @@ const AlertsPage = () => {
     const tab = filterTabs[activeTab];
     return tab === "All" || a.category === tab;
   });
+
+  // ── Feature 16: AI Action Recommendations ────────────────────────────────
+  type Action = { label: string; primary: boolean; color?: string; onClick: () => void };
+  const getActions = (alert: ParsedAlert): Action[] => {
+    const go = (path: string) => () => navigate(path);
+    const dismiss = () => dismissAlert(alert);
+
+    if (alert.category === "Attendance" && alert.priority === "High Priority")
+      return [
+        { label: "📞 Schedule Teacher Call", primary: true, color: "bg-rose-600 hover:bg-rose-700 text-white", onClick: go("/teacher-notes") },
+        { label: "View Attendance Report", primary: false, onClick: go("/attendance") },
+      ];
+
+    if (alert.category === "Attendance")
+      return [
+        { label: "💬 Message Teacher", primary: true, color: "bg-blue-600 hover:bg-blue-700 text-white", onClick: go("/teacher-notes") },
+        { label: "Acknowledge", primary: false, onClick: dismiss },
+      ];
+
+    if (alert.source === "test_scores" && alert.priority === "High Priority")
+      return [
+        { label: "📚 Request Extra Support", primary: true, color: "bg-indigo-600 hover:bg-indigo-700 text-white", onClick: go("/teacher-notes") },
+        { label: "View Performance", primary: false, onClick: go("/performance") },
+      ];
+
+    if (alert.source === "assignments" && alert.priority === "High Priority")
+      return [
+        { label: "📤 Submit Now", primary: true, color: "bg-slate-900 hover:bg-slate-800 text-white", onClick: go("/assignments") },
+        { label: "💬 Message Teacher", primary: false, onClick: go("/teacher-notes") },
+      ];
+
+    if (alert.source === "assignments" && alert.priority === "Medium Priority")
+      return [
+        { label: "⏰ Go to Assignments", primary: true, color: "bg-amber-500 hover:bg-amber-600 text-white", onClick: go("/assignments") },
+        { label: "Dismiss", primary: false, onClick: dismiss },
+      ];
+
+    if (alert.priority === "Good News")
+      return [
+        { label: "🎉 View Full Performance", primary: true, color: "bg-emerald-600 hover:bg-emerald-700 text-white", onClick: go("/performance") },
+        { label: "Acknowledge", primary: false, onClick: dismiss },
+      ];
+
+    if (alert.source === "parent_notes")
+      return [
+        { label: "💬 Reply to Teacher", primary: true, color: "bg-blue-600 hover:bg-blue-700 text-white", onClick: go("/teacher-notes") },
+        { label: "Acknowledge", primary: false, onClick: dismiss },
+      ];
+
+    if (alert.source === "risks")
+      return [
+        { label: "📞 Contact Teacher Now", primary: true, color: "bg-rose-600 hover:bg-rose-700 text-white", onClick: go("/teacher-notes") },
+        { label: "Dismiss", primary: false, onClick: dismiss },
+      ];
+
+    return [
+      { label: "View Details", primary: true, color: "bg-indigo-600 hover:bg-indigo-700 text-white", onClick: go("/performance") },
+      { label: "Dismiss", primary: false, onClick: dismiss },
+    ];
+  };
 
   const getTabCount = (tab: string) =>
     tab === "All" ? allAlerts.length : allAlerts.filter(a => a.category === tab).length;
@@ -511,53 +610,27 @@ const AlertsPage = () => {
                   </div>
                 </div>
 
-                {/* Action Buttons — full width below on mobile, inline on sm+ */}
-                <div className="flex flex-wrap gap-2 mt-3 sm:justify-end">
-                  {alert.category === "Attendance" && alert.priority !== "High Priority" ? (
-                    <button
-                      onClick={() => dismissAlert(alert)}
-                      className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-all"
-                    >
-                      Acknowledge
-                    </button>
-                  ) : alert.category === "General" ? (
-                    <>
+                {/* Feature 16 — AI Action Recommendations */}
+                <div className="mt-4 pt-3 border-t border-slate-50">
+                  <div className="flex items-center gap-1.5 mb-2.5">
+                    <Sparkles className="w-3 h-3 text-indigo-400" />
+                    <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Recommended Actions</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {getActions(alert).map((action, ai) => (
                       <button
-                        onClick={() => dismissAlert(alert)}
-                        className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition-all"
+                        key={ai}
+                        onClick={action.onClick}
+                        className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 ${
+                          action.primary
+                            ? `${action.color || "bg-[#1e3a8a] hover:bg-blue-900 text-white"} shadow-sm`
+                            : "border border-slate-200 text-slate-500 hover:bg-slate-50"
+                        }`}
                       >
-                        Confirm
+                        {action.label}
                       </button>
-                      <button
-                        onClick={() => dismissAlert(alert)}
-                        className="flex-1 sm:flex-none px-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-all"
-                      >
-                        Reschedule
-                      </button>
-                    </>
-                  ) : alert.priority === "Good News" ? (
-                    <button
-                      onClick={() => navigate("/performance")}
-                      className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition-all"
-                    >
-                      View Details
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => navigate("/teacher-notes")}
-                        className="flex-1 sm:flex-none px-4 py-2 bg-[#1e3a8a] text-white rounded-xl text-sm font-semibold hover:bg-blue-900 transition-all"
-                      >
-                        View Details
-                      </button>
-                      <button
-                        onClick={() => dismissAlert(alert)}
-                        className="flex-1 sm:flex-none px-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-all"
-                      >
-                        Dismiss
-                      </button>
-                    </>
-                  )}
+                    ))}
+                  </div>
                 </div>
               </div>
             );

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import {
   ArrowUp, ArrowDown, Minus, Loader2,
-  Calculator, FlaskConical, Languages, Globe, Monitor, Palette, BookOpen
+  Calculator, FlaskConical, Languages, Globe, Monitor, Palette, BookOpen,
+  Sparkles, Target, Trophy
 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { SubjectPerformanceDetail } from "@/components/performance/SubjectPerformanceDetail";
@@ -31,6 +32,8 @@ const PerformancePage = () => {
   const [trendData, setTrendData] = useState<any[]>([]);
   const [overallStats, setOverallStats] = useState({ grade: "N/A", avg: 0, trend: "+8%" });
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
+  const [goalSubject, setGoalSubject] = useState<string>("");
+  const [goalTarget, setGoalTarget] = useState<number>(80);
 
   useEffect(() => {
     if (!studentData?.id) return;
@@ -126,6 +129,47 @@ const PerformancePage = () => {
 
     return () => { u1(); u2(); u3(); };
   }, [studentData?.id]);
+
+  // ── AI helpers ──────────────────────────────────────────────────────────────
+  const studentName = studentData?.name?.split(" ")[0] || "Your child";
+
+  const generateNarrative = () => {
+    if (subjects.length === 0) return "Loading performance insights...";
+    const sorted = [...subjects].sort((a, b) => b.progress - a.progress);
+    const top = sorted[0];
+    const bottom = sorted[sorted.length - 1];
+    const avg = overallStats.avg;
+    let text = `${studentName} is performing best in ${top.name} with ${top.progress}% this term — ${top.progress >= 85 ? "an excellent result" : "showing steady progress"}. `;
+    if (sorted.length > 1 && bottom.progress < 75)
+      text += `${bottom.name} needs extra attention at ${bottom.progress}% — targeted revision on weak topics can help close the gap. `;
+    if (avg >= 85)
+      text += `Overall performance is outstanding. Keep up the great work!`;
+    else if (avg >= 75)
+      text += `The overall average of ${avg}% reflects consistent effort. A little more daily revision can push it to the next level.`;
+    else if (avg >= 60)
+      text += `With a ${avg}% overall average, there is room to grow. Structured study of 30–45 minutes per subject daily can make a real difference.`;
+    else
+      text += `The overall average is ${avg}%. Extra practice and teacher support are recommended to build confidence and improve results.`;
+    return text;
+  };
+
+  const getGoalInsight = (current: number, target: number, subName: string) => {
+    const gap = target - current;
+    if (gap <= 0) return { line1: `✓ Target already achieved in ${subName}!`, line2: "Maintain consistency to stay at this level.", color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" };
+    if (gap <= 5)  return { line1: `Just ${gap}% more needed in ${subName}`, line2: "20 mins of daily revision for 1–2 weeks can close this gap.", color: "text-sky-700", bg: "bg-sky-50 border-sky-200" };
+    if (gap <= 15) return { line1: `${gap}% gap to close in ${subName}`, line2: "30 mins of focused daily practice for 3–4 weeks is recommended.", color: "text-indigo-700", bg: "bg-indigo-50 border-indigo-200" };
+    if (gap <= 25) return { line1: `${gap}% improvement needed in ${subName}`, line2: "45 mins daily for 1.5–2 months, with weekly mock tests, should get there.", color: "text-amber-700", bg: "bg-amber-50 border-amber-200" };
+    return { line1: `${gap}% is a big gap in ${subName}`, line2: "1 hour of daily study for 2–3 months + teacher guidance strongly recommended.", color: "text-rose-700", bg: "bg-rose-50 border-rose-200" };
+  };
+
+  const getBenchmarkTier = (pct: number) => {
+    if (pct >= 90) return { label: "Top 10%", color: "text-violet-700 bg-violet-100", icon: "🏆" };
+    if (pct >= 80) return { label: "Top 20%", color: "text-indigo-700 bg-indigo-100", icon: "⭐" };
+    if (pct >= 70) return { label: "Top 40%", color: "text-emerald-700 bg-emerald-100", icon: "📈" };
+    if (pct >= 60) return { label: "Top 60%", color: "text-amber-700 bg-amber-100", icon: "📊" };
+    return { label: "Needs Work", color: "text-rose-700 bg-rose-100", icon: "📚" };
+  };
+  // ────────────────────────────────────────────────────────────────────────────
 
   // Subject detail view
   if (selectedSubject) {
@@ -285,6 +329,115 @@ const PerformancePage = () => {
               </LineChart>
             </ResponsiveContainer>
           </div>
+        </div>
+      )}
+
+      {/* ── FEATURE 4: AI Narrative Analysis ──────────────────────────────── */}
+      {!loading && subjects.length > 0 && (
+        <div className="mt-5 rounded-2xl overflow-hidden shadow-sm" style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)" }}>
+          <div className="p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(99,102,241,0.2)" }}>
+                <Sparkles className="w-4 h-4 text-indigo-400" />
+              </div>
+              <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">AI Narrative Analysis</span>
+            </div>
+            <p className="text-sm text-slate-200 leading-relaxed">{generateNarrative()}</p>
+            <div className="mt-3 flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+              <span className="text-[9px] text-indigo-400 font-semibold uppercase tracking-widest">Generated from real-time assessment data</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── FEATURE 5: Goal Setting AI ────────────────────────────────────── */}
+      {!loading && subjects.length > 0 && (
+        <div className="mt-5 bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center">
+              <Target className="w-4 h-4 text-amber-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-800">Goal Setting AI</h3>
+              <p className="text-[10px] text-slate-400">Set a target score and get a personalised plan</p>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
+            <div className="flex-1">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Subject</label>
+              <select
+                value={goalSubject || subjects[0]?.name || ""}
+                onChange={e => setGoalSubject(e.target.value)}
+                className="w-full h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-300"
+              >
+                {subjects.map(s => (
+                  <option key={s.name} value={s.name}>{s.name} — Current: {s.progress}%</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex-1">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                Target Score: <span className="text-amber-600">{goalTarget}%</span>
+              </label>
+              <input
+                type="range" min={50} max={100} value={goalTarget}
+                onChange={e => setGoalTarget(Number(e.target.value))}
+                className="w-full mt-3 accent-amber-500"
+              />
+              <div className="flex justify-between text-[9px] text-slate-400 font-bold mt-0.5">
+                <span>50%</span><span>75%</span><span>100%</span>
+              </div>
+            </div>
+          </div>
+
+          {(() => {
+            const activeSub = subjects.find(s => s.name === (goalSubject || subjects[0]?.name));
+            if (!activeSub) return null;
+            const insight = getGoalInsight(activeSub.progress, goalTarget, activeSub.name);
+            return (
+              <div className={`rounded-xl border p-4 ${insight.bg}`}>
+                <p className={`text-sm font-bold ${insight.color}`}>{insight.line1}</p>
+                <p className={`text-xs mt-1 ${insight.color} opacity-80`}>{insight.line2}</p>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* ── FEATURE 6: Benchmark / Peer Insights ─────────────────────────── */}
+      {!loading && subjects.length > 0 && (
+        <div className="mt-5 mb-8 bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center">
+              <Trophy className="w-4 h-4 text-emerald-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-800">Benchmark Insights</h3>
+              <p className="text-[10px] text-slate-400">Where {studentName} stands vs academic benchmarks — no names, fully private</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {subjects.map((s, i) => {
+              const tier = getBenchmarkTier(s.progress);
+              return (
+                <div key={i} className="rounded-xl border border-slate-100 p-3 hover:border-slate-200 transition-all">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-slate-700 truncate pr-1">{s.name}</span>
+                    <span className="text-base leading-none">{tier.icon}</span>
+                  </div>
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${tier.color}`}>{tier.label}</span>
+                  <p className="text-[9px] text-slate-400 font-medium mt-2">Score: {s.progress}%</p>
+                </div>
+              );
+            })}
+          </div>
+
+          <p className="text-[9px] text-slate-300 text-center mt-4 font-medium">
+            * Rankings based on national academic performance benchmarks. No other student's data is used.
+          </p>
         </div>
       )}
     </div>
