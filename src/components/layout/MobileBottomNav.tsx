@@ -4,109 +4,44 @@ interface MobileBottomNavProps {
   onMenuClick: () => void;
 }
 
-// Premium custom SVG icons — filled when active, stroke when inactive
-const NavIcons = {
-  Home: ({ filled }: { filled: boolean }) => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-      {filled ? (
-        <>
-          <path d="M10.707 2.293a1 1 0 0 1 1.414 0l8 8A1 1 0 0 1 20 12h-1v8a1 1 0 0 1-1 1h-4v-5H10v5H6a1 1 0 0 1-1-1v-8H4a1 1 0 0 1-.707-1.707l8-8Z" fill="currentColor"/>
-        </>
-      ) : (
-        <path d="M3 12L12 3l9 9M5 10v10a1 1 0 0 0 1 1h4v-5h4v5h4a1 1 0 0 0 1-1V10M9 21V12h6v9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-      )}
-    </svg>
-  ),
-
-  Tests: ({ filled }: { filled: boolean }) => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-      {filled ? (
-        <path d="M4 4a2 2 0 0 1 2-2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4Zm9 0v5h5M8 13h8M8 17h5" fill="currentColor" stroke="white" strokeWidth="1.2" strokeLinecap="round"/>
-      ) : (
-        <>
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-          <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-        </>
-      )}
-    </svg>
-  ),
-
-  Progress: ({ filled }: { filled: boolean }) => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-      {filled ? (
-        <>
-          <rect x="2" y="14" width="4" height="8" rx="1.5" fill="currentColor" opacity="0.6"/>
-          <rect x="9" y="9" width="4" height="13" rx="1.5" fill="currentColor" opacity="0.8"/>
-          <rect x="16" y="4" width="4" height="18" rx="1.5" fill="currentColor"/>
-          <path d="M3 7l5-4 5 4 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          <circle cx="18" cy="2.5" r="1.5" fill="currentColor"/>
-        </>
-      ) : (
-        <>
-          <path d="M18 20V10M12 20V4M6 20v-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-        </>
-      )}
-    </svg>
-  ),
-
-  Alerts: ({ filled }: { filled: boolean }) => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-      {filled ? (
-        <>
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9Z" fill="currentColor"/>
-          <path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
-        </>
-      ) : (
-        <>
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-          <path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-        </>
-      )}
-    </svg>
-  ),
-
-  Messages: ({ filled }: { filled: boolean }) => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-      {filled ? (
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10Z" fill="currentColor"/>
-      ) : (
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-      )}
-    </svg>
-  ),
-
-  Menu: () => (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-      <circle cx="5" cy="12" r="1.5" fill="currentColor"/>
-      <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
-      <circle cx="19" cy="12" r="1.5" fill="currentColor"/>
-    </svg>
-  ),
-};
-
 const bottomNavItems = [
-  { key: "Home" as const, label: "Home", path: "/" },
-  { key: "Tests" as const, label: "Tests", path: "/tests" },
-  { key: "Progress" as const, label: "Progress", path: "/performance" },
-  { key: "Alerts" as const, label: "Alerts", path: "/alerts", badge: 3 },
-  { key: "Messages" as const, label: "Messages", path: "/teacher-notes" },
+  { key: "Home", label: "Home", path: "/" },
+  { key: "Tests", label: "Tests", path: "/tests" },
+  { key: "Progress", label: "Progress", path: "/performance" },
+  { key: "Alerts", label: "Alerts", path: "/alerts" },
+  { key: "Messages", label: "Messages", path: "/teacher-notes" },
 ];
 
-// Gradient map per tab
-const activeGradient: Record<string, string> = {
-  Home:     "from-violet-500 to-indigo-600",
-  Tests:    "from-blue-500 to-cyan-500",
-  Progress: "from-emerald-500 to-teal-500",
-  Alerts:   "from-rose-500 to-pink-500",
-  Messages: "from-amber-400 to-orange-500",
-};
-
-const activeText: Record<string, string> = {
-  Home:     "text-indigo-600",
-  Tests:    "text-cyan-600",
-  Progress: "text-emerald-600",
-  Alerts:   "text-rose-500",
-  Messages: "text-amber-500",
+const NavIcons: Record<string, (props: { active: boolean }) => JSX.Element> = {
+  Home: ({ active }) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill={active ? "#007AFF" : "none"} stroke={active ? "#007AFF" : "#8E8E93"} strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
+    </svg>
+  ),
+  Tests: ({ active }) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? "#007AFF" : "#8E8E93"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+    </svg>
+  ),
+  Progress: ({ active }) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? "#007AFF" : "#8E8E93"} strokeWidth="1.8" strokeLinecap="round">
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
+    </svg>
+  ),
+  Alerts: ({ active }) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? "#007AFF" : "#8E8E93"} strokeWidth="1.8" strokeLinecap="round">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  ),
+  Messages: ({ active }) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? "#007AFF" : "#8E8E93"} strokeWidth="1.8" strokeLinecap="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  ),
 };
 
 export const MobileBottomNav = ({ onMenuClick }: MobileBottomNavProps) => {
@@ -117,60 +52,37 @@ export const MobileBottomNav = ({ onMenuClick }: MobileBottomNavProps) => {
       className="fixed bottom-0 left-0 right-0 lg:hidden z-[100]"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      {/* Frosted glass bar */}
-      <div className="mx-3 mb-3 rounded-3xl bg-white/75 backdrop-blur-xl border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.12)] flex items-center h-[68px] px-1">
-
-        {bottomNavItems.map(({ key, label, path, badge }) => {
+      <div
+        className="flex items-start justify-around pt-[10px]"
+        style={{
+          height: 82,
+          background: "rgba(249,249,249,0.92)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          borderTop: "0.5px solid rgba(60,60,67,0.12)",
+        }}
+      >
+        {bottomNavItems.map(({ key, label, path }) => {
           const isActive = location.pathname === path;
           const IconComp = NavIcons[key];
           return (
             <Link
               key={path}
               to={path}
-              className="flex-1 flex flex-col items-center justify-center gap-[3px] relative transition-all duration-200"
+              className="flex flex-col items-center gap-1 min-w-[60px] px-3 py-1 active:scale-95 transition-transform"
             >
-              {/* Floating pill behind active icon */}
-              <div className={`relative flex items-center justify-center transition-all duration-300 ${
-                isActive ? "w-12 h-9 rounded-2xl" : "w-10 h-9"
-              }`}>
-                {isActive && (
-                  <div className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${activeGradient[key]} opacity-15`} />
-                )}
-
-                <div className={`transition-all duration-200 ${isActive ? "scale-110" : "scale-100"} relative`}>
-                  <div className={isActive ? activeText[key] : "text-slate-400"}>
-                    <IconComp filled={isActive} />
-                  </div>
-
-                  {/* Badge */}
-                  {badge && (
-                    <span className="absolute -top-1.5 -right-2 min-w-[17px] h-[17px] bg-red-500 rounded-full text-[9px] font-black flex items-center justify-center text-white border-[1.5px] border-white shadow-sm">
-                      {badge}
-                    </span>
-                  )}
-                </div>
+              <div className="w-7 h-7 flex items-center justify-center relative">
+                <IconComp active={isActive} />
               </div>
-
-              <span className={`text-[9px] font-bold tracking-wide transition-all duration-200 ${
-                isActive ? `${activeText[key]} font-extrabold` : "text-slate-400"
-              }`}>
+              <span
+                className="text-[10px] font-medium"
+                style={{ color: isActive ? "#007AFF" : "#AEAEB2" }}
+              >
                 {label}
               </span>
             </Link>
           );
         })}
-
-        {/* Menu button */}
-        <button
-          onClick={onMenuClick}
-          className="flex-1 flex flex-col items-center justify-center gap-[3px] text-slate-400 transition-all active:scale-95"
-        >
-          <div className="w-10 h-9 rounded-2xl bg-slate-100/80 flex items-center justify-center">
-            <NavIcons.Menu />
-          </div>
-          <span className="text-[9px] font-bold tracking-wide text-slate-400">Menu</span>
-        </button>
-
       </div>
     </nav>
   );

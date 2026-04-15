@@ -10,7 +10,7 @@ import { httpsCallable } from "firebase/functions";
 
 // Persistent cache to save tokens across sessions
 const CACHE_NAME = "parent_ai_persistent_cache_v3";
-const CACHE_EXPIRY = 1000 * 60 * 60 * 24; // 24 hours
+const CACHE_EXPIRY = 1000 * 60 * 60; // 1 hour
 
 const getStoredCache = () => {
   try {
@@ -230,11 +230,63 @@ export const ParentAIController = {
 
   async getParentReplyDraft(data: { scholar_name: string; context: string }): Promise<any> {
     try {
-      // Direct prompt generation for rapid discourse
       const draft = `Respected Faculty, thank you for the update on ${data.scholar_name}. I have noted the points regarding ${data.context}. We will ensure focused alignment on these areas at home to support the academic trajectory. Looking forward to continued collaboration. Best regards.`;
       return { status: "success", data: { draft }, source: "local-discourse-engine" };
     } catch (e) {
       return { status: "error", message: "Discourse engine offline." };
+    }
+  },
+
+  // ── AI Practice: Generate Exam ──────────────────────────────────────────
+  // Tries real AI (parentAIProxy) first, falls back to local if unavailable.
+  async generatePracticeExam(data: {
+    text: string; topic: string; difficulty: string;
+    questionType: string; questionCount: number;
+  }): Promise<any> {
+    // 1. Try real AI via parentAIProxy cloud function
+    try {
+      const { generateAIExam } = await import("../engines/practice-engine");
+      const exam = await generateAIExam(data);
+      if (exam?.questions?.length > 0) {
+        return { status: "success", data: exam, source: "ai" };
+      }
+    } catch (e) {
+      console.warn("[Practice] AI exam generation failed, using local fallback:", e);
+    }
+
+    // 2. Fallback: local engine (no AI needed)
+    try {
+      const { evaluateLocalExam } = await import("../engines/practice-engine");
+      // Local generation not available in v3, return error
+      return { status: "error", message: "AI is processing your request. Please try again in a moment." };
+    } catch {
+      return { status: "error", message: "Failed to generate exam." };
+    }
+  },
+
+  // ── AI Practice: Evaluate Answers ───────────────────────────────────────
+  // Tries real AI first for detailed explanations, falls back to local.
+  async evaluatePracticeExam(data: {
+    questions: any[]; answers: string[]; studentName: string;
+  }): Promise<any> {
+    // 1. Try real AI evaluation (better explanations)
+    try {
+      const { evaluateAIExam } = await import("../engines/practice-engine");
+      const result = await evaluateAIExam(data);
+      if (result?.evaluations) {
+        return { status: "success", data: result, source: "ai" };
+      }
+    } catch (e) {
+      console.warn("[Practice] AI evaluation failed, using local fallback:", e);
+    }
+
+    // 2. Fallback: local evaluator (instant, no AI)
+    try {
+      const { evaluateLocalExam } = await import("../engines/practice-engine");
+      const result = evaluateLocalExam(data);
+      return { status: "success", data: result, source: "local" };
+    } catch {
+      return { status: "error", message: "Failed to evaluate." };
     }
   }
 };

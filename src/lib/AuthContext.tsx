@@ -47,6 +47,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               if (docSnap.exists()) {
                 const data = docSnap.data();
 
+                // Block deactivated / suspended accounts
+                if (data.status === "Deactivated" || data.status === "Suspended" || data.status === "Blocked") {
+                   await signOut(auth);
+                   setUser(null);
+                   setStudentData(null);
+                   setError("Your account has been deactivated. Please contact school administration.");
+                   setLoading(false);
+                   return;
+                }
+
                 if (data.status === "Invited") {
                    updateDoc(doc(db, "students", studentId), { status: "Active" });
                 }
@@ -101,6 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
+    localStorage.removeItem("parent_ai_persistent_cache_v3");
     await signOut(auth);
   };
 

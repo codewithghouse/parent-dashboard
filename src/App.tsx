@@ -10,6 +10,7 @@ import { ParentLayout } from "./components/layout/ParentLayout";
 import { InstallBanner } from "./components/InstallBanner";
 import { PWAUpdatePrompt } from "./components/PWAUpdatePrompt";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { OfflineBanner } from "./components/OfflineBanner";
 
 // ── Lazy-loaded pages (code splitting) ──────────────────────────────────────
 const DashboardPage       = lazy(() => import("./pages/DashboardPage"));
@@ -28,6 +29,7 @@ const ReportsPage         = lazy(() => import("./pages/ReportsPage"));
 const ClassesPage         = lazy(() => import("./pages/ClassesPage"));
 const FeesPage            = lazy(() => import("./pages/FeesPage"));
 const TimetablePage       = lazy(() => import("./pages/TimetablePage"));
+const AIPracticePage      = lazy(() => import("./pages/AIPracticePage"));
 const NotFound            = lazy(() => import("./pages/NotFound"));
 const Login               = lazy(() => import("./pages/Login"));
 
@@ -98,6 +100,7 @@ const AppRoutes = () => {
           <Route path="/alerts"        element={<AlertsPage />} />
           <Route path="/fees"          element={<FeesPage />} />
           <Route path="/timetable"     element={<TimetablePage />} />
+          <Route path="/ai-practice"   element={<AIPracticePage />} />
           <Route path="/settings"      element={<SettingsPage />} />
         </Route>
         <Route path="*" element={<NotFound />} />
@@ -113,6 +116,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <OfflineBanner />
           <AppRoutes />
           {/* PWA: install banner + update prompt (outside routes so always visible) */}
           <InstallBanner />

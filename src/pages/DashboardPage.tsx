@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/AuthContext";
-import { CheckCircle, AlertCircle, Calendar, Star, Clock, Loader2, ShieldCheck, BrainCircuit, Sparkles, TrendingUp, BookOpen, Lightbulb } from "lucide-react";
+import { CheckCircle, AlertCircle, Calendar, Star, Clock, Loader2, ShieldCheck, BrainCircuit, Sparkles, TrendingUp, BookOpen, Lightbulb, Download } from "lucide-react";
 import { ParentAIController } from "../ai/controller/ai-controller";
 import { generateWeeklyReport } from "../ai/engines/weekly-report-engine";
 import WeeklyReportPDF from "../components/WeeklyReportPDF";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, getDocs, Timestamp } from "firebase/firestore";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 function timeAgo(date: Date): string {
   const diff = (Date.now() - date.getTime()) / 1000;
@@ -147,6 +148,7 @@ function ScoreArc({ pct, color, size = 80 }: { pct: number; color: string; size?
 
 const DashboardPage = () => {
   const { studentData, user } = useAuth();
+  const isMobile = useIsMobile();
   const [aiInsights, setAiInsights] = useState<any>(null);
   const [liveStats, setLiveStats] = useState({
     attendance: 100,
@@ -451,6 +453,456 @@ const DashboardPage = () => {
   const weekConfig = getWeekConfig();
   const isPrevWeekReport = !!weeklyReport && !weekConfig.canGenerate && !localStorage.getItem(weekConfig.thisWeekKey);
 
+  /* ═══════════════════════════════════════════════════════════════
+     MOBILE — Premium iOS-style UI
+     ═══════════════════════════════════════════════════════════════ */
+  if (isMobile) {
+    const scoreColor = liveStats.avgScore >= 80 ? "#34C759" : liveStats.avgScore >= 60 ? "#FF9500" : "#FF3B30";
+    const scorePct = Math.min(liveStats.avgScore, 100);
+    const attColor = liveStats.attendance >= 85 ? "#FF9500" : liveStats.attendance >= 70 ? "#FF9500" : "#FF3B30";
+    const avgScoreColor = liveStats.avgScore >= 80 ? "#34C759" : liveStats.avgScore >= 60 ? "#FF9500" : "#FF3B30";
+    const ringR = 38, ringCirc = 2 * Math.PI * ringR;
+    const ringOffset = ringCirc - (scorePct / 100) * ringCirc;
+
+    return (
+      <div className="animate-in fade-in duration-500 -mx-3 -mt-3 md:mx-0 md:mt-0" style={{ background: "#F2F2F7", minHeight: "100vh" }}>
+
+        {/* ── Greeting ── */}
+        <div className="px-5 pt-5 pb-1">
+          <h1 className="text-[28px] font-bold tracking-tight leading-[1.15]" style={{ color: "#1C1C1E", letterSpacing: "-0.5px" }}>
+            {greeting},<br />{parentFirstName}! 👋
+          </h1>
+          <p className="text-[15px] mt-1" style={{ color: "#8E8E93" }}>Here's how {childFirstName} is doing today</p>
+        </div>
+
+        {/* ── Academic Health Card ── */}
+        <div className="mx-5 mt-5 bg-white rounded-[24px] p-5 relative overflow-hidden" style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}>
+          <div className="absolute -top-[30px] -right-[30px] w-[140px] h-[140px] rounded-full" style={{ background: "radial-gradient(circle, rgba(0,122,255,0.05) 0%, transparent 70%)" }} />
+          <div className="relative z-10">
+            <h3 className="text-[19px] font-bold tracking-tight" style={{ color: "#1C1C1E" }}>Academic Health</h3>
+            <p className="text-[13px] mt-0.5" style={{ color: "#8E8E93" }}>Overall performance indicator</p>
+            <div className="inline-flex items-center gap-[5px] mt-3 px-3 py-[5px] rounded-full text-[13px] font-semibold"
+              style={{
+                background: liveStats.trendPct >= 0 ? "#E8F9ED" : "#FFEBEA",
+                color: liveStats.trendPct >= 0 ? "#1A7A36" : "#FF3B30"
+              }}>
+              <TrendingUp className={`w-[13px] h-[13px] ${liveStats.trendPct < 0 ? "rotate-180" : ""}`} />
+              {liveStats.trendPct === 0 ? "Stable performance" : liveStats.trendPct > 0 ? `Improved by ${liveStats.trendPct}%` : `Declined by ${Math.abs(liveStats.trendPct)}%`}
+            </div>
+            <div className="flex items-center justify-between mt-5">
+              <div>
+                <div className="text-[40px] font-bold leading-none" style={{ color: scoreColor, letterSpacing: "-1px" }}>
+                  {liveStats.avgScore > 0 ? `${liveStats.avgScore}%` : "—"}
+                </div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.06em] mt-1" style={{ color: "#AEAEB2" }}>
+                  {liveStats.avgScore >= 75 ? "Good Standing" : liveStats.avgScore > 0 ? "Needs Attention" : "No data yet"}
+                </div>
+              </div>
+              <div className="relative w-[88px] h-[88px]">
+                <svg viewBox="0 0 88 88" width="88" height="88" style={{ transform: "rotate(-90deg)" }}>
+                  <circle cx="44" cy="44" r={ringR} fill="none" stroke="#F2F2F7" strokeWidth="6" />
+                  <circle cx="44" cy="44" r={ringR} fill="none" stroke={scoreColor} strokeWidth="6" strokeLinecap="round"
+                    strokeDasharray={ringCirc} strokeDashoffset={ringOffset}
+                    style={{ transition: "stroke-dashoffset 1s cubic-bezier(0.4,0,0.2,1)" }} />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center text-[15px] font-bold" style={{ color: "#1C1C1E" }}>
+                  {liveStats.avgScore > 0 ? `${liveStats.avgScore}%` : "—"}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Stats Grid 2×2 ── */}
+        <div className="grid grid-cols-2 gap-3 mx-5 mt-3">
+          {[
+            { icon: CheckCircle, iconColor: "#34C759", bg: "#E8F9ED", label: "Attendance", value: `${liveStats.attendance}%`, status: liveStats.attendance >= 85 ? "On track ✓" : "Below target", statusColor: "#34C759" },
+            { icon: AlertCircle, iconColor: "#FF9500", bg: "#FFF3E0", label: "Pending Work", value: liveStats.pending.toString(), status: "Due this week", statusColor: "#FF9500" },
+            { icon: Calendar, iconColor: "#AF52DE", bg: "#F4EBFC", label: "Upcoming Tests", value: liveStats.tests.toString(), status: "Next 7 days", statusColor: "#8E8E93" },
+            { icon: Star, iconColor: "#007AFF", bg: "#E8F2FF", label: "Recent Grade", value: liveStats.recentGrade, status: liveStats.recentSubject, statusColor: "#8E8E93" },
+          ].map(({ icon: Icon, iconColor, bg, label, value, status, statusColor }) => (
+            <div key={label} className="bg-white rounded-[20px] p-4" style={{ boxShadow: "0 2px 10px rgba(0,0,0,0.06)" }}>
+              <div className="w-9 h-9 rounded-[10px] flex items-center justify-center mb-3" style={{ background: bg }}>
+                <Icon className="w-[18px] h-[18px]" style={{ color: iconColor }} />
+              </div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.06em]" style={{ color: "#AEAEB2" }}>{label}</div>
+              <div className="text-[26px] font-bold mt-0.5 leading-[1.1]" style={{ color: "#1C1C1E", letterSpacing: "-0.5px" }}>{value}</div>
+              <div className="text-[13px] font-medium mt-1" style={{ color: statusColor }}>{status}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── AI Live Summary Dark Card ── */}
+        <div className="mx-5 mt-4 rounded-[24px] overflow-hidden" style={{ background: "#1C1C1E", boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
+          {/* Header */}
+          <div className="flex items-center justify-between px-[18px] pt-4 pb-3" style={{ borderBottom: "0.5px solid rgba(255,255,255,0.08)" }}>
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+              <span className="text-[12px] font-bold uppercase tracking-[0.08em]" style={{ color: "rgba(255,255,255,0.9)" }}>EduIntellect AI · Live</span>
+            </div>
+            <div className="flex items-center gap-[5px] px-[10px] py-1 rounded-full" style={{ background: "rgba(52,199,89,0.15)", border: "1px solid rgba(52,199,89,0.3)" }}>
+              <div className="w-[6px] h-[6px] rounded-full animate-pulse" style={{ background: "#34C759" }} />
+              <span className="text-[11px] font-bold tracking-[0.04em]" style={{ color: "#34C759" }}>LIVE</span>
+            </div>
+          </div>
+
+          {dataLoading ? (
+            <div className="flex items-center gap-3 py-10 justify-center">
+              <Loader2 className="w-5 h-5 animate-spin" style={{ color: "rgba(255,255,255,0.3)" }} />
+              <span className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>Loading {childFirstName}'s data...</span>
+            </div>
+          ) : (
+            <>
+              {/* 2×2 Metrics Grid */}
+              <div className="grid grid-cols-2" style={{ gap: "1px", background: "rgba(255,255,255,0.06)" }}>
+                {/* Attendance */}
+                <div className="p-4 flex flex-col gap-[10px]" style={{ background: "#2C2C2E" }}>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "rgba(255,255,255,0.4)" }}>Attendance</span>
+                  <div className="flex items-center gap-[10px]">
+                    <DonutRing pct={liveStats.attendance} color={attColor} size={60} stroke={5} />
+                    <div className="flex flex-col gap-[2px]">
+                      <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.4)" }}>Target</span>
+                      <span className="text-[11px] font-semibold" style={{ color: "rgba(255,255,255,0.7)" }}>85%</span>
+                      <div className="w-[60px] h-[3px] rounded-full mt-1 overflow-hidden" style={{ background: "rgba(255,255,255,0.1)" }}>
+                        <div className="h-full rounded-full" style={{ width: `${liveStats.attendance}%`, background: attColor }} />
+                      </div>
+                      <div className="inline-flex items-center gap-1 px-2 py-[3px] rounded-full mt-[6px] w-fit text-[10px] font-bold"
+                        style={{ background: liveStats.attendance >= 85 ? "rgba(52,199,89,0.15)" : "rgba(255,59,48,0.15)", color: liveStats.attendance >= 85 ? "#34C759" : "#FF3B30" }}>
+                        {liveStats.attendance >= 85 ? "✓ On Track" : "Needs Work"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Avg Score */}
+                <div className="p-4 flex flex-col gap-[10px]" style={{ background: "#2C2C2E" }}>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "rgba(255,255,255,0.4)" }}>Avg Score</span>
+                  <div className="flex items-center gap-[10px]">
+                    <DonutRing pct={liveStats.avgScore} color={avgScoreColor} size={60} stroke={5} />
+                    <div>
+                      <div className="inline-flex items-center px-2 py-[3px] rounded-full text-[10px] font-bold"
+                        style={{ background: liveStats.avgScore >= 60 ? "rgba(52,199,89,0.15)" : "rgba(255,59,48,0.15)", color: liveStats.avgScore >= 60 ? "#34C759" : "#FF3B30" }}>
+                        {liveStats.avgScore >= 80 ? "Excellent" : liveStats.avgScore >= 60 ? "Good" : liveStats.avgScore > 0 ? "Needs Work" : "No Data"}
+                      </div>
+                      <div className="flex gap-[5px] mt-2">
+                        {["C", "B", "A", "A+"].map(g => {
+                          const active = liveStats.avgScore >= (g === "A+" ? 90 : g === "A" ? 80 : g === "B" ? 70 : 0);
+                          return (
+                            <div key={g} className="w-6 h-6 rounded-[6px] flex items-center justify-center text-[11px] font-bold"
+                              style={{ background: active ? "rgba(255,59,48,0.3)" : "rgba(255,255,255,0.07)", color: active ? "#FF6B6B" : "rgba(255,255,255,0.4)" }}>
+                              {g}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Assignments */}
+                <div className="p-4 flex flex-col gap-[10px]" style={{ background: "#2C2C2E" }}>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "rgba(255,255,255,0.4)" }}>Assignments</span>
+                  <div className="text-[36px] font-bold leading-none" style={{ color: "rgba(255,255,255,0.9)" }}>{liveStats.pending}</div>
+                  <div className="text-[12px]" style={{ color: "rgba(255,255,255,0.4)" }}>pending</div>
+                  <div className="inline-flex items-center gap-1 px-2 py-[3px] rounded-full mt-1 w-fit text-[10px] font-bold"
+                    style={{ background: liveStats.pending === 0 ? "rgba(52,199,89,0.15)" : "rgba(255,149,0,0.15)", color: liveStats.pending === 0 ? "#34C759" : "#FF9500" }}>
+                    {liveStats.pending === 0 ? "✓ All Done" : `${liveStats.pending} to complete`}
+                  </div>
+                </div>
+
+                {/* Recent Test */}
+                <div className="p-4 flex flex-col gap-[10px]" style={{ background: "#2C2C2E" }}>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "rgba(255,255,255,0.4)" }}>Recent Test</span>
+                  <div className="text-[36px] font-bold leading-none" style={{ color: "rgba(255,255,255,0.9)" }}>
+                    {liveStats.recentGrade !== "N/A" ? liveStats.recentGrade : "—"}
+                  </div>
+                  <div className="text-[11px]" style={{ color: "rgba(255,255,255,0.4)" }}>{liveStats.recentSubject}</div>
+                  <div className="flex gap-[5px] mt-1">
+                    {["C", "B", "A", "A+"].map(g => {
+                      const gradeSteps = ["C", "B", "A", "A+"];
+                      const gradeIdx = gradeSteps.indexOf(liveStats.recentGrade);
+                      const idx = gradeSteps.indexOf(g);
+                      const active = idx <= gradeIdx && gradeIdx >= 0;
+                      return (
+                        <div key={g} className="w-6 h-6 rounded-[6px] flex items-center justify-center text-[11px] font-bold"
+                          style={{ background: active ? "rgba(255,59,48,0.3)" : "rgba(255,255,255,0.07)", color: active ? "#FF6B6B" : "rgba(255,255,255,0.4)" }}>
+                          {g}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* AI Insight Strip */}
+              <div className="px-[18px] py-[14px] flex items-start gap-[10px]" style={{ borderTop: "0.5px solid rgba(255,255,255,0.06)" }}>
+                <BrainCircuit className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "rgba(255,255,255,0.5)" }} />
+                {aiInsights?.child_summary_narrative ? (
+                  <p className="text-[13px] leading-[1.5]" style={{ color: "rgba(255,255,255,0.6)", letterSpacing: "-0.1px" }}>
+                    <span style={{ color: "rgba(255,255,255,0.9)", fontWeight: 500 }}>{studentData?.name}</span>{" "}
+                    {aiInsights.child_summary_narrative.replace(studentData?.name || "", "").trim()}
+                  </p>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-3 h-3 animate-spin" style={{ color: "rgba(255,255,255,0.3)" }} />
+                    <p className="text-[11px] italic" style={{ color: "rgba(255,255,255,0.4)" }}>AI summary generating...</p>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* ── Profile Card ── */}
+        <div className="mx-5 mt-4 bg-white rounded-[24px] p-5" style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}>
+          <div className="w-16 h-16 rounded-[20px] flex items-center justify-center text-[22px] font-bold text-white mb-[14px]"
+            style={{ background: "linear-gradient(135deg, #1C3A8A, #3B5FD9)", boxShadow: "0 4px 16px rgba(28,58,138,0.3)" }}>
+            {studentInitials}
+          </div>
+          <div className="text-[22px] font-bold tracking-tight" style={{ color: "#1C1C1E", letterSpacing: "-0.4px" }}>{studentData?.name || "Student"}</div>
+          <div className="text-[14px] mt-0.5" style={{ color: "#8E8E93" }}>
+            {studentMeta.className !== "—" ? `Grade ${studentMeta.className}` : studentData?.grade ? `Grade ${studentData.grade}` : ""}
+            {teacherInfo.name !== "—" ? ` — ${teacherInfo.name}` : ""}
+          </div>
+          <div className="grid grid-cols-2 mt-4 rounded-[12px] overflow-hidden" style={{ gap: "1px", background: "rgba(60,60,67,0.12)" }}>
+            <div className="px-[14px] py-3" style={{ background: "#F8F8FA" }}>
+              <div className="text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: "#AEAEB2" }}>Class Teacher</div>
+              <div className="text-[15px] font-semibold mt-0.5" style={{ color: "#1C1C1E" }}>{teacherInfo.name}</div>
+            </div>
+            <div className="px-[14px] py-3" style={{ background: "#F8F8FA" }}>
+              <div className="text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: "#AEAEB2" }}>Academic Year</div>
+              <div className="text-[15px] font-semibold mt-0.5" style={{ color: "#1C1C1E" }}>2025–26</div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Recent Alerts ── */}
+        <div className="mx-5 mt-3 bg-white rounded-[20px] p-5" style={{ boxShadow: "0 2px 10px rgba(0,0,0,0.05)" }}>
+          <h3 className="text-[19px] font-bold mb-5" style={{ color: "#1C1C1E" }}>Recent Alerts</h3>
+          {recentAlerts.length > 0 ? (
+            <div className="space-y-3">
+              {recentAlerts.map(alert => (
+                <div key={alert.id} className={`flex items-start gap-3 p-3 rounded-xl ${alert.urgent ? "bg-amber-50" : "bg-emerald-50"}`}>
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${alert.urgent ? "bg-amber-100 text-amber-600" : "bg-emerald-100 text-emerald-600"}`}>
+                    {alert.urgent ? <Clock className="w-3.5 h-3.5" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium leading-snug" style={{ color: "#1C1C1E" }}>{alert.title}</p>
+                    <p className="text-xs mt-0.5" style={{ color: "#8E8E93" }}>{timeAgo(alert.time)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-[10px] py-5">
+              <div className="w-14 h-14 rounded-[18px] flex items-center justify-center" style={{ background: "#F2F2F7" }}>
+                <ShieldCheck className="w-[26px] h-[26px]" style={{ color: "#AEAEB2" }} />
+              </div>
+              <p className="text-[15px]" style={{ color: "#8E8E93" }}>No alerts right now</p>
+            </div>
+          )}
+        </div>
+
+        {/* ── Weekly AI Report Card ── */}
+        <div className="mx-5 mt-4 bg-white rounded-[20px] p-4" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-[10px]">
+              <div className="w-[38px] h-[38px] rounded-[10px] flex items-center justify-center" style={{ background: "#E8F2FF" }}>
+                <BookOpen className="w-[18px] h-[18px]" style={{ color: "#007AFF" }} />
+              </div>
+              <div>
+                <div className="text-[16px] font-bold" style={{ color: "#1C1C1E", letterSpacing: "-0.2px" }}>Weekly AI Report</div>
+                <div className="text-[12px] mt-[1px]" style={{ color: "#8E8E93" }}>
+                  {isPrevWeekReport ? "Last week's report" : weekConfig.canGenerate ? "Generate this week's report" : "New report available Friday"}
+                </div>
+              </div>
+            </div>
+            {weekConfig.canGenerate && !weeklyReport ? (
+              <button onClick={handleGenerateWeeklyReport} disabled={weeklyLoading || dataLoading}
+                className="flex items-center gap-2 px-3 py-2 rounded-[10px] text-[12px] font-semibold text-white disabled:opacity-50"
+                style={{ background: "#007AFF" }}>
+                {weeklyLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                {weeklyLoading ? "..." : "Generate"}
+              </button>
+            ) : !weekConfig.canGenerate ? (
+              <div className="flex items-center gap-1 px-[10px] py-[6px] rounded-[10px] text-[11px] font-semibold" style={{ background: "#F2F2F7", color: "#8E8E93" }}>
+                <Clock className="w-[11px] h-[11px]" />
+                Opens Fri{weekConfig.daysLeft > 0 ? ` · ${weekConfig.daysLeft}d` : ""}
+              </div>
+            ) : null}
+          </div>
+
+          {weeklyLoading && (
+            <div className="flex flex-col items-center py-6 gap-3">
+              <Loader2 className="w-6 h-6 animate-spin" style={{ color: "#007AFF" }} />
+              <p className="text-xs" style={{ color: "#8E8E93" }}>Analysing {childFirstName}'s week...</p>
+            </div>
+          )}
+
+          {!weeklyReport && !weeklyLoading && (
+            <div className="flex items-start gap-2 mt-[14px] pt-[14px]" style={{ borderTop: "0.5px solid rgba(60,60,67,0.12)" }}>
+              <Clock className="w-[14px] h-[14px] shrink-0 mt-0.5" style={{ color: "#AEAEB2" }} />
+              <p className="text-[13px] leading-[1.5]" style={{ color: "#8E8E93" }}>
+                {weekConfig.canGenerate
+                  ? `Tap "Generate" to get ${childFirstName}'s weekly digest.`
+                  : `You can generate ${childFirstName}'s weekly report every Friday, Saturday & Sunday.`}
+              </p>
+            </div>
+          )}
+
+          {/* Report exists — show previous week note */}
+          {weeklyReport && !weeklyLoading && isPrevWeekReport && (
+            <div className="flex items-start gap-2 mt-[14px] pt-[14px]" style={{ borderTop: "0.5px solid rgba(60,60,67,0.12)" }}>
+              <Clock className="w-[14px] h-[14px] shrink-0 mt-0.5" style={{ color: "#AEAEB2" }} />
+              <p className="text-[13px] leading-[1.5]" style={{ color: "#8E8E93" }}>
+                This is last week's report. A new report can be generated this Friday.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* ── AI Message (when report exists) ── */}
+        {weeklyReport && !weeklyLoading && (
+          <div className="mx-5 mt-3 rounded-[20px] p-4" style={{ background: "linear-gradient(135deg, #EEF2FF, #E8F2FF)", border: "1px solid rgba(99,102,241,0.12)" }}>
+            <div className="flex items-center gap-[6px] text-[11px] font-bold uppercase tracking-[0.08em] mb-[10px]" style={{ color: "#5B5BD6" }}>
+              <Sparkles className="w-[13px] h-[13px]" />
+              AI Message
+            </div>
+            <p className="text-[14px] leading-[1.65] font-normal" style={{ color: "#1C1C1E", letterSpacing: "-0.1px" }}>
+              {weeklyReport.message}
+            </p>
+          </div>
+        )}
+
+        {/* ── Detail Sections (when report exists) ── */}
+        {weeklyReport && !weeklyLoading && (
+          <div className="mx-5 mt-3 bg-white rounded-[20px] overflow-hidden" style={{ boxShadow: "0 2px 10px rgba(0,0,0,0.05)" }}>
+            {[
+              { tag: "Attendance", text: weeklyReport.attendance_summary },
+              { tag: "Tests", text: weeklyReport.test_analysis },
+              { tag: "Assignments", text: weeklyReport.assignment_status },
+            ].map(({ tag, text }, i, arr) => (
+              <div key={tag} className="px-[18px] py-[14px] flex flex-col gap-1"
+                style={{ borderBottom: i < arr.length - 1 ? "0.5px solid rgba(60,60,67,0.12)" : "none" }}>
+                <span className="text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: "#AEAEB2" }}>{tag}</span>
+                <p className="text-[14px] leading-[1.5]" style={{ color: "#1C1C1E" }}>{text}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── Performance Alert (when report exists) ── */}
+        {weeklyReport?.overall_performance && (
+          <div className="mx-5 mt-3 rounded-[20px] p-4 flex items-start justify-between gap-3"
+            style={{ background: "#FFF3E0", border: "1px solid rgba(255,149,0,0.15)" }}>
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-[0.08em] mb-1" style={{ color: "#C45C00" }}>Overall Performance</div>
+              <div className="text-[17px] font-bold" style={{ color: "#1C1C1E", letterSpacing: "-0.3px" }}>{weeklyReport.overall_performance.verdict}</div>
+              <p className="text-[13px] mt-1 leading-[1.5]" style={{ color: "rgba(0,0,0,0.55)" }}>{weeklyReport.overall_performance.score_context}</p>
+            </div>
+            <div className="px-[14px] py-2 bg-white rounded-[12px] flex items-center gap-[5px] text-[13px] font-bold shrink-0"
+              style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.08)", color: weeklyReport.overall_performance.trend === "Improving" ? "#34C759" : weeklyReport.overall_performance.trend === "Stable" ? "#34C759" : "#FF9500" }}>
+              <TrendingUp className={`w-3 h-3 ${weeklyReport.overall_performance.trend === "Declining" ? "rotate-180" : ""}`} />
+              {weeklyReport.overall_performance.trend}
+            </div>
+          </div>
+        )}
+
+        {/* ── AI Improvement Tips (when report exists) ── */}
+        {weeklyReport?.improvement_tips?.length > 0 && (
+          <>
+            <div className="px-5 pt-5 pb-2 text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color: "#AEAEB2" }}>
+              AI Improvement Tips
+            </div>
+            {weeklyReport.improvement_tips.map((t: { tip: string; reason: string }, i: number) => (
+              <div key={i} className="mx-5 mb-[10px] bg-white rounded-[20px] p-4 flex items-start gap-3" style={{ boxShadow: "0 2px 10px rgba(0,0,0,0.05)" }}>
+                <div className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0 text-[18px]"
+                  style={{ background: "#FFCC00" }}>
+                  {i === 0 ? "💡" : "🎯"}
+                </div>
+                <div>
+                  <div className="text-[15px] font-semibold" style={{ color: "#1C1C1E", letterSpacing: "-0.2px" }}>{t.tip}</div>
+                  <p className="text-[13px] mt-[3px] leading-[1.45]" style={{ color: "#8E8E93" }}>{t.reason}</p>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* ── Download PDF Button (when report exists) ── */}
+        {weeklyReport && !weeklyLoading && (
+          <button onClick={handleDownloadPDF} disabled={pdfDownloading}
+            className="mx-5 mt-2 w-[calc(100%-40px)] rounded-[16px] py-4 flex items-center justify-center gap-2 text-[16px] font-bold text-white disabled:opacity-50 active:scale-[0.97] transition-transform"
+            style={{ background: "#1C1C1E", boxShadow: "0 4px 20px rgba(0,0,0,0.2)", letterSpacing: "-0.2px" }}>
+            {pdfDownloading ? (
+              <><Loader2 className="w-[18px] h-[18px] animate-spin" /> Generating PDF...</>
+            ) : (
+              <><Download className="w-[18px] h-[18px]" /> Download PDF Report</>
+            )}
+          </button>
+        )}
+
+        {/* ── AI Parenting Tips ── */}
+        <div className="mx-5 mt-5 mb-2">
+          {/* Header */}
+          <div className="flex items-center gap-[10px] bg-white rounded-t-[20px] px-[18px] py-4" style={{ borderBottom: "0.5px solid rgba(60,60,67,0.12)", boxShadow: "0 2px 10px rgba(0,0,0,0.05)" }}>
+            <span className="text-[22px]">💡</span>
+            <div>
+              <div className="text-[17px] font-bold" style={{ color: "#1C1C1E", letterSpacing: "-0.3px" }}>AI Parenting Tips</div>
+              <div className="text-[12px]" style={{ color: "#8E8E93" }}>Based on {childFirstName}'s current data</div>
+            </div>
+          </div>
+
+          {/* Tips list */}
+          {(() => {
+            const tips = aiInsights?.parenting_tips?.length > 0 ? aiInsights.parenting_tips : smartTips;
+            return tips.length > 0 ? tips.map((item: { tip: string; reason: string }, i: number) => (
+              <div key={i} className={`bg-white px-[18px] py-[14px] flex items-start gap-3 ${i === tips.length - 1 ? "rounded-b-[20px]" : ""}`}
+                style={{ borderBottom: i < tips.length - 1 ? "0.5px solid rgba(60,60,67,0.12)" : "none", boxShadow: "0 2px 10px rgba(0,0,0,0.05)" }}>
+                <div className="w-[26px] h-[26px] rounded-lg flex items-center justify-center text-[13px] font-bold shrink-0 mt-[1px]"
+                  style={{ background: "#FFF3E0", color: "#FF9500" }}>
+                  {i + 1}
+                </div>
+                <div>
+                  <div className="text-[14px] font-semibold" style={{ color: "#1C1C1E" }}>{item.tip}</div>
+                  <p className="text-[13px] mt-[3px] leading-[1.45]" style={{ color: "#8E8E93" }}>{item.reason}</p>
+                </div>
+              </div>
+            )) : (
+              <div className="bg-white rounded-b-[20px] px-[18px] py-6 flex items-center gap-3">
+                <Loader2 className="w-4 h-4 animate-spin" style={{ color: "#8E8E93" }} />
+                <p className="text-sm italic" style={{ color: "#8E8E93" }}>Loading {childFirstName}'s tips...</p>
+              </div>
+            );
+          })()}
+        </div>
+
+        <div className="h-6" />
+
+        {/* Hidden PDF render target */}
+        {weeklyReport && pdfData && (
+          <div style={{ position: "fixed", top: "-9999px", left: "-9999px", zIndex: -1 }}>
+            <WeeklyReportPDF
+              ref={pdfRef}
+              report={weeklyReport}
+              studentName={pdfData.child_name}
+              grade={pdfData.grade}
+              attendance={pdfData.attendance}
+              tests={pdfData.tests}
+              assignments={pdfData.assignments}
+              avgScore={pdfData.overall_avg}
+              weekEnd={pdfData.weekEnd}
+              onDownload={() => {}}
+            />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     DESKTOP — Existing UI (unchanged)
+     ═══════════════════════════════════════════════════════════════ */
   return (
     <div className="animate-in fade-in duration-500">
       <PageHeader

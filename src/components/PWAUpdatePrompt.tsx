@@ -11,7 +11,7 @@ export function PWAUpdatePrompt() {
     return () => window.removeEventListener('sw-update-available', handler);
   }, []);
 
-  if (!reg) return null;
+  if (!reg || import.meta.env.DEV) return null;
 
   return (
     <div className="fixed top-4 left-4 right-4 z-50 max-w-sm mx-auto">
