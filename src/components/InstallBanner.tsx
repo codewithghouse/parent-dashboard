@@ -20,7 +20,7 @@ export function InstallBanner() {
           <GraduationCap className="w-5 h-5 text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold leading-tight">Install EduIntellect</p>
+          <p className="text-sm font-bold leading-tight">Install Edullent</p>
           <p className="text-xs text-white/60 mt-0.5">Add to home screen for offline access</p>
         </div>
         <button

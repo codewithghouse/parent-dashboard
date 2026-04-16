@@ -34,11 +34,11 @@ export const getParentAITutor = functions
             }
         }
 
-        let systemPrompt = "You are a friendly AI Tutor for EduIntellect.";
+        let systemPrompt = "You are a friendly AI Tutor for Edullent.";
         let userPrompt = `Context: ${description}\nText: ${pdfText}\nQuery: ${question}`;
 
         if (type === "calibration") {
-            systemPrompt = "You are an expert Curriculum Designer for EduIntellect.";
+            systemPrompt = "You are an expert Curriculum Designer for Edullent.";
             userPrompt = `Generate a calibrated assignment for Class: ${target_class} (${students_count} students) on Topic: ${topic || title}. Return JSON with: generated_assignment { title, description }.`;
         }
 
@@ -74,7 +74,7 @@ export const parentAIProxy = functions
 
     const {
       prompt,
-      systemPrompt = "You are EduIntellect AI, a friendly educational assistant for school students and their parents. Always respond in simple, encouraging language.",
+      systemPrompt = "You are Edullent AI, a friendly educational assistant for school students and their parents. Always respond in simple, encouraging language.",
       jsonMode = true,
       imageBase64,
       model,

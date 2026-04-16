@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800;900&display=swap');
+/* Google Fonts loaded via <link> in index.html for non-blocking render */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -115,7 +115,7 @@ img, video {
 
     --radius: 0.75rem;
 
-    /* EduIntellect custom tokens */
+    /* Edullent custom tokens */
     --edu-navy: 220 60% 25%;
     --edu-navy-light: 220 50% 35%;
     --edu-green: 142 70% 45%;

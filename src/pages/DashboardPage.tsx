@@ -454,58 +454,81 @@ const DashboardPage = () => {
   const isPrevWeekReport = !!weeklyReport && !weekConfig.canGenerate && !localStorage.getItem(weekConfig.thisWeekKey);
 
   /* ═══════════════════════════════════════════════════════════════
-     MOBILE — Premium iOS-style UI
+     MOBILE — Deep Purple Premium UI
      ═══════════════════════════════════════════════════════════════ */
   if (isMobile) {
-    const scoreColor = liveStats.avgScore >= 80 ? "#34C759" : liveStats.avgScore >= 60 ? "#FF9500" : "#FF3B30";
     const scorePct = Math.min(liveStats.avgScore, 100);
-    const attColor = liveStats.attendance >= 85 ? "#FF9500" : liveStats.attendance >= 70 ? "#FF9500" : "#FF3B30";
-    const avgScoreColor = liveStats.avgScore >= 80 ? "#34C759" : liveStats.avgScore >= 60 ? "#FF9500" : "#FF3B30";
-    const ringR = 38, ringCirc = 2 * Math.PI * ringR;
+    const ringR = 40, ringCirc = 2 * Math.PI * ringR;
     const ringOffset = ringCirc - (scorePct / 100) * ringCirc;
+    // Purple theme constants
+    const PUR = "#6B35B8";
+    const PUR2 = "#8A55D4";
+    const LAV = "#C4A8E8";
+    const T1 = "#1A1128";
+    const T2 = "#5C4F78";
+    const T3 = "#9586AE";
+    const T4 = "#C0B2D4";
+    const SEP = "rgba(107,53,184,0.09)";
+    const CARD_SHADOW = "0 0 0 0.5px rgba(107,53,184,0.06), 0 2px 6px rgba(107,53,184,0.05), 0 12px 24px rgba(107,53,184,0.07)";
+    const CARD_SHADOW_LG = "0 0 0 0.5px rgba(107,53,184,0.08), 0 4px 16px rgba(107,53,184,0.07), 0 20px 40px rgba(107,53,184,0.10)";
+    const DK = "#120D1E";
+    const DK_CELL = "rgba(18,13,30,0.55)";
+    const attRingColor = liveStats.attendance >= 85 ? "#FF9F0A" : liveStats.attendance >= 70 ? "#FF9F0A" : "#FF453A";
+    const scoreRingColor = liveStats.avgScore >= 80 ? "#30D158" : liveStats.avgScore >= 60 ? PUR : "#FF453A";
 
     return (
-      <div className="animate-in fade-in duration-500 -mx-3 -mt-3 md:mx-0 md:mt-0" style={{ background: "#F2F2F7", minHeight: "100vh" }}>
+      <div className="animate-in fade-in duration-500 -mx-3 -mt-3 md:mx-0 md:mt-0" style={{ fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif", background: "#F2EEF9", minHeight: "100vh" }}>
 
         {/* ── Greeting ── */}
-        <div className="px-5 pt-5 pb-1">
-          <h1 className="text-[28px] font-bold tracking-tight leading-[1.15]" style={{ color: "#1C1C1E", letterSpacing: "-0.5px" }}>
-            {greeting},<br />{parentFirstName}! 👋
+        <div className="px-6 pt-[22px] pb-1">
+          <h1 className="text-[30px] font-bold leading-[1.12]" style={{ color: T1, letterSpacing: "-0.7px" }}>
+            {greeting},<br />
+            <span style={{ background: `linear-gradient(130deg, ${PUR}, #FF6FA3)`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+              {parentFirstName}
+            </span> 👋
           </h1>
-          <p className="text-[15px] mt-1" style={{ color: "#8E8E93" }}>Here's how {childFirstName} is doing today</p>
+          <p className="text-[14px] mt-[5px]" style={{ color: T3, letterSpacing: "-0.1px" }}>Here's how {childFirstName} is doing today</p>
         </div>
 
         {/* ── Academic Health Card ── */}
-        <div className="mx-5 mt-5 bg-white rounded-[24px] p-5 relative overflow-hidden" style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}>
-          <div className="absolute -top-[30px] -right-[30px] w-[140px] h-[140px] rounded-full" style={{ background: "radial-gradient(circle, rgba(0,122,255,0.05) 0%, transparent 70%)" }} />
+        <div className="mx-5 mt-5 bg-white rounded-[28px] p-[22px] relative overflow-hidden" style={{ boxShadow: CARD_SHADOW_LG, border: "0.5px solid rgba(107,53,184,0.08)" }}>
+          <div className="absolute -top-[70px] -right-[50px] w-[220px] h-[220px] rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, rgba(107,53,184,0.07) 0%, transparent 70%)" }} />
+          <div className="absolute -bottom-[50px] left-[30px] w-[160px] h-[160px] rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, rgba(196,168,232,0.07) 0%, transparent 70%)" }} />
           <div className="relative z-10">
-            <h3 className="text-[19px] font-bold tracking-tight" style={{ color: "#1C1C1E" }}>Academic Health</h3>
-            <p className="text-[13px] mt-0.5" style={{ color: "#8E8E93" }}>Overall performance indicator</p>
-            <div className="inline-flex items-center gap-[5px] mt-3 px-3 py-[5px] rounded-full text-[13px] font-semibold"
+            <h3 className="text-[18px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Academic Health</h3>
+            <p className="text-[13px] mt-0.5" style={{ color: T3 }}>Overall performance indicator</p>
+            <div className="inline-flex items-center gap-[5px] mt-[14px] px-3 py-[5px] rounded-full text-[12px] font-semibold"
               style={{
-                background: liveStats.trendPct >= 0 ? "#E8F9ED" : "#FFEBEA",
-                color: liveStats.trendPct >= 0 ? "#1A7A36" : "#FF3B30"
+                background: liveStats.trendPct >= 0 ? "rgba(48,209,88,0.10)" : "rgba(255,69,58,0.10)",
+                color: liveStats.trendPct >= 0 ? "#1A7A36" : "#FF453A",
+                border: `0.5px solid ${liveStats.trendPct >= 0 ? "rgba(48,209,88,0.2)" : "rgba(255,69,58,0.2)"}`
               }}>
-              <TrendingUp className={`w-[13px] h-[13px] ${liveStats.trendPct < 0 ? "rotate-180" : ""}`} />
+              <TrendingUp className={`w-3 h-3 ${liveStats.trendPct < 0 ? "rotate-180" : ""}`} />
               {liveStats.trendPct === 0 ? "Stable performance" : liveStats.trendPct > 0 ? `Improved by ${liveStats.trendPct}%` : `Declined by ${Math.abs(liveStats.trendPct)}%`}
             </div>
             <div className="flex items-center justify-between mt-5">
               <div>
-                <div className="text-[40px] font-bold leading-none" style={{ color: scoreColor, letterSpacing: "-1px" }}>
+                <div className="text-[52px] font-bold leading-none" style={{ color: PUR, letterSpacing: "-2px" }}>
                   {liveStats.avgScore > 0 ? `${liveStats.avgScore}%` : "—"}
                 </div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.06em] mt-1" style={{ color: "#AEAEB2" }}>
+                <div className="text-[10px] font-bold uppercase tracking-[0.08em] mt-[6px]" style={{ color: T4 }}>
                   {liveStats.avgScore >= 75 ? "Good Standing" : liveStats.avgScore > 0 ? "Needs Attention" : "No data yet"}
                 </div>
               </div>
-              <div className="relative w-[88px] h-[88px]">
-                <svg viewBox="0 0 88 88" width="88" height="88" style={{ transform: "rotate(-90deg)" }}>
-                  <circle cx="44" cy="44" r={ringR} fill="none" stroke="#F2F2F7" strokeWidth="6" />
-                  <circle cx="44" cy="44" r={ringR} fill="none" stroke={scoreColor} strokeWidth="6" strokeLinecap="round"
+              <div className="relative w-[96px] h-[96px]">
+                <svg viewBox="0 0 96 96" width="96" height="96" style={{ transform: "rotate(-90deg)" }}>
+                  <defs>
+                    <linearGradient id="purGradMobile" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#A97FE8" />
+                      <stop offset="100%" stopColor={PUR} />
+                    </linearGradient>
+                  </defs>
+                  <circle cx="48" cy="48" r={ringR} fill="none" stroke="#EDE8F5" strokeWidth="7" />
+                  <circle cx="48" cy="48" r={ringR} fill="none" stroke="url(#purGradMobile)" strokeWidth="7" strokeLinecap="round"
                     strokeDasharray={ringCirc} strokeDashoffset={ringOffset}
                     style={{ transition: "stroke-dashoffset 1s cubic-bezier(0.4,0,0.2,1)" }} />
                 </svg>
-                <div className="absolute inset-0 flex items-center justify-center text-[15px] font-bold" style={{ color: "#1C1C1E" }}>
+                <div className="absolute inset-0 flex items-center justify-center text-[16px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>
                   {liveStats.avgScore > 0 ? `${liveStats.avgScore}%` : "—"}
                 </div>
               </div>
@@ -516,58 +539,71 @@ const DashboardPage = () => {
         {/* ── Stats Grid 2×2 ── */}
         <div className="grid grid-cols-2 gap-3 mx-5 mt-3">
           {[
-            { icon: CheckCircle, iconColor: "#34C759", bg: "#E8F9ED", label: "Attendance", value: `${liveStats.attendance}%`, status: liveStats.attendance >= 85 ? "On track ✓" : "Below target", statusColor: "#34C759" },
-            { icon: AlertCircle, iconColor: "#FF9500", bg: "#FFF3E0", label: "Pending Work", value: liveStats.pending.toString(), status: "Due this week", statusColor: "#FF9500" },
-            { icon: Calendar, iconColor: "#AF52DE", bg: "#F4EBFC", label: "Upcoming Tests", value: liveStats.tests.toString(), status: "Next 7 days", statusColor: "#8E8E93" },
-            { icon: Star, iconColor: "#007AFF", bg: "#E8F2FF", label: "Recent Grade", value: liveStats.recentGrade, status: liveStats.recentSubject, statusColor: "#8E8E93" },
-          ].map(({ icon: Icon, iconColor, bg, label, value, status, statusColor }) => (
-            <div key={label} className="bg-white rounded-[20px] p-4" style={{ boxShadow: "0 2px 10px rgba(0,0,0,0.06)" }}>
-              <div className="w-9 h-9 rounded-[10px] flex items-center justify-center mb-3" style={{ background: bg }}>
-                <Icon className="w-[18px] h-[18px]" style={{ color: iconColor }} />
+            { icon: CheckCircle, iconColor: "#30D158", bg: "rgba(48,209,88,0.10)", border: "rgba(48,209,88,0.2)", label: "Attendance", value: `${liveStats.attendance}%`, status: liveStats.attendance >= 85 ? "On track ✓" : "Below target", statusColor: "#30D158" },
+            { icon: AlertCircle, iconColor: "#FF9F0A", bg: "rgba(255,159,10,0.10)", border: "rgba(255,159,10,0.2)", label: "Pending Work", value: liveStats.pending.toString(), status: "Due this week", statusColor: "#FF9F0A" },
+            { icon: Calendar, iconColor: PUR, bg: "rgba(107,53,184,0.10)", border: "rgba(107,53,184,0.18)", label: "Upcoming Tests", value: liveStats.tests.toString(), status: "Next 7 days", statusColor: T4 },
+            { icon: Star, iconColor: "#FF6FA3", bg: "rgba(255,111,163,0.10)", border: "rgba(255,111,163,0.2)", label: "Recent Grade", value: liveStats.recentGrade, status: liveStats.recentSubject, statusColor: T4 },
+          ].map(({ icon: Icon, iconColor, bg, border, label, value, status, statusColor }) => (
+            <div key={label} className="bg-white rounded-[22px] p-[18px] relative overflow-hidden active:scale-[0.95] transition-transform" style={{ boxShadow: CARD_SHADOW, border: "0.5px solid rgba(107,53,184,0.06)" }}>
+              <div className="w-[34px] h-[34px] rounded-[10px] flex items-center justify-center mb-[14px]" style={{ background: bg, border: `0.5px solid ${border}` }}>
+                <Icon className="w-[17px] h-[17px]" style={{ color: iconColor }} />
               </div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.06em]" style={{ color: "#AEAEB2" }}>{label}</div>
-              <div className="text-[26px] font-bold mt-0.5 leading-[1.1]" style={{ color: "#1C1C1E", letterSpacing: "-0.5px" }}>{value}</div>
-              <div className="text-[13px] font-medium mt-1" style={{ color: statusColor }}>{status}</div>
+              <div className="text-[10px] font-bold uppercase tracking-[0.07em]" style={{ color: T4 }}>{label}</div>
+              <div className="text-[28px] font-bold mt-[3px] leading-none" style={{ color: T1, letterSpacing: "-0.8px" }}>{value}</div>
+              <div className="text-[12px] font-medium mt-[5px]" style={{ color: statusColor }}>{status}</div>
             </div>
           ))}
         </div>
 
         {/* ── AI Live Summary Dark Card ── */}
-        <div className="mx-5 mt-4 rounded-[24px] overflow-hidden" style={{ background: "#1C1C1E", boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
+        <div className="mx-5 mt-4 rounded-[28px] overflow-hidden relative" style={{ background: DK, boxShadow: "0 0 0 0.5px rgba(196,168,232,0.08), 0 8px 32px rgba(0,0,0,0.3)" }}>
+          {/* Purple ambient glow overlays */}
+          <div className="absolute inset-0 pointer-events-none" style={{
+            background: "radial-gradient(ellipse 280px 180px at 80% 0%, rgba(107,53,184,0.18) 0%, transparent 60%), radial-gradient(ellipse 200px 200px at -20% 80%, rgba(196,168,232,0.10) 0%, transparent 60%)"
+          }} />
+          <div className="absolute inset-0 pointer-events-none" style={{
+            backgroundImage: "linear-gradient(rgba(196,168,232,0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(196,168,232,0.018) 1px, transparent 1px)",
+            backgroundSize: "32px 32px"
+          }} />
+
           {/* Header */}
-          <div className="flex items-center justify-between px-[18px] pt-4 pb-3" style={{ borderBottom: "0.5px solid rgba(255,255,255,0.08)" }}>
+          <div className="relative z-10 flex items-center justify-between px-5 pt-[18px] pb-[14px]" style={{ borderBottom: "0.5px solid rgba(196,168,232,0.08)" }}>
             <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
-              <span className="text-[12px] font-bold uppercase tracking-[0.08em]" style={{ color: "rgba(255,255,255,0.9)" }}>EduIntellect AI · Live</span>
+              <span className="text-[15px] opacity-80">✦</span>
+              <span className="text-[11px] font-bold uppercase tracking-[0.1em]" style={{ color: `rgba(196,168,232,0.6)` }}>Edullent AI · Live</span>
             </div>
-            <div className="flex items-center gap-[5px] px-[10px] py-1 rounded-full" style={{ background: "rgba(52,199,89,0.15)", border: "1px solid rgba(52,199,89,0.3)" }}>
-              <div className="w-[6px] h-[6px] rounded-full animate-pulse" style={{ background: "#34C759" }} />
-              <span className="text-[11px] font-bold tracking-[0.04em]" style={{ color: "#34C759" }}>LIVE</span>
+            <div className="flex items-center gap-[5px] px-[10px] py-1 rounded-full" style={{ background: "rgba(48,209,88,0.1)", border: "0.5px solid rgba(48,209,88,0.25)" }}>
+              <div className="w-[5px] h-[5px] rounded-full animate-pulse" style={{ background: "#30D158" }} />
+              <span className="text-[10px] font-bold tracking-[0.06em]" style={{ color: "#30D158" }}>LIVE</span>
             </div>
           </div>
 
           {dataLoading ? (
-            <div className="flex items-center gap-3 py-10 justify-center">
-              <Loader2 className="w-5 h-5 animate-spin" style={{ color: "rgba(255,255,255,0.3)" }} />
-              <span className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>Loading {childFirstName}'s data...</span>
+            <div className="relative z-10 flex items-center gap-3 py-10 justify-center">
+              <Loader2 className="w-5 h-5 animate-spin" style={{ color: LAV }} />
+              <span className="text-xs" style={{ color: `rgba(196,168,232,0.4)` }}>Loading {childFirstName}'s data...</span>
             </div>
           ) : (
             <>
               {/* 2×2 Metrics Grid */}
-              <div className="grid grid-cols-2" style={{ gap: "1px", background: "rgba(255,255,255,0.06)" }}>
+              <div className="relative z-10 grid grid-cols-2" style={{ gap: "1px", background: "rgba(196,168,232,0.07)" }}>
                 {/* Attendance */}
-                <div className="p-4 flex flex-col gap-[10px]" style={{ background: "#2C2C2E" }}>
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "rgba(255,255,255,0.4)" }}>Attendance</span>
+                <div className="p-[18px] flex flex-col gap-[10px]" style={{ background: DK_CELL }}>
+                  <span className="text-[9px] font-bold uppercase tracking-[0.1em]" style={{ color: `rgba(196,168,232,0.35)` }}>Attendance</span>
                   <div className="flex items-center gap-[10px]">
-                    <DonutRing pct={liveStats.attendance} color={attColor} size={60} stroke={5} />
-                    <div className="flex flex-col gap-[2px]">
-                      <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.4)" }}>Target</span>
-                      <span className="text-[11px] font-semibold" style={{ color: "rgba(255,255,255,0.7)" }}>85%</span>
-                      <div className="w-[60px] h-[3px] rounded-full mt-1 overflow-hidden" style={{ background: "rgba(255,255,255,0.1)" }}>
-                        <div className="h-full rounded-full" style={{ width: `${liveStats.attendance}%`, background: attColor }} />
+                    <DonutRing pct={liveStats.attendance} color={attRingColor} size={56} stroke={5} />
+                    <div className="flex flex-col gap-[3px]">
+                      <span className="text-[9px]" style={{ color: "rgba(255,255,255,0.3)" }}>Target</span>
+                      <span className="text-[11px] font-semibold" style={{ color: "rgba(255,255,255,0.6)" }}>85%</span>
+                      <div className="w-[52px] h-[3px] rounded-full mt-[2px] overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+                        <div className="h-full rounded-full" style={{ width: `${liveStats.attendance}%`, background: attRingColor }} />
                       </div>
-                      <div className="inline-flex items-center gap-1 px-2 py-[3px] rounded-full mt-[6px] w-fit text-[10px] font-bold"
-                        style={{ background: liveStats.attendance >= 85 ? "rgba(52,199,89,0.15)" : "rgba(255,59,48,0.15)", color: liveStats.attendance >= 85 ? "#34C759" : "#FF3B30" }}>
+                      <div className="inline-flex items-center gap-[3px] px-2 py-[3px] rounded-full mt-1 w-fit text-[10px] font-bold"
+                        style={{
+                          background: liveStats.attendance >= 85 ? "rgba(48,209,88,0.15)" : "rgba(255,69,58,0.15)",
+                          color: liveStats.attendance >= 85 ? "#30D158" : "#FF6961",
+                          border: `0.5px solid ${liveStats.attendance >= 85 ? "rgba(48,209,88,0.2)" : "rgba(255,69,58,0.2)"}`
+                        }}>
                         {liveStats.attendance >= 85 ? "✓ On Track" : "Needs Work"}
                       </div>
                     </div>
@@ -575,21 +611,25 @@ const DashboardPage = () => {
                 </div>
 
                 {/* Avg Score */}
-                <div className="p-4 flex flex-col gap-[10px]" style={{ background: "#2C2C2E" }}>
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "rgba(255,255,255,0.4)" }}>Avg Score</span>
+                <div className="p-[18px] flex flex-col gap-[10px]" style={{ background: DK_CELL }}>
+                  <span className="text-[9px] font-bold uppercase tracking-[0.1em]" style={{ color: `rgba(196,168,232,0.35)` }}>Avg Score</span>
                   <div className="flex items-center gap-[10px]">
-                    <DonutRing pct={liveStats.avgScore} color={avgScoreColor} size={60} stroke={5} />
+                    <DonutRing pct={liveStats.avgScore} color={scoreRingColor} size={56} stroke={5} />
                     <div>
                       <div className="inline-flex items-center px-2 py-[3px] rounded-full text-[10px] font-bold"
-                        style={{ background: liveStats.avgScore >= 60 ? "rgba(52,199,89,0.15)" : "rgba(255,59,48,0.15)", color: liveStats.avgScore >= 60 ? "#34C759" : "#FF3B30" }}>
+                        style={{
+                          background: liveStats.avgScore >= 60 ? "rgba(196,168,232,0.15)" : "rgba(255,69,58,0.15)",
+                          color: liveStats.avgScore >= 60 ? LAV : "#FF6961",
+                          border: `0.5px solid ${liveStats.avgScore >= 60 ? "rgba(196,168,232,0.25)" : "rgba(255,69,58,0.2)"}`
+                        }}>
                         {liveStats.avgScore >= 80 ? "Excellent" : liveStats.avgScore >= 60 ? "Good" : liveStats.avgScore > 0 ? "Needs Work" : "No Data"}
                       </div>
-                      <div className="flex gap-[5px] mt-2">
+                      <div className="flex gap-1 mt-2">
                         {["C", "B", "A", "A+"].map(g => {
                           const active = liveStats.avgScore >= (g === "A+" ? 90 : g === "A" ? 80 : g === "B" ? 70 : 0);
                           return (
-                            <div key={g} className="w-6 h-6 rounded-[6px] flex items-center justify-center text-[11px] font-bold"
-                              style={{ background: active ? "rgba(255,59,48,0.3)" : "rgba(255,255,255,0.07)", color: active ? "#FF6B6B" : "rgba(255,255,255,0.4)" }}>
+                            <div key={g} className="w-[26px] h-[26px] rounded-[7px] flex items-center justify-center text-[11px] font-bold"
+                              style={{ background: active ? "rgba(255,69,58,0.2)" : "rgba(255,255,255,0.05)", color: active ? "#FF6961" : "rgba(255,255,255,0.2)" }}>
                               {g}
                             </div>
                           );
@@ -600,32 +640,36 @@ const DashboardPage = () => {
                 </div>
 
                 {/* Assignments */}
-                <div className="p-4 flex flex-col gap-[10px]" style={{ background: "#2C2C2E" }}>
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "rgba(255,255,255,0.4)" }}>Assignments</span>
-                  <div className="text-[36px] font-bold leading-none" style={{ color: "rgba(255,255,255,0.9)" }}>{liveStats.pending}</div>
-                  <div className="text-[12px]" style={{ color: "rgba(255,255,255,0.4)" }}>pending</div>
-                  <div className="inline-flex items-center gap-1 px-2 py-[3px] rounded-full mt-1 w-fit text-[10px] font-bold"
-                    style={{ background: liveStats.pending === 0 ? "rgba(52,199,89,0.15)" : "rgba(255,149,0,0.15)", color: liveStats.pending === 0 ? "#34C759" : "#FF9500" }}>
+                <div className="p-[18px] flex flex-col gap-[10px]" style={{ background: DK_CELL }}>
+                  <span className="text-[9px] font-bold uppercase tracking-[0.1em]" style={{ color: `rgba(196,168,232,0.35)` }}>Assignments</span>
+                  <div className="text-[34px] font-bold leading-none text-white" style={{ letterSpacing: "-1px" }}>{liveStats.pending}</div>
+                  <div className="text-[11px]" style={{ color: "rgba(255,255,255,0.35)" }}>pending</div>
+                  <div className="inline-flex items-center gap-[3px] px-2 py-[3px] rounded-full w-fit text-[10px] font-bold"
+                    style={{
+                      background: liveStats.pending === 0 ? "rgba(48,209,88,0.15)" : "rgba(255,159,10,0.15)",
+                      color: liveStats.pending === 0 ? "#30D158" : "#FF9F0A",
+                      border: `0.5px solid ${liveStats.pending === 0 ? "rgba(48,209,88,0.2)" : "rgba(255,159,10,0.2)"}`
+                    }}>
                     {liveStats.pending === 0 ? "✓ All Done" : `${liveStats.pending} to complete`}
                   </div>
                 </div>
 
                 {/* Recent Test */}
-                <div className="p-4 flex flex-col gap-[10px]" style={{ background: "#2C2C2E" }}>
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "rgba(255,255,255,0.4)" }}>Recent Test</span>
-                  <div className="text-[36px] font-bold leading-none" style={{ color: "rgba(255,255,255,0.9)" }}>
+                <div className="p-[18px] flex flex-col gap-[10px]" style={{ background: DK_CELL }}>
+                  <span className="text-[9px] font-bold uppercase tracking-[0.1em]" style={{ color: `rgba(196,168,232,0.35)` }}>Recent Test</span>
+                  <div className="text-[34px] font-bold leading-none text-white" style={{ letterSpacing: "-1px" }}>
                     {liveStats.recentGrade !== "N/A" ? liveStats.recentGrade : "—"}
                   </div>
-                  <div className="text-[11px]" style={{ color: "rgba(255,255,255,0.4)" }}>{liveStats.recentSubject}</div>
-                  <div className="flex gap-[5px] mt-1">
+                  <div className="text-[11px]" style={{ color: "rgba(255,255,255,0.35)" }}>{liveStats.recentSubject}</div>
+                  <div className="flex gap-1">
                     {["C", "B", "A", "A+"].map(g => {
                       const gradeSteps = ["C", "B", "A", "A+"];
                       const gradeIdx = gradeSteps.indexOf(liveStats.recentGrade);
                       const idx = gradeSteps.indexOf(g);
                       const active = idx <= gradeIdx && gradeIdx >= 0;
                       return (
-                        <div key={g} className="w-6 h-6 rounded-[6px] flex items-center justify-center text-[11px] font-bold"
-                          style={{ background: active ? "rgba(255,59,48,0.3)" : "rgba(255,255,255,0.07)", color: active ? "#FF6B6B" : "rgba(255,255,255,0.4)" }}>
+                        <div key={g} className="w-[26px] h-[26px] rounded-[7px] flex items-center justify-center text-[11px] font-bold"
+                          style={{ background: active ? "rgba(255,69,58,0.2)" : "rgba(255,255,255,0.05)", color: active ? "#FF6961" : "rgba(255,255,255,0.2)" }}>
                           {g}
                         </div>
                       );
@@ -635,17 +679,17 @@ const DashboardPage = () => {
               </div>
 
               {/* AI Insight Strip */}
-              <div className="px-[18px] py-[14px] flex items-start gap-[10px]" style={{ borderTop: "0.5px solid rgba(255,255,255,0.06)" }}>
-                <BrainCircuit className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "rgba(255,255,255,0.5)" }} />
+              <div className="relative z-10 px-[18px] py-[14px] flex items-start gap-[10px]" style={{ borderTop: "0.5px solid rgba(196,168,232,0.07)", background: "rgba(255,255,255,0.015)" }}>
+                <span className="text-[16px] mt-0.5">🤖</span>
                 {aiInsights?.child_summary_narrative ? (
-                  <p className="text-[13px] leading-[1.5]" style={{ color: "rgba(255,255,255,0.6)", letterSpacing: "-0.1px" }}>
-                    <span style={{ color: "rgba(255,255,255,0.9)", fontWeight: 500 }}>{studentData?.name}</span>{" "}
+                  <p className="text-[12px] leading-[1.6]" style={{ color: `rgba(196,168,232,0.55)`, letterSpacing: "-0.1px" }}>
+                    <strong style={{ color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>{studentData?.name}</strong>{" "}
                     {aiInsights.child_summary_narrative.replace(studentData?.name || "", "").trim()}
                   </p>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <Loader2 className="w-3 h-3 animate-spin" style={{ color: "rgba(255,255,255,0.3)" }} />
-                    <p className="text-[11px] italic" style={{ color: "rgba(255,255,255,0.4)" }}>AI summary generating...</p>
+                    <Loader2 className="w-3 h-3 animate-spin" style={{ color: LAV }} />
+                    <p className="text-[11px] italic" style={{ color: `rgba(196,168,232,0.4)` }}>AI summary generating...</p>
                   </div>
                 )}
               </div>
@@ -654,95 +698,98 @@ const DashboardPage = () => {
         </div>
 
         {/* ── Profile Card ── */}
-        <div className="mx-5 mt-4 bg-white rounded-[24px] p-5" style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}>
-          <div className="w-16 h-16 rounded-[20px] flex items-center justify-center text-[22px] font-bold text-white mb-[14px]"
-            style={{ background: "linear-gradient(135deg, #1C3A8A, #3B5FD9)", boxShadow: "0 4px 16px rgba(28,58,138,0.3)" }}>
+        <div className="mx-5 mt-[18px] bg-white rounded-[28px] p-[22px] relative overflow-hidden" style={{ boxShadow: CARD_SHADOW_LG, border: "0.5px solid rgba(107,53,184,0.07)" }}>
+          <div className="absolute -top-[50px] -right-[30px] w-[180px] h-[180px] rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, rgba(107,53,184,0.06) 0%, transparent 70%)" }} />
+          <div className="w-[68px] h-[68px] rounded-[22px] flex items-center justify-center text-[24px] font-bold text-white mb-4"
+            style={{ background: `linear-gradient(140deg, #4A1A9A, ${PUR2})`, boxShadow: "0 4px 20px rgba(107,53,184,0.32)" }}>
             {studentInitials}
           </div>
-          <div className="text-[22px] font-bold tracking-tight" style={{ color: "#1C1C1E", letterSpacing: "-0.4px" }}>{studentData?.name || "Student"}</div>
-          <div className="text-[14px] mt-0.5" style={{ color: "#8E8E93" }}>
+          <div className="text-[22px] font-bold" style={{ color: T1, letterSpacing: "-0.5px" }}>{studentData?.name || "Student"}</div>
+          <div className="text-[14px] mt-[3px]" style={{ color: T3 }}>
             {studentMeta.className !== "—" ? `Grade ${studentMeta.className}` : studentData?.grade ? `Grade ${studentData.grade}` : ""}
             {teacherInfo.name !== "—" ? ` — ${teacherInfo.name}` : ""}
           </div>
-          <div className="grid grid-cols-2 mt-4 rounded-[12px] overflow-hidden" style={{ gap: "1px", background: "rgba(60,60,67,0.12)" }}>
-            <div className="px-[14px] py-3" style={{ background: "#F8F8FA" }}>
-              <div className="text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: "#AEAEB2" }}>Class Teacher</div>
-              <div className="text-[15px] font-semibold mt-0.5" style={{ color: "#1C1C1E" }}>{teacherInfo.name}</div>
+          <div className="grid grid-cols-2 mt-[18px] rounded-[14px] overflow-hidden" style={{ gap: "1px", background: SEP }}>
+            <div className="px-[14px] py-[13px]" style={{ background: "#F2EEF9" }}>
+              <div className="text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: T4 }}>Class Teacher</div>
+              <div className="text-[15px] font-semibold mt-[3px]" style={{ color: T1, letterSpacing: "-0.2px" }}>{teacherInfo.name}</div>
             </div>
-            <div className="px-[14px] py-3" style={{ background: "#F8F8FA" }}>
-              <div className="text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: "#AEAEB2" }}>Academic Year</div>
-              <div className="text-[15px] font-semibold mt-0.5" style={{ color: "#1C1C1E" }}>2025–26</div>
+            <div className="px-[14px] py-[13px]" style={{ background: "#F2EEF9" }}>
+              <div className="text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: T4 }}>Academic Year</div>
+              <div className="text-[15px] font-semibold mt-[3px]" style={{ color: T1, letterSpacing: "-0.2px" }}>2025–26</div>
             </div>
           </div>
         </div>
 
         {/* ── Recent Alerts ── */}
-        <div className="mx-5 mt-3 bg-white rounded-[20px] p-5" style={{ boxShadow: "0 2px 10px rgba(0,0,0,0.05)" }}>
-          <h3 className="text-[19px] font-bold mb-5" style={{ color: "#1C1C1E" }}>Recent Alerts</h3>
+        <div className="mx-5 mt-3 bg-white rounded-[22px] p-5" style={{ boxShadow: CARD_SHADOW, border: "0.5px solid rgba(107,53,184,0.06)" }}>
+          <h3 className="text-[18px] font-bold mb-5" style={{ color: T1, letterSpacing: "-0.3px" }}>Recent Alerts</h3>
           {recentAlerts.length > 0 ? (
             <div className="space-y-3">
               {recentAlerts.map(alert => (
-                <div key={alert.id} className={`flex items-start gap-3 p-3 rounded-xl ${alert.urgent ? "bg-amber-50" : "bg-emerald-50"}`}>
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${alert.urgent ? "bg-amber-100 text-amber-600" : "bg-emerald-100 text-emerald-600"}`}>
+                <div key={alert.id} className="flex items-start gap-3 p-3 rounded-xl"
+                  style={{ background: alert.urgent ? "rgba(255,159,10,0.08)" : "rgba(48,209,88,0.08)" }}>
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+                    style={{ background: alert.urgent ? "rgba(255,159,10,0.15)" : "rgba(48,209,88,0.15)", color: alert.urgent ? "#FF9F0A" : "#30D158" }}>
                     {alert.urgent ? <Clock className="w-3.5 h-3.5" /> : <CheckCircle className="w-3.5 h-3.5" />}
                   </div>
                   <div>
-                    <p className="text-sm font-medium leading-snug" style={{ color: "#1C1C1E" }}>{alert.title}</p>
-                    <p className="text-xs mt-0.5" style={{ color: "#8E8E93" }}>{timeAgo(alert.time)}</p>
+                    <p className="text-sm font-medium leading-snug" style={{ color: T1 }}>{alert.title}</p>
+                    <p className="text-xs mt-0.5" style={{ color: T3 }}>{timeAgo(alert.time)}</p>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="flex flex-col items-center gap-[10px] py-5">
-              <div className="w-14 h-14 rounded-[18px] flex items-center justify-center" style={{ background: "#F2F2F7" }}>
-                <ShieldCheck className="w-[26px] h-[26px]" style={{ color: "#AEAEB2" }} />
+            <div className="flex flex-col items-center gap-[10px] py-4">
+              <div className="w-[52px] h-[52px] rounded-[16px] flex items-center justify-center" style={{ background: "#F2EEF9", border: `0.5px solid ${SEP}` }}>
+                <ShieldCheck className="w-6 h-6" style={{ color: T4 }} />
               </div>
-              <p className="text-[15px]" style={{ color: "#8E8E93" }}>No alerts right now</p>
+              <p className="text-[14px]" style={{ color: T3 }}>No alerts right now</p>
             </div>
           )}
         </div>
 
         {/* ── Weekly AI Report Card ── */}
-        <div className="mx-5 mt-4 bg-white rounded-[20px] p-4" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+        <div className="mx-5 mt-4 bg-white rounded-[22px] p-[18px]" style={{ boxShadow: CARD_SHADOW, border: "0.5px solid rgba(107,53,184,0.06)" }}>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-[10px]">
-              <div className="w-[38px] h-[38px] rounded-[10px] flex items-center justify-center" style={{ background: "#E8F2FF" }}>
-                <BookOpen className="w-[18px] h-[18px]" style={{ color: "#007AFF" }} />
+            <div className="flex items-center gap-3">
+              <div className="w-[42px] h-[42px] rounded-[13px] flex items-center justify-center" style={{ background: "rgba(107,53,184,0.10)", border: "0.5px solid rgba(107,53,184,0.18)" }}>
+                <BookOpen className="w-[18px] h-[18px]" style={{ color: PUR }} />
               </div>
               <div>
-                <div className="text-[16px] font-bold" style={{ color: "#1C1C1E", letterSpacing: "-0.2px" }}>Weekly AI Report</div>
-                <div className="text-[12px] mt-[1px]" style={{ color: "#8E8E93" }}>
+                <div className="text-[15px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>Weekly AI Report</div>
+                <div className="text-[12px] mt-[1px]" style={{ color: T3 }}>
                   {isPrevWeekReport ? "Last week's report" : weekConfig.canGenerate ? "Generate this week's report" : "New report available Friday"}
                 </div>
               </div>
             </div>
             {weekConfig.canGenerate && !weeklyReport ? (
               <button onClick={handleGenerateWeeklyReport} disabled={weeklyLoading || dataLoading}
-                className="flex items-center gap-2 px-3 py-2 rounded-[10px] text-[12px] font-semibold text-white disabled:opacity-50"
-                style={{ background: "#007AFF" }}>
+                className="flex items-center gap-2 px-3 py-2 rounded-[11px] text-[12px] font-semibold text-white disabled:opacity-50"
+                style={{ background: PUR }}>
                 {weeklyLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                 {weeklyLoading ? "..." : "Generate"}
               </button>
             ) : !weekConfig.canGenerate ? (
-              <div className="flex items-center gap-1 px-[10px] py-[6px] rounded-[10px] text-[11px] font-semibold" style={{ background: "#F2F2F7", color: "#8E8E93" }}>
+              <div className="flex items-center gap-1 px-[11px] py-[7px] rounded-[11px] text-[11px] font-semibold" style={{ background: "#F2EEF9", color: T3, border: `0.5px solid ${SEP}` }}>
                 <Clock className="w-[11px] h-[11px]" />
-                Opens Fri{weekConfig.daysLeft > 0 ? ` · ${weekConfig.daysLeft}d` : ""}
+                Fri{weekConfig.daysLeft > 0 ? ` · ${weekConfig.daysLeft}d` : ""}
               </div>
             ) : null}
           </div>
 
           {weeklyLoading && (
             <div className="flex flex-col items-center py-6 gap-3">
-              <Loader2 className="w-6 h-6 animate-spin" style={{ color: "#007AFF" }} />
-              <p className="text-xs" style={{ color: "#8E8E93" }}>Analysing {childFirstName}'s week...</p>
+              <Loader2 className="w-6 h-6 animate-spin" style={{ color: PUR }} />
+              <p className="text-xs" style={{ color: T3 }}>Analysing {childFirstName}'s week...</p>
             </div>
           )}
 
           {!weeklyReport && !weeklyLoading && (
-            <div className="flex items-start gap-2 mt-[14px] pt-[14px]" style={{ borderTop: "0.5px solid rgba(60,60,67,0.12)" }}>
-              <Clock className="w-[14px] h-[14px] shrink-0 mt-0.5" style={{ color: "#AEAEB2" }} />
-              <p className="text-[13px] leading-[1.5]" style={{ color: "#8E8E93" }}>
+            <div className="flex items-start gap-2 mt-[14px] pt-[14px]" style={{ borderTop: `0.5px solid ${SEP}` }}>
+              <Clock className="w-[14px] h-[14px] shrink-0 mt-0.5" style={{ color: T4 }} />
+              <p className="text-[13px] leading-[1.55]" style={{ color: T3, letterSpacing: "-0.1px" }}>
                 {weekConfig.canGenerate
                   ? `Tap "Generate" to get ${childFirstName}'s weekly digest.`
                   : `You can generate ${childFirstName}'s weekly report every Friday, Saturday & Sunday.`}
@@ -750,11 +797,10 @@ const DashboardPage = () => {
             </div>
           )}
 
-          {/* Report exists — show previous week note */}
           {weeklyReport && !weeklyLoading && isPrevWeekReport && (
-            <div className="flex items-start gap-2 mt-[14px] pt-[14px]" style={{ borderTop: "0.5px solid rgba(60,60,67,0.12)" }}>
-              <Clock className="w-[14px] h-[14px] shrink-0 mt-0.5" style={{ color: "#AEAEB2" }} />
-              <p className="text-[13px] leading-[1.5]" style={{ color: "#8E8E93" }}>
+            <div className="flex items-start gap-2 mt-[14px] pt-[14px]" style={{ borderTop: `0.5px solid ${SEP}` }}>
+              <Clock className="w-[14px] h-[14px] shrink-0 mt-0.5" style={{ color: T4 }} />
+              <p className="text-[13px] leading-[1.55]" style={{ color: T3 }}>
                 This is last week's report. A new report can be generated this Friday.
               </p>
             </div>
@@ -763,12 +809,12 @@ const DashboardPage = () => {
 
         {/* ── AI Message (when report exists) ── */}
         {weeklyReport && !weeklyLoading && (
-          <div className="mx-5 mt-3 rounded-[20px] p-4" style={{ background: "linear-gradient(135deg, #EEF2FF, #E8F2FF)", border: "1px solid rgba(99,102,241,0.12)" }}>
-            <div className="flex items-center gap-[6px] text-[11px] font-bold uppercase tracking-[0.08em] mb-[10px]" style={{ color: "#5B5BD6" }}>
-              <Sparkles className="w-[13px] h-[13px]" />
+          <div className="mx-5 mt-3 rounded-[22px] p-[18px]" style={{ background: "linear-gradient(140deg, #F0EBFF, #E8E0FF)", border: "0.5px solid rgba(107,53,184,0.18)", boxShadow: "0 2px 16px rgba(107,53,184,0.08)" }}>
+            <div className="flex items-center gap-[6px] text-[10px] font-bold uppercase tracking-[0.1em] mb-3" style={{ color: PUR }}>
+              <Sparkles className="w-3 h-3" />
               AI Message
             </div>
-            <p className="text-[14px] leading-[1.65] font-normal" style={{ color: "#1C1C1E", letterSpacing: "-0.1px" }}>
+            <p className="text-[14px] leading-[1.7] font-normal" style={{ color: T1, letterSpacing: "-0.1px" }}>
               {weeklyReport.message}
             </p>
           </div>
@@ -776,16 +822,16 @@ const DashboardPage = () => {
 
         {/* ── Detail Sections (when report exists) ── */}
         {weeklyReport && !weeklyLoading && (
-          <div className="mx-5 mt-3 bg-white rounded-[20px] overflow-hidden" style={{ boxShadow: "0 2px 10px rgba(0,0,0,0.05)" }}>
+          <div className="mx-5 mt-3 bg-white rounded-[22px] overflow-hidden" style={{ boxShadow: CARD_SHADOW, border: "0.5px solid rgba(107,53,184,0.06)" }}>
             {[
               { tag: "Attendance", text: weeklyReport.attendance_summary },
               { tag: "Tests", text: weeklyReport.test_analysis },
               { tag: "Assignments", text: weeklyReport.assignment_status },
             ].map(({ tag, text }, i, arr) => (
               <div key={tag} className="px-[18px] py-[14px] flex flex-col gap-1"
-                style={{ borderBottom: i < arr.length - 1 ? "0.5px solid rgba(60,60,67,0.12)" : "none" }}>
-                <span className="text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: "#AEAEB2" }}>{tag}</span>
-                <p className="text-[14px] leading-[1.5]" style={{ color: "#1C1C1E" }}>{text}</p>
+                style={{ borderBottom: i < arr.length - 1 ? `0.5px solid ${SEP}` : "none" }}>
+                <span className="text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: "#A97FE8" }}>{tag}</span>
+                <p className="text-[13px] leading-[1.55]" style={{ color: T2 }}>{text}</p>
               </div>
             ))}
           </div>
@@ -793,15 +839,15 @@ const DashboardPage = () => {
 
         {/* ── Performance Alert (when report exists) ── */}
         {weeklyReport?.overall_performance && (
-          <div className="mx-5 mt-3 rounded-[20px] p-4 flex items-start justify-between gap-3"
-            style={{ background: "#FFF3E0", border: "1px solid rgba(255,149,0,0.15)" }}>
+          <div className="mx-5 mt-3 rounded-[22px] p-[18px] flex items-start justify-between gap-[14px]"
+            style={{ background: "linear-gradient(140deg, #FFF7F0, #FFF0E8)", border: "0.5px solid rgba(255,159,10,0.2)", boxShadow: "0 2px 14px rgba(255,159,10,0.07)" }}>
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.08em] mb-1" style={{ color: "#C45C00" }}>Overall Performance</div>
-              <div className="text-[17px] font-bold" style={{ color: "#1C1C1E", letterSpacing: "-0.3px" }}>{weeklyReport.overall_performance.verdict}</div>
-              <p className="text-[13px] mt-1 leading-[1.5]" style={{ color: "rgba(0,0,0,0.55)" }}>{weeklyReport.overall_performance.score_context}</p>
+              <div className="text-[10px] font-bold uppercase tracking-[0.08em] mb-1" style={{ color: "#FF9F0A" }}>Overall Performance</div>
+              <div className="text-[17px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>{weeklyReport.overall_performance.verdict}</div>
+              <p className="text-[12px] mt-[5px] leading-[1.55]" style={{ color: "rgba(0,0,0,0.5)" }}>{weeklyReport.overall_performance.score_context}</p>
             </div>
-            <div className="px-[14px] py-2 bg-white rounded-[12px] flex items-center gap-[5px] text-[13px] font-bold shrink-0"
-              style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.08)", color: weeklyReport.overall_performance.trend === "Improving" ? "#34C759" : weeklyReport.overall_performance.trend === "Stable" ? "#34C759" : "#FF9500" }}>
+            <div className="flex items-center gap-1 px-[14px] py-[9px] bg-white rounded-[14px] text-[12px] font-bold shrink-0"
+              style={{ border: "0.5px solid rgba(48,209,88,0.2)", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", color: weeklyReport.overall_performance.trend === "Declining" ? "#FF9F0A" : "#30D158" }}>
               <TrendingUp className={`w-3 h-3 ${weeklyReport.overall_performance.trend === "Declining" ? "rotate-180" : ""}`} />
               {weeklyReport.overall_performance.trend}
             </div>
@@ -811,18 +857,18 @@ const DashboardPage = () => {
         {/* ── AI Improvement Tips (when report exists) ── */}
         {weeklyReport?.improvement_tips?.length > 0 && (
           <>
-            <div className="px-5 pt-5 pb-2 text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color: "#AEAEB2" }}>
+            <div className="px-6 pt-5 pb-0 text-[10px] font-bold uppercase tracking-[0.1em]" style={{ color: T4 }}>
               AI Improvement Tips
             </div>
             {weeklyReport.improvement_tips.map((t: { tip: string; reason: string }, i: number) => (
-              <div key={i} className="mx-5 mb-[10px] bg-white rounded-[20px] p-4 flex items-start gap-3" style={{ boxShadow: "0 2px 10px rgba(0,0,0,0.05)" }}>
-                <div className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0 text-[18px]"
-                  style={{ background: "#FFCC00" }}>
+              <div key={i} className="mx-5 mt-[10px] bg-white rounded-[20px] p-4 flex items-start gap-[14px] active:scale-[0.97] transition-transform" style={{ boxShadow: CARD_SHADOW, border: "0.5px solid rgba(107,53,184,0.06)" }}>
+                <div className="w-10 h-10 rounded-[13px] flex items-center justify-center shrink-0 text-[20px]"
+                  style={{ background: i === 0 ? "rgba(255,204,0,0.1)" : "rgba(107,53,184,0.10)", border: `0.5px solid ${i === 0 ? "rgba(255,204,0,0.2)" : "rgba(107,53,184,0.18)"}` }}>
                   {i === 0 ? "💡" : "🎯"}
                 </div>
                 <div>
-                  <div className="text-[15px] font-semibold" style={{ color: "#1C1C1E", letterSpacing: "-0.2px" }}>{t.tip}</div>
-                  <p className="text-[13px] mt-[3px] leading-[1.45]" style={{ color: "#8E8E93" }}>{t.reason}</p>
+                  <div className="text-[14px] font-semibold leading-[1.3]" style={{ color: T1, letterSpacing: "-0.2px" }}>{t.tip}</div>
+                  <p className="text-[12px] mt-[3px] leading-[1.45]" style={{ color: T3 }}>{t.reason}</p>
                 </div>
               </div>
             ))}
@@ -832,49 +878,54 @@ const DashboardPage = () => {
         {/* ── Download PDF Button (when report exists) ── */}
         {weeklyReport && !weeklyLoading && (
           <button onClick={handleDownloadPDF} disabled={pdfDownloading}
-            className="mx-5 mt-2 w-[calc(100%-40px)] rounded-[16px] py-4 flex items-center justify-center gap-2 text-[16px] font-bold text-white disabled:opacity-50 active:scale-[0.97] transition-transform"
-            style={{ background: "#1C1C1E", boxShadow: "0 4px 20px rgba(0,0,0,0.2)", letterSpacing: "-0.2px" }}>
-            {pdfDownloading ? (
-              <><Loader2 className="w-[18px] h-[18px] animate-spin" /> Generating PDF...</>
-            ) : (
-              <><Download className="w-[18px] h-[18px]" /> Download PDF Report</>
-            )}
+            className="mx-5 mt-[18px] w-[calc(100%-40px)] rounded-[18px] py-[17px] flex items-center justify-center gap-[9px] text-[16px] font-bold text-white disabled:opacity-50 active:scale-[0.97] transition-transform relative overflow-hidden"
+            style={{ background: `linear-gradient(135deg, ${PUR}, #4A1A9A)`, boxShadow: "0 8px 32px rgba(107,53,184,0.3), 0 2px 8px rgba(0,0,0,0.12)", letterSpacing: "-0.2px" }}>
+            <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 55%)" }} />
+            <span className="relative z-10 flex items-center gap-[9px]">
+              {pdfDownloading ? (
+                <><Loader2 className="w-[17px] h-[17px] animate-spin" /> Generating PDF...</>
+              ) : (
+                <><Download className="w-[17px] h-[17px]" /> Download PDF Report</>
+              )}
+            </span>
           </button>
         )}
 
         {/* ── AI Parenting Tips ── */}
         <div className="mx-5 mt-5 mb-2">
-          {/* Header */}
-          <div className="flex items-center gap-[10px] bg-white rounded-t-[20px] px-[18px] py-4" style={{ borderBottom: "0.5px solid rgba(60,60,67,0.12)", boxShadow: "0 2px 10px rgba(0,0,0,0.05)" }}>
-            <span className="text-[22px]">💡</span>
-            <div>
-              <div className="text-[17px] font-bold" style={{ color: "#1C1C1E", letterSpacing: "-0.3px" }}>AI Parenting Tips</div>
-              <div className="text-[12px]" style={{ color: "#8E8E93" }}>Based on {childFirstName}'s current data</div>
+          <div className="bg-white rounded-[22px] overflow-hidden" style={{ boxShadow: CARD_SHADOW, border: "0.5px solid rgba(107,53,184,0.06)" }}>
+            {/* Header */}
+            <div className="flex items-center gap-3 px-[18px] py-4" style={{ borderBottom: `0.5px solid ${SEP}` }}>
+              <span className="text-[22px]">💡</span>
+              <div>
+                <div className="text-[16px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>AI Parenting Tips</div>
+                <div className="text-[12px] mt-[1px]" style={{ color: T3 }}>Based on {childFirstName}'s current data</div>
+              </div>
             </div>
-          </div>
 
-          {/* Tips list */}
-          {(() => {
-            const tips = aiInsights?.parenting_tips?.length > 0 ? aiInsights.parenting_tips : smartTips;
-            return tips.length > 0 ? tips.map((item: { tip: string; reason: string }, i: number) => (
-              <div key={i} className={`bg-white px-[18px] py-[14px] flex items-start gap-3 ${i === tips.length - 1 ? "rounded-b-[20px]" : ""}`}
-                style={{ borderBottom: i < tips.length - 1 ? "0.5px solid rgba(60,60,67,0.12)" : "none", boxShadow: "0 2px 10px rgba(0,0,0,0.05)" }}>
-                <div className="w-[26px] h-[26px] rounded-lg flex items-center justify-center text-[13px] font-bold shrink-0 mt-[1px]"
-                  style={{ background: "#FFF3E0", color: "#FF9500" }}>
-                  {i + 1}
+            {/* Tips list */}
+            {(() => {
+              const tips = aiInsights?.parenting_tips?.length > 0 ? aiInsights.parenting_tips : smartTips;
+              return tips.length > 0 ? tips.map((item: { tip: string; reason: string }, i: number) => (
+                <div key={i} className="px-[18px] py-[15px] flex items-start gap-[14px]"
+                  style={{ borderBottom: i < tips.length - 1 ? `0.5px solid ${SEP}` : "none" }}>
+                  <div className="w-7 h-7 rounded-[9px] flex items-center justify-center text-[12px] font-bold shrink-0 mt-[1px]"
+                    style={{ background: "rgba(107,53,184,0.10)", color: PUR, border: "0.5px solid rgba(107,53,184,0.18)" }}>
+                    {i + 1}
+                  </div>
+                  <div>
+                    <div className="text-[13px] font-semibold" style={{ color: T1, letterSpacing: "-0.2px" }}>{item.tip}</div>
+                    <p className="text-[12px] mt-[3px] leading-[1.45]" style={{ color: T3 }}>{item.reason}</p>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-[14px] font-semibold" style={{ color: "#1C1C1E" }}>{item.tip}</div>
-                  <p className="text-[13px] mt-[3px] leading-[1.45]" style={{ color: "#8E8E93" }}>{item.reason}</p>
+              )) : (
+                <div className="px-[18px] py-6 flex items-center gap-3">
+                  <Loader2 className="w-4 h-4 animate-spin" style={{ color: PUR }} />
+                  <p className="text-sm italic" style={{ color: T3 }}>Loading {childFirstName}'s tips...</p>
                 </div>
-              </div>
-            )) : (
-              <div className="bg-white rounded-b-[20px] px-[18px] py-6 flex items-center gap-3">
-                <Loader2 className="w-4 h-4 animate-spin" style={{ color: "#8E8E93" }} />
-                <p className="text-sm italic" style={{ color: "#8E8E93" }}>Loading {childFirstName}'s tips...</p>
-              </div>
-            );
-          })()}
+              );
+            })()}
+          </div>
         </div>
 
         <div className="h-6" />
@@ -1029,7 +1080,7 @@ const DashboardPage = () => {
         <div className="relative z-10 flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">EduIntellect AI · Live Summary</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Edullent AI · Live Summary</span>
           </div>
           <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2.5 py-1">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />

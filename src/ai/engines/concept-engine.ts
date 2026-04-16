@@ -41,7 +41,7 @@ export async function generateParentConceptInsights(data: any): Promise<any> {
     try {
         const prompt = getConceptIntelligencePrompt(data);
         return callAI(prompt, {
-            systemPrompt: "You are EduIntellect AI, a cognitive analysis engine.",
+            systemPrompt: "You are Edullent AI, a cognitive analysis engine.",
         });
     } catch (e) {
         console.info("Concept AI: falling back to mathematical model.", e);
@@ -56,7 +56,7 @@ export async function analyzeConceptMastery(
     try {
         const prompt = getMasteryAnalysisPrompt(studentName, data);
         const aiResult = await callAI(prompt, {
-            systemPrompt: "You are EduIntellect AI, a cognitive analysis engine.",
+            systemPrompt: "You are Edullent AI, a cognitive analysis engine.",
         });
         return { status: "success", source: "ai", data: aiResult };
     } catch (e) {

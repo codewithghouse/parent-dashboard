@@ -70,7 +70,7 @@ function fillCircle(buf, w, cx, cy, rad, r, g, b) {
       if ((x-cx)**2 + (y-cy)**2 <= rad*rad) setPixel(buf, w, x, y, r, g, b);
 }
 
-// ── Draw EduIntellect icon ─────────────────────────────────────
+// ── Draw Edullent icon ─────────────────────────────────────
 function drawIcon(size) {
   const buf = new Uint8Array(size * size * 4); // transparent
 

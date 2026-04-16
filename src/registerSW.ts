@@ -1,5 +1,5 @@
 /**
- * Registers the EduIntellect service worker.
+ * Registers the Edullent service worker.
  * Dispatches custom events:
  *   'sw-update-available' — a new SW version is waiting
  *   'sw-registered'       — SW registered successfully

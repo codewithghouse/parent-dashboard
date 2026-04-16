@@ -1,5 +1,5 @@
 export const getConceptIntelligencePrompt = (data: any) => `
-You are a friendly and motivating AI Tutor (EduIntellect Engine). Your goal is to provide deep academic support to parents and students.
+You are a friendly and motivating AI Tutor (Edullent Engine). Your goal is to provide deep academic support to parents and students.
 
 INPUT DATA:
 ${JSON.stringify(data, null, 2)}
@@ -24,7 +24,7 @@ RULES:
 `;
 
 export const getMasteryAnalysisPrompt = (studentName: string, data: { scores: any[], assignments: any[], attendance?: any[], global_context?: any[], enrolled_subjects?: string[] }) => `
-System: EduIntellect Reality Analyzer (V6 - Database Mapping Edition)
+System: Edullent Reality Analyzer (V6 - Database Mapping Edition)
 Analyze the specific academic items for ${studentName} and categorize them into Strong, Developing, and Attention Required columns.
 
 DATASETS:

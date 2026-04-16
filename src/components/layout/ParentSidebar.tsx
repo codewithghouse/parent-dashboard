@@ -48,7 +48,7 @@ export const ParentSidebar = ({ open, onClose }: ParentSidebarProps) => {
           <GraduationCap className="w-5 h-5 text-primary" />
         </div>
         <div className="flex flex-col leading-none flex-1 min-w-0">
-          <span className="text-primary-foreground font-bold text-lg tracking-wide uppercase">EDUINTELLECT</span>
+          <span className="text-primary-foreground font-bold text-lg tracking-wide uppercase">EDULLENT</span>
           <span className="text-[10px] font-bold text-primary-foreground/60 uppercase tracking-widest mt-1">Parent Portal</span>
         </div>
         {/* Close button — mobile only */}

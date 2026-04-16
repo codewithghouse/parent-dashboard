@@ -1,5 +1,5 @@
 /**
- * EduIntellect Parent — Service Worker v2
+ * Edullent Parent — Service Worker v2
  *
  * Caching strategy:
  *   Static assets (JS/CSS/HTML/fonts/images) → Cache-First   (precached on install)
@@ -14,9 +14,9 @@
  */
 
 const CACHE_VERSION  = 'v2';
-const STATIC_CACHE   = `eduintellect-static-${CACHE_VERSION}`;
-const API_CACHE      = `eduintellect-api-${CACHE_VERSION}`;
-const STORAGE_CACHE  = `eduintellect-storage-${CACHE_VERSION}`;
+const STATIC_CACHE   = `edullent-static-${CACHE_VERSION}`;
+const API_CACHE      = `edullent-api-${CACHE_VERSION}`;
+const STORAGE_CACHE  = `edullent-storage-${CACHE_VERSION}`;
 
 // App shell — cached on install so first paint is always instant
 const PRECACHE_URLS = [
@@ -36,7 +36,7 @@ const OFFLINE_HTML = `<!doctype html>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
   <meta name="theme-color" content="#0B1F3A"/>
-  <title>EduIntellect — Offline</title>
+  <title>Edullent — Offline</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     html,body{height:100%;overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
@@ -163,7 +163,7 @@ self.addEventListener('fetch', (event) => {
 // ── Push notifications ───────────────────────────────────────────────────────
 self.addEventListener('push', (event) => {
   if (!event.data) return;
-  const { title = 'EduIntellect', body = '', icon = '/icons/icon-192x192.png', url = '/' } =
+  const { title = 'Edullent', body = '', icon = '/icons/icon-192x192.png', url = '/' } =
     event.data.json();
   event.waitUntil(
     self.registration.showNotification(title, {

@@ -21,7 +21,7 @@ export const ParentTopbar = ({ onMenuClick }: ParentTopbarProps) => {
 
         <div className="flex flex-col leading-tight min-w-0">
           <span className="text-sm font-black text-slate-800 truncate max-w-[140px] md:max-w-none uppercase tracking-tight">
-            {studentData?.schoolName || "EDUINTELLECT"}
+            {studentData?.schoolName || "EDULLENT"}
           </span>
           <div className="flex items-center gap-2 mt-0.5">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />

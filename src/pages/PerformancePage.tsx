@@ -40,21 +40,39 @@ const PerformancePage = () => {
   useEffect(() => {
     if (!studentData?.id) return;
     setLoading(true);
-    let snap1Cache: any = null, snap2Cache: any = null;
+    let snap1Cache: any = null, snap2Cache: any = null, snap3Cache: any = null;
+
+    // Normalize any score doc to a percentage value
+    const getPct = (s: any): number => {
+      if (s.percentage != null && !isNaN(Number(s.percentage))) return Number(s.percentage);
+      if (s.mark != null && s.maxMarks) return (s.mark / s.maxMarks) * 100;
+      if (s.score != null && s.maxScore) return (s.score / s.maxScore) * 100;
+      if (s.score != null && !isNaN(Number(s.score))) return Number(s.score);
+      return 0;
+    };
+
     const processScores = () => {
       if (!mountedRef.current) return;
       const scoreMap = new Map();
-      [...(snap1Cache?.docs || []), ...(snap2Cache?.docs || [])].forEach((d: any) => {
-        if (!scoreMap.has(d.id)) scoreMap.set(d.id, { id: d.id, ...d.data() });
+      // Merge all 3 sources: test_scores + results + gradebook_scores
+      [...(snap1Cache?.docs || []), ...(snap2Cache?.docs || []), ...(snap3Cache?.docs || [])].forEach((d: any) => {
+        if (!scoreMap.has(d.id)) {
+          const data = d.data();
+          scoreMap.set(d.id, {
+            id: d.id, ...data,
+            // Normalize percentage field for all sources
+            percentage: getPct(data),
+          });
+        }
       });
-      const scores = Array.from(scoreMap.values());
+      const scores = Array.from(scoreMap.values()).filter(s => s.percentage > 0);
 
       const subMap = new Map();
       scores.forEach(s => {
-        const sub = s.subject || "General";
+        const sub = s.subject || s.subjectName || s.testName || s.columnName || "General";
         if (!subMap.has(sub)) subMap.set(sub, { name: sub, total: 0, count: 0, scores: [] });
         const curr = subMap.get(sub);
-        curr.total += (parseFloat(s.percentage) || 0);
+        curr.total += s.percentage;
         curr.count += 1;
         curr.scores.push(s);
       });
@@ -74,20 +92,38 @@ const PerformancePage = () => {
       setSubjects(derivedSubjs);
       if (derivedSubjs.length > 0) {
         const globalAvg = Math.round(derivedSubjs.reduce((a, b) => a + b.progress, 0) / derivedSubjs.length);
+        // Calculate real trend from recent vs older scores
+        const allSorted = scores.sort((a: any, b: any) => {
+          const da = toSafeDate(a.timestamp || a.createdAt || a.date).getTime();
+          const db2 = toSafeDate(b.timestamp || b.createdAt || b.date).getTime();
+          return db2 - da;
+        });
+        const recent = allSorted.slice(0, Math.ceil(allSorted.length / 2));
+        const older = allSorted.slice(Math.ceil(allSorted.length / 2));
+        const recentAvg = recent.length > 0 ? recent.reduce((a: number, s: any) => a + s.percentage, 0) / recent.length : globalAvg;
+        const olderAvg = older.length > 0 ? older.reduce((a: number, s: any) => a + s.percentage, 0) / older.length : globalAvg;
+        const trendDiff = Math.round(recentAvg - olderAvg);
+        const trendStr = trendDiff >= 0 ? `+${trendDiff}%` : `${trendDiff}%`;
         setOverallStats({
           avg: globalAvg,
           grade: globalAvg >= 90 ? "A+" : globalAvg >= 85 ? "A" : globalAvg >= 80 ? "A-" : globalAvg >= 75 ? "B+" : globalAvg >= 70 ? "B" : "C",
-          trend: "+8%"
+          trend: trendStr
         });
       }
 
-      // Trend chart
+      // Trend chart — handle all date formats
       const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
       const scoresByMonth = new Map<string, Map<string, { total: number; count: number }>>();
+      const toSafeDate = (v: any): Date => {
+        if (v?.toDate) return v.toDate();
+        if (v?.seconds) return new Date(v.seconds * 1000);
+        if (typeof v === "string" || typeof v === "number") { const d = new Date(v); if (!isNaN(d.getTime())) return d; }
+        return new Date();
+      };
       scores.forEach(s => {
-        const date = s.timestamp?.toDate() || new Date();
+        const date = toSafeDate(s.timestamp || s.createdAt || s.date);
         const month = monthNames[date.getMonth()];
-        const sub = s.subject || "General";
+        const sub = s.subject || s.subjectName || s.testName || "General";
         if (!scoresByMonth.has(month)) scoresByMonth.set(month, new Map());
         const mm = scoresByMonth.get(month)!;
         if (!mm.has(sub)) mm.set(sub, { total: 0, count: 0 });
@@ -110,26 +146,83 @@ const PerformancePage = () => {
       setLoading(false);
     };
 
-    const schoolId = studentData.schoolId;
+    const sid = studentData.id;
+    const email = (studentData.email || studentData.studentEmail || "").toLowerCase();
 
-    // Single query scoped to this school — prevents cross-school data access
-    const scoresQ = schoolId
-      ? query(collection(db, "test_scores"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id))
-      : query(collection(db, "test_scores"), where("studentId", "==", studentData.id));
-    const u1 = onSnapshot(scoresQ, s => { snap1Cache = s; processScores(); });
+    // Query helper — tries studentId first, no schoolId filter (avoids composite index issues)
+    const byId = (col: string) => query(collection(db, col), where("studentId", "==", sid));
+    const byEmail = (col: string) => email
+      ? query(collection(db, col), where("studentEmail", "==", email))
+      : null;
 
-    // Feedback — single scoped query
-    const feedbackQ = schoolId
-      ? query(collection(db, "performance_feedback"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id))
-      : query(collection(db, "performance_feedback"), where("studentId", "==", studentData.id));
-    const u2 = onSnapshot(feedbackQ, snap => {
+    // 1. test_scores — by studentId
+    const u1 = onSnapshot(byId("test_scores"), s => { snap1Cache = s; processScores(); },
+      () => { /* silent fail if index missing */ });
+
+    // 2. results — by studentId (many schools store scores here instead)
+    const u2r = onSnapshot(byId("results"), s => { snap2Cache = s; processScores(); },
+      () => {});
+
+    // 3. Also fetch by email if available (covers email-based enrollments)
+    let u3r = () => {};
+    const emailQ = byEmail("test_scores");
+    if (emailQ) {
+      u3r = onSnapshot(emailQ, s => {
+        // Merge email-based scores into snap1Cache
+        if (snap1Cache) {
+          const existingIds = new Set(snap1Cache.docs.map((d: any) => d.id));
+          const newDocs = s.docs.filter((d: any) => !existingIds.has(d.id));
+          if (newDocs.length > 0) {
+            snap1Cache = { docs: [...snap1Cache.docs, ...newDocs] };
+            processScores();
+          }
+        } else {
+          snap1Cache = s;
+          processScores();
+        }
+      }, () => {});
+    }
+
+    // 4. gradebook_scores — fetch by classId (need enrollment first)
+    let u4r = () => {};
+    const fetchGradebook = async () => {
+      try {
+        const enrolSnap = await getDocs(byId("enrollments"));
+        const classIds = [...new Set(enrolSnap.docs.map(d => d.data().classId).filter(Boolean))] as string[];
+        if (classIds.length > 0) {
+          // Fetch gradebook scores for the student's classes
+          const chunks: string[][] = [];
+          for (let i = 0; i < classIds.length; i += 10) chunks.push(classIds.slice(i, i + 10));
+          const gbSnaps = await Promise.all(
+            chunks.map(ch => getDocs(query(collection(db, "gradebook_scores"), where("classId", "in", ch))))
+          );
+          // Filter to only this student's scores
+          const studentGbDocs = gbSnaps
+            .flatMap(s => s.docs)
+            .filter(d => {
+              const data = d.data();
+              return data.studentId === sid || (email && data.studentEmail?.toLowerCase() === email);
+            });
+          if (studentGbDocs.length > 0) {
+            snap3Cache = { docs: studentGbDocs };
+            processScores();
+          }
+        }
+      } catch (e) {
+        console.warn("[Performance] Gradebook fetch failed:", e);
+      }
+    };
+    fetchGradebook();
+
+    // 5. Feedback
+    const u5 = onSnapshot(byId("performance_feedback"), snap => {
       if (!mountedRef.current) return;
       const feedMap = new Map(snap.docs.map(d => [d.id, { id: d.id, ...d.data() }]));
       setFeedbacks(Array.from(feedMap.values()));
-    });
+    }, () => {});
 
-    return () => { u1(); u2(); };
-  }, [studentData?.id, studentData?.schoolId]);
+    return () => { u1(); u2r(); u3r(); u4r(); u5(); };
+  }, [studentData?.id]);
 
   // ── AI helpers ──────────────────────────────────────────────────────────────
   const studentName = studentData?.name?.split(" ")[0] || "Your child";

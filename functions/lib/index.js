@@ -32,10 +32,10 @@ exports.getParentAITutor = functions
                 console.warn("PDF scan failed, continuing with context only.");
             }
         }
-        let systemPrompt = "You are a friendly AI Tutor for EduIntellect.";
+        let systemPrompt = "You are a friendly AI Tutor for Edullent.";
         let userPrompt = `Context: ${description}\nText: ${pdfText}\nQuery: ${question}`;
         if (type === "calibration") {
-            systemPrompt = "You are an expert Curriculum Designer for EduIntellect.";
+            systemPrompt = "You are an expert Curriculum Designer for Edullent.";
             userPrompt = `Generate a calibrated assignment for Class: ${target_class} (${students_count} students) on Topic: ${topic || title}. Return JSON with: generated_assignment { title, description }.`;
         }
         const completion = await openai.chat.completions.create({
@@ -64,7 +64,7 @@ exports.parentAIProxy = functions
         throw new functions.https.HttpsError("unauthenticated", "Login required.");
     }
     const openai = new openai_1.default({ apiKey: openaiApiKey.value() });
-    const { prompt, systemPrompt = "You are EduIntellect AI, a friendly educational assistant for school students and their parents. Always respond in simple, encouraging language.", jsonMode = true, imageBase64, model, } = data;
+    const { prompt, systemPrompt = "You are Edullent AI, a friendly educational assistant for school students and their parents. Always respond in simple, encouraging language.", jsonMode = true, imageBase64, model, } = data;
     if (!prompt) {
         throw new functions.https.HttpsError("invalid-argument", "prompt is required.");
     }
