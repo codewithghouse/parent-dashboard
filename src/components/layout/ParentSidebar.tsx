@@ -4,7 +4,7 @@ import {
   Home, User, TrendingUp, CalendarCheck, ClipboardList,
   FileText, Brain, SmilePlus, StickyNote,
   Bell, Settings, GraduationCap, LogOut, CreditCard, CalendarDays, School, X,
-  Sparkles
+  Sparkles, Library
 } from "lucide-react";
 
 interface ParentSidebarProps {
@@ -21,6 +21,7 @@ const navItems = [
   { title: "Attendance", path: "/attendance", icon: CalendarCheck },
   { title: "Assignments", path: "/assignments", icon: ClipboardList },
   { title: "Tests & Exams", path: "/tests", icon: FileText },
+  { title: "Syllabus", path: "/syllabus", icon: Library },
   { title: "Concept Strengths", path: "/concepts", icon: Brain },
   { title: "AI Practice", path: "/ai-practice", icon: Sparkles },
   { title: "Behaviour", path: "/behaviour", icon: SmilePlus },

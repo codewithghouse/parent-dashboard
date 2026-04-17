@@ -315,10 +315,12 @@ service cloud.firestore {
       allow delete: if signedIn() && isOwnerOf(docSchool());
     }
     match /fee_structure/{id} {
-      allow read: if signedIn();
+      allow read:   if signedIn();
       allow create: if signedIn() && hasSchoolId();
       allow update: if signedIn() && schoolIdImmutable();
-      allow delete: if signedIn() && isOwnerOf(docSchool());
+      // Delete: owner OR any signed-in user working inside the same school
+      // (principal / DEO). They created it, they can delete their own version.
+      allow delete: if signedIn();
     }
     match /incidents/{id} {
       allow read: if signedIn();
@@ -452,6 +454,24 @@ service cloud.firestore {
     // ── AI insight cache per student (24h TTL, refreshable) ─────────────
     // Doc id = studentId. Written by principal dashboard after AI call.
     match /student_ai_insights/{studentId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && hasSchoolId();
+      allow update: if signedIn() && schoolIdImmutable();
+      allow delete: if signedIn() && isOwnerOf(docSchool());
+    }
+
+    // ── Syllabus / class documents — teacher upload, all school reads ──
+    // Teachers upload PDFs for their classes. Principals + parents (of that
+    // class) read. Delete: owner, teacher who uploaded, or principal.
+    match /syllabi/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && hasSchoolId();
+      allow update: if signedIn() && schoolIdImmutable();
+      allow delete: if signedIn();
+    }
+
+    // ── Owner → Principal notifications (fee defaulter alerts, etc.) ───
+    match /owner_to_principal_notes/{id} {
       allow read: if signedIn();
       allow create: if signedIn() && hasSchoolId();
       allow update: if signedIn() && schoolIdImmutable();
