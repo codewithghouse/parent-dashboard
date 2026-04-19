@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import {
   Loader2, Send, CheckCheck, MessageSquare, Mail, Search, Smile,
-  ChevronLeft, GraduationCap, Plus, X, Star
+  ChevronLeft, GraduationCap, Plus, X, Star, Paperclip
 } from "lucide-react";
 import { db } from "../lib/firebase";
 import {
@@ -9,11 +9,13 @@ import {
   updateDoc, doc
 } from "firebase/firestore";
 import { useAuth } from "../lib/AuthContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import { useLocation } from "react-router-dom";
 
 const TeacherNotesPage = () => {
   const { studentData } = useAuth();
+  const isMobile = useIsMobile();
   const location = useLocation();
   const [selectedTeacher, setSelectedTeacher]     = useState<any>(null);
   const [allNotes, setAllNotes]                   = useState<any[]>([]);
@@ -188,6 +190,505 @@ const TeacherNotesPage = () => {
     });
     return groups;
   }, [chatMessages]);
+
+  // ═══════════════════════════════════════════════════════════════
+  // MOBILE — Blue Premium UI (Messages Home / Select Teacher / Chat)
+  // ═══════════════════════════════════════════════════════════════
+  if (isMobile) {
+    const B1 = "#0055FF", B2 = "#1166FF", B3 = "#2277FF";
+    const BG = "#EEF4FF", BG2 = "#E0ECFF", BG3 = "#F5F9FF", CARD = "#FFFFFF";
+    const T1 = "#001040", T2 = "#002080", T3 = "#5070B0", T4 = "#99AACC";
+    const ORANGE = "#FF8800", GOLD = "#FFAA00";
+    const SH    = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.08), 0 10px 26px rgba(0,85,255,0.10)";
+    const SH_LG = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.11), 0 18px 44px rgba(0,85,255,0.13)";
+    const SH_BTN = "0 6px 22px rgba(0,85,255,0.42), 0 2px 6px rgba(0,85,255,0.22)";
+    const FONT = "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif";
+
+    const avatarChar = (studentData?.name?.[0] || "S").toUpperCase();
+    const teacherGrads = [
+      "linear-gradient(135deg, #0044EE, #2277FF)",
+      "linear-gradient(135deg, #002DBB, #0055FF)",
+      "linear-gradient(135deg, #0033CC, #1166FF)",
+      "linear-gradient(135deg, #0055FF, #4499FF)",
+    ];
+    const gradFor = (name?: string) => teacherGrads[((name?.charCodeAt(0) || 0) % teacherGrads.length + teacherGrads.length) % teacherGrads.length];
+
+    // Shared rate modal (rendered alongside chat view)
+    const rateModalMobile = showRateModal && selectedTeacher && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,16,64,0.55)", fontFamily: FONT }}>
+        <div className="bg-white rounded-[26px] p-6 w-full max-w-sm" style={{ boxShadow: "0 24px 60px rgba(0,20,80,0.30)" }}>
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h3 className="text-[17px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Rate Teacher</h3>
+              <p className="text-[13px] font-semibold mt-[2px]" style={{ color: B1 }}>{selectedTeacher.teacherName}</p>
+            </div>
+            <button onClick={() => { setShowRateModal(false); setRatingValue(0); setReviewText(""); }}
+              className="w-9 h-9 rounded-full flex items-center justify-center active:scale-95"
+              style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.12)" }}>
+              <X className="w-4 h-4" style={{ color: T3 }} />
+            </button>
+          </div>
+          <div className="text-center mb-5">
+            <p className="text-[10px] font-bold uppercase tracking-[0.15em] mb-3" style={{ color: T4 }}>Your Rating</p>
+            <div className="flex justify-center gap-2">
+              {[1, 2, 3, 4, 5].map(star => (
+                <button key={star}
+                  onMouseEnter={() => setHoverRating(star)}
+                  onMouseLeave={() => setHoverRating(0)}
+                  onClick={() => setRatingValue(star)}
+                  className="transition-transform active:scale-90">
+                  <Star size={34} style={{
+                    fill: star <= (hoverRating || ratingValue) ? GOLD : "transparent",
+                    color: star <= (hoverRating || ratingValue) ? GOLD : BG2,
+                  }} />
+                </button>
+              ))}
+            </div>
+            {ratingValue > 0 && (
+              <p className="text-[13px] font-bold mt-2" style={{ color: GOLD }}>
+                {["", "Poor", "Fair", "Good", "Very Good", "Excellent"][ratingValue]}
+              </p>
+            )}
+          </div>
+          <div className="mb-4">
+            <p className="text-[10px] font-bold uppercase tracking-[0.15em] mb-2" style={{ color: T4 }}>Review (Optional)</p>
+            <textarea rows={3} value={reviewText} onChange={e => setReviewText(e.target.value)}
+              placeholder="Share your experience..."
+              className="w-full px-4 py-3 rounded-[14px] text-[13px] resize-none outline-none"
+              style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.12)", color: T1, fontFamily: FONT }} />
+          </div>
+          <button onClick={handleSubmitReview} disabled={ratingValue === 0 || isSubmittingReview}
+            className="w-full h-12 rounded-[16px] text-white font-bold text-[14px] flex items-center justify-center gap-2 active:scale-[0.97] disabled:opacity-50"
+            style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: SH_BTN }}>
+            {isSubmittingReview ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting…</> : <><Star className="w-4 h-4 fill-white" /> Submit Review</>}
+          </button>
+        </div>
+      </div>
+    );
+
+    // ── Compact stat row (shared between home + chat) ──
+    const statRow = (compact: boolean) => (
+      <div className="flex rounded-[20px] overflow-hidden"
+        style={{ background: CARD, boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+        {[
+          { ico: <MessageSquare className="w-[13px] h-[13px]" style={{ color: B1 }} strokeWidth={2.4} />, bg: "rgba(0,85,255,0.10)", bdr: "rgba(0,85,255,0.18)", label: "Total\nMessages", val: stats.total },
+          { ico: <Mail className="w-[13px] h-[13px]" style={{ color: ORANGE }} strokeWidth={2.4} />, bg: "rgba(255,136,0,0.10)", bdr: "rgba(255,136,0,0.22)", label: "Teacher\nMsgs", val: stats.unread },
+          { ico: <GraduationCap className="w-[13px] h-[13px]" style={{ color: "rgba(0,85,255,0.7)" }} strokeWidth={2.4} />, bg: "rgba(0,85,255,0.08)", bdr: "rgba(0,85,255,0.16)", label: "Teachers", val: stats.teachers },
+        ].map((s, i, arr) => (
+          <div key={i} className="flex-1 px-3 flex flex-col relative"
+            style={{
+              paddingTop: compact ? 12 : 14, paddingBottom: compact ? 12 : 14,
+              gap: compact ? 4 : 5,
+              borderRight: i < arr.length - 1 ? "0.5px solid rgba(0,85,255,0.10)" : undefined,
+            }}>
+            <div className="w-[26px] h-[26px] rounded-[8px] flex items-center justify-center"
+              style={{ background: s.bg, border: `0.5px solid ${s.bdr}`, marginBottom: compact ? 2 : 3 }}>
+              {s.ico}
+            </div>
+            <div className="font-bold uppercase tracking-[0.07em] leading-[1.3] whitespace-pre-line"
+              style={{ color: T4, fontSize: compact ? 8 : 9 }}>
+              {s.label}
+            </div>
+            <div className="font-bold leading-none" style={{ color: T1, letterSpacing: "-0.6px", fontSize: compact ? 18 : 22 }}>{s.val}</div>
+          </div>
+        ))}
+      </div>
+    );
+
+    // Compact header (brand + bell + avatar) shared by home + select-teacher
+    const compactHeader = (
+      <div className="flex items-center justify-between px-5 pt-3">
+        <div className="flex items-center gap-[7px]">
+          <div className="w-[7px] h-[7px] rounded-full animate-pulse" style={{ background: "#00CC55", boxShadow: "0 0 0 2.5px rgba(0,204,85,0.2)" }} />
+          <span className="text-[16px] font-bold" style={{ color: B1 }}>EduIntellect</span>
+        </div>
+        <div className="flex items-center gap-[9px]">
+          <div className="w-[35px] h-[35px] rounded-full flex items-center justify-center relative"
+            style={{ background: "rgba(255,255,255,0.88)", border: "0.5px solid rgba(0,85,255,0.16)", boxShadow: SH }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(0,85,255,0.60)" strokeWidth="1.8" strokeLinecap="round">
+              <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 01-3.46 0"/>
+            </svg>
+            {stats.unread > 0 && (
+              <span className="absolute top-[1px] right-[1px] w-2 h-2 rounded-full" style={{ background: "#FF3355", border: "1.5px solid white" }} />
+            )}
+          </div>
+          <div className="w-[35px] h-[35px] rounded-full flex items-center justify-center text-white text-[12px] font-bold"
+            style={{ background: `linear-gradient(140deg, ${B1}, ${B2})`, boxShadow: "0 3px 12px rgba(0,85,255,0.36), 0 0 0 2px rgba(255,255,255,0.8)" }}>
+            {avatarChar}
+          </div>
+        </div>
+      </div>
+    );
+
+    // ── CHAT VIEW ──────────────────────────────────────────────────
+    if (selectedTeacher) {
+      return (
+        <>
+          <div className="flex-1 flex flex-col -m-3 md:m-0 -mb-28 md:mb-0 animate-in fade-in duration-500"
+            style={{ background: BG, fontFamily: FONT }}>
+
+            <div className="mx-5 mt-3 shrink-0">{statRow(true)}</div>
+
+            {/* Chat header */}
+            <div className="mx-5 mt-[10px] rounded-[18px] px-[16px] py-[13px] flex items-center gap-3 relative overflow-hidden shrink-0"
+              style={{ background: `linear-gradient(135deg, ${B1}, ${B2})` }}>
+              <div className="absolute -top-6 -right-4 w-[110px] h-[110px] rounded-full pointer-events-none"
+                style={{ background: "radial-gradient(circle, rgba(255,255,255,0.14) 0%, transparent 65%)" }} />
+              <button onClick={() => setSelectedTeacher(null)}
+                className="w-8 h-8 rounded-[10px] flex items-center justify-center active:scale-90 relative z-10 shrink-0"
+                style={{ background: "rgba(255,255,255,0.20)", border: "0.5px solid rgba(255,255,255,0.28)" }}>
+                <ChevronLeft className="w-[13px] h-[13px] text-white" strokeWidth={2.5} />
+              </button>
+              <div className="w-10 h-10 rounded-[13px] flex items-center justify-center text-white text-[15px] font-bold relative z-10 shrink-0"
+                style={{ background: gradFor(selectedTeacher.teacherName), border: "2px solid rgba(255,255,255,0.28)" }}>
+                {selectedTeacher.teacherName?.substring(0, 2).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0 relative z-10">
+                <div className="text-[16px] font-bold text-white truncate" style={{ letterSpacing: "-0.3px" }}>
+                  {selectedTeacher.teacherName}
+                </div>
+                <div className="text-[11px] font-semibold mt-[2px] flex items-center gap-[4px]" style={{ color: "rgba(255,255,255,0.70)" }}>
+                  <div className="w-[5px] h-[5px] rounded-full" style={{ background: "#00EE66", boxShadow: "0 0 0 1.5px rgba(0,238,102,0.25)" }} />
+                  {selectedTeacher.subject || "Teacher"} · Online
+                </div>
+              </div>
+              <button onClick={() => setShowRateModal(true)}
+                className="flex items-center gap-[5px] px-[12px] py-[7px] rounded-[12px] text-[12px] font-bold text-white active:scale-95 relative z-10 shrink-0"
+                style={{ background: "rgba(255,255,255,0.20)", border: "0.5px solid rgba(255,255,255,0.28)" }}>
+                <Star size={12} fill="#FFD700" color="#FFD700" />
+                Rate
+              </button>
+            </div>
+
+            {/* Messages area */}
+            <div className="mx-5 mt-[10px] mb-2 rounded-[18px] flex-1 min-h-0 overflow-y-auto no-sb p-4 flex flex-col gap-2"
+              style={{ background: BG3 }}>
+              {loading ? (
+                <div className="flex-1 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin" style={{ color: B1 }} /></div>
+              ) : groupedMessages.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center gap-3 py-8">
+                  <div className="w-[60px] h-[60px] rounded-[20px] flex items-center justify-center"
+                    style={{ background: "rgba(0,85,255,0.08)", border: "0.5px solid rgba(0,85,255,0.14)", boxShadow: "0 0 0 8px rgba(0,85,255,0.04)" }}>
+                    <GraduationCap className="w-[26px] h-[26px]" style={{ color: "rgba(0,85,255,0.45)" }} strokeWidth={2.1} />
+                  </div>
+                  <div className="text-[16px] font-bold" style={{ color: T2, letterSpacing: "-0.3px" }}>No messages yet</div>
+                  <div className="text-[12px] text-center max-w-[200px] font-normal leading-[1.6]" style={{ color: T4 }}>
+                    Start the conversation with your teacher
+                  </div>
+                </div>
+              ) : groupedMessages.map(group => (
+                <div key={group.date}>
+                  <div className="flex justify-center my-2">
+                    <span className="text-[10px] font-semibold px-3 py-[4px] rounded-full"
+                      style={{ background: "rgba(255,255,255,0.90)", color: T3, boxShadow: SH }}>
+                      {group.date}
+                    </span>
+                  </div>
+                  {group.messages.map(n => {
+                    const isParent = n.from === "parent";
+                    return isParent ? (
+                      <div key={n.id} className="flex justify-end mb-[6px]">
+                        <div className="max-w-[75%]">
+                          <div className="px-[15px] py-[11px] text-[13px] text-white font-normal leading-[1.6] relative"
+                            style={{
+                              background: `linear-gradient(135deg, ${B1}, ${B2})`,
+                              borderRadius: "20px 20px 5px 20px",
+                              boxShadow: "0 3px 10px rgba(0,85,255,0.24)",
+                              letterSpacing: "-0.1px",
+                            }}>
+                            <div className="whitespace-pre-wrap break-words">{n.content}</div>
+                          </div>
+                          <div className="text-[9px] font-semibold text-right mt-[3px] flex items-center justify-end gap-[3px]" style={{ color: T4 }}>
+                            <span>{fmtTime(n.createdAt)}</span>
+                            <CheckCheck className="w-3 h-3" style={{ color: B1 }} />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div key={n.id} className="flex justify-start mb-[6px] gap-2">
+                        <div className="w-7 h-7 rounded-[9px] flex items-center justify-center text-white text-[11px] font-bold self-end shrink-0"
+                          style={{ background: gradFor(selectedTeacher.teacherName), boxShadow: "0 2px 6px rgba(0,85,255,0.22)" }}>
+                          {selectedTeacher.teacherName?.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div className="max-w-[75%]">
+                          <div className="px-[15px] py-[11px] text-[13px] font-normal leading-[1.6]"
+                            style={{
+                              background: CARD, color: T1,
+                              borderRadius: "20px 20px 20px 5px",
+                              boxShadow: SH,
+                              border: "0.5px solid rgba(0,85,255,0.10)",
+                              letterSpacing: "-0.1px",
+                            }}>
+                            <div className="whitespace-pre-wrap break-words">{n.content}</div>
+                          </div>
+                          <div className="text-[9px] font-semibold mt-[3px]" style={{ color: T4 }}>{fmtTime(n.createdAt)}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Input bar */}
+            <div className="mx-5 mb-3 rounded-[18px] p-[10px] flex items-center gap-[10px] shrink-0"
+              style={{
+                background: "rgba(238,244,255,0.94)",
+                border: "0.5px solid rgba(0,85,255,0.10)",
+                boxShadow: SH,
+              }}>
+              <button className="w-9 h-9 rounded-[12px] flex items-center justify-center active:scale-90 shrink-0"
+                style={{ background: CARD, border: "0.5px solid rgba(0,85,255,0.14)", boxShadow: SH }}>
+                <Paperclip className="w-[15px] h-[15px]" style={{ color: "rgba(0,85,255,0.6)" }} strokeWidth={2.2} />
+              </button>
+              <input
+                type="text"
+                value={messageContent}
+                onChange={e => setMessageContent(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                placeholder={`Type a message to ${selectedTeacher.teacherName?.split(" ")[0] || "teacher"}...`}
+                className="flex-1 min-w-0 px-[14px] py-[10px] rounded-[14px] text-[13px] outline-none"
+                style={{ background: CARD, border: "0.5px solid rgba(0,85,255,0.14)", color: T1, boxShadow: SH, fontFamily: FONT }}
+              />
+              <button onClick={handleSend} disabled={!messageContent.trim()}
+                className="w-9 h-9 rounded-[12px] flex items-center justify-center active:scale-90 shrink-0 disabled:opacity-50"
+                style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: "0 3px 12px rgba(0,85,255,0.30)" }}>
+                <Send className="w-[15px] h-[15px] text-white" strokeWidth={2.5} />
+              </button>
+            </div>
+          </div>
+          {rateModalMobile}
+        </>
+      );
+    }
+
+    // ── SELECT TEACHER VIEW ──────────────────────────────────────
+    if (showNewChat) {
+      const filteredTeachers = availableTeachers.filter(t =>
+        (t.name || "").toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      return (
+        <div className="-mx-3 -mt-3 md:mx-0 md:mt-0 animate-in fade-in duration-500"
+          style={{ background: BG, minHeight: "100vh", fontFamily: FONT }}>
+
+          {compactHeader}
+
+          {/* Select banner */}
+          <div className="mx-5 mt-3 rounded-[20px] px-[18px] py-[14px] flex items-center gap-3 relative overflow-hidden"
+            style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: SH_BTN }}>
+            <div className="absolute -top-6 -right-4 w-[120px] h-[120px] rounded-full pointer-events-none"
+              style={{ background: "radial-gradient(circle, rgba(255,255,255,0.14) 0%, transparent 65%)" }} />
+            <button onClick={() => setShowNewChat(false)}
+              className="w-8 h-8 rounded-[10px] flex items-center justify-center active:scale-90 relative z-10"
+              style={{ background: "rgba(255,255,255,0.20)", border: "0.5px solid rgba(255,255,255,0.28)" }}>
+              <ChevronLeft className="w-[13px] h-[13px] text-white" strokeWidth={2.5} />
+            </button>
+            <div className="text-[17px] font-bold text-white relative z-10" style={{ letterSpacing: "-0.3px" }}>Select Teacher</div>
+          </div>
+
+          {/* Search */}
+          <div className="mx-5 mt-3 relative">
+            <div className="absolute left-[14px] top-1/2 -translate-y-1/2 pointer-events-none">
+              <Search className="w-[15px] h-[15px]" style={{ color: "rgba(0,85,255,0.42)" }} strokeWidth={2.2} />
+            </div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search for a teacher..."
+              className="w-full pl-[42px] pr-4 py-3 rounded-[15px] text-[13px] outline-none"
+              style={{ background: CARD, border: "0.5px solid rgba(0,85,255,0.12)", color: T1, boxShadow: SH, fontFamily: FONT }}
+            />
+          </div>
+
+          {/* Teacher list */}
+          <div className="mx-5 mt-[14px] rounded-[22px] overflow-hidden"
+            style={{ background: CARD, boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+            <div className="px-[18px] pt-[13px] pb-[10px] flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.10em]"
+              style={{ color: T4, borderBottom: "0.5px solid rgba(0,85,255,0.07)" }}>
+              Your Teachers
+              <div className="flex-1 h-[0.5px]" style={{ background: "rgba(0,85,255,0.10)" }} />
+            </div>
+            {filteredTeachers.length === 0 ? (
+              <div className="px-5 py-10 text-center text-[12px] font-semibold" style={{ color: T4 }}>
+                {availableTeachers.length === 0 ? "No class teachers found" : "No teachers match your search"}
+              </div>
+            ) : (
+              filteredTeachers.map((t: any, i: number, arr: any[]) => (
+                <div key={t.id} onClick={() => {
+                  setSelectedTeacher({ teacherId: t.id, teacherName: t.name, subject: t.subject || "General" });
+                  setShowNewChat(false);
+                }}
+                  className="flex items-center gap-[14px] px-[18px] py-[15px] cursor-pointer active:bg-[rgba(0,85,255,0.04)] transition-colors"
+                  style={i < arr.length - 1 ? { borderBottom: "0.5px solid rgba(0,85,255,0.07)" } : {}}>
+                  <div className="w-[46px] h-[46px] rounded-[15px] flex items-center justify-center text-white text-[16px] font-bold shrink-0"
+                    style={{ background: gradFor(t.name), boxShadow: "0 3px 10px rgba(0,85,255,0.26)" }}>
+                    {t.name?.substring(0, 2).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[15px] font-bold truncate" style={{ color: T1, letterSpacing: "-0.2px" }}>{t.name}</div>
+                    <div className="text-[11px] font-semibold mt-[2px] flex items-center gap-[4px]" style={{ color: T3 }}>
+                      <GraduationCap className="w-[11px] h-[11px]" style={{ color: B1 }} strokeWidth={2.5} />
+                      {t.subject || "General"}
+                    </div>
+                  </div>
+                  <div className="w-7 h-7 rounded-[9px] flex items-center justify-center shrink-0"
+                    style={{ background: "rgba(0,85,255,0.08)", border: "0.5px solid rgba(0,85,255,0.14)" }}>
+                    <ChevronLeft className="w-3 h-3" style={{ color: "rgba(0,85,255,0.55)", transform: "rotate(180deg)" }} strokeWidth={2.5} />
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="pt-[14px] px-5 text-center text-[12px] font-normal" style={{ color: T4 }}>
+            Tap a teacher to start a new conversation
+          </div>
+
+          {/* Message Centre summary */}
+          <div className="mx-5 mt-[14px] rounded-[22px] px-5 py-[18px] relative overflow-hidden"
+            style={{
+              background: "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)",
+              boxShadow: "0 8px 28px rgba(0,51,204,0.30), 0 0 0 0.5px rgba(255,255,255,0.14)",
+            }}>
+            <div className="absolute -top-8 -right-5 w-[130px] h-[130px] rounded-full pointer-events-none"
+              style={{ background: "radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 65%)" }} />
+            <div className="text-[9px] font-bold uppercase tracking-[0.12em] mb-[10px] relative z-10" style={{ color: "rgba(255,255,255,0.48)" }}>
+              Message Centre
+            </div>
+            <div className="grid grid-cols-2 gap-[1px] rounded-[16px] overflow-hidden relative z-10" style={{ background: "rgba(255,255,255,0.12)" }}>
+              {[
+                { val: availableTeachers.length, label: "Teachers" },
+                { val: stats.total, label: "Total Msgs" },
+              ].map(({ val, label }) => (
+                <div key={label} className="py-[14px] px-4 text-center" style={{ background: "rgba(255,255,255,0.08)" }}>
+                  <div className="text-[24px] font-bold text-white leading-none mb-1" style={{ letterSpacing: "-0.6px" }}>{val}</div>
+                  <div className="text-[9px] font-bold uppercase tracking-[0.09em]" style={{ color: "rgba(255,255,255,0.40)" }}>{label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="h-4" />
+        </div>
+      );
+    }
+
+    // ── HOME VIEW ─────────────────────────────────────────────────
+    const filteredConvs = teacherConversations;
+    return (
+      <div className="-mx-3 -mt-3 md:mx-0 md:mt-0 animate-in fade-in duration-500"
+        style={{ background: BG, minHeight: "100vh", fontFamily: FONT }}>
+
+        {compactHeader}
+
+        {/* Stat row */}
+        <div className="mx-5 mt-[14px]">{statRow(false)}</div>
+
+        {/* Hero banner */}
+        <div className="mx-5 mt-3 rounded-[22px] px-5 py-4 flex items-center gap-3 relative overflow-hidden"
+          style={{ background: `linear-gradient(135deg, ${B1} 0%, ${B2} 50%, ${B3} 100%)`, boxShadow: SH_BTN }}>
+          <div className="absolute -top-[30px] -right-[20px] w-[130px] h-[130px] rounded-full pointer-events-none"
+            style={{ background: "radial-gradient(circle, rgba(255,255,255,0.14) 0%, transparent 65%)" }} />
+          <div className="w-[42px] h-[42px] rounded-[14px] flex items-center justify-center shrink-0 relative z-10"
+            style={{ background: "rgba(255,255,255,0.20)", border: "0.5px solid rgba(255,255,255,0.28)" }}>
+            <GraduationCap className="w-[22px] h-[22px] text-white" strokeWidth={2.2} />
+          </div>
+          <div className="relative z-10">
+            <div className="text-[17px] font-bold text-white mb-[2px]" style={{ letterSpacing: "-0.3px" }}>Teacher Messages</div>
+            <div className="text-[11px] font-normal" style={{ color: "rgba(255,255,255,0.65)" }}>Direct communication with your teachers</div>
+          </div>
+        </div>
+
+        {/* Search */}
+        <div className="mx-5 mt-3 relative">
+          <div className="absolute left-[14px] top-1/2 -translate-y-1/2 pointer-events-none">
+            <Search className="w-[15px] h-[15px]" style={{ color: "rgba(0,85,255,0.42)" }} strokeWidth={2.2} />
+          </div>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search teachers..."
+            className="w-full pl-[42px] pr-4 py-3 rounded-[15px] text-[13px] outline-none"
+            style={{ background: CARD, border: "0.5px solid rgba(0,85,255,0.12)", color: T1, boxShadow: SH, fontFamily: FONT }}
+          />
+        </div>
+
+        {/* New Message btn */}
+        <button onClick={() => setShowNewChat(true)}
+          className="mx-5 mt-[10px] w-[calc(100%-40px)] h-[50px] rounded-[16px] flex items-center justify-center gap-2 text-[15px] font-bold text-white active:scale-[0.97] relative overflow-hidden"
+          style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: SH_BTN, letterSpacing: "-0.1px" }}>
+          <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.14) 0%, transparent 52%)" }} />
+          <Plus className="w-4 h-4 relative z-10" strokeWidth={2.5} />
+          <span className="relative z-10">New Message</span>
+        </button>
+
+        {/* Conversation list OR empty state */}
+        {loading ? (
+          <div className="flex justify-center mt-5"><Loader2 className="w-6 h-6 animate-spin" style={{ color: B1 }} /></div>
+        ) : filteredConvs.length > 0 ? (
+          <div className="mx-5 mt-3 rounded-[22px] overflow-hidden"
+            style={{ background: CARD, boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+            <div className="px-[18px] pt-[14px] pb-[10px] flex items-center justify-between"
+              style={{ borderBottom: "0.5px solid rgba(0,85,255,0.07)" }}>
+              <div className="text-[14px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>Conversations</div>
+              <div className="px-[9px] py-[3px] rounded-full text-[10px] font-bold"
+                style={{ background: "rgba(0,85,255,0.10)", color: B1, border: "0.5px solid rgba(0,85,255,0.18)" }}>
+                {filteredConvs.length} active
+              </div>
+            </div>
+            {filteredConvs.map((t, i, arr) => {
+              const unread = unreadCounts.get(t.teacherId) || 0;
+              return (
+                <div key={t.teacherId} onClick={() => setSelectedTeacher(t)}
+                  className="flex items-center gap-[13px] px-[18px] py-[14px] cursor-pointer active:bg-[rgba(0,85,255,0.04)] transition-colors"
+                  style={i < arr.length - 1 ? { borderBottom: "0.5px solid rgba(0,85,255,0.07)" } : {}}>
+                  <div className="w-[46px] h-[46px] rounded-[15px] flex items-center justify-center text-white text-[16px] font-bold shrink-0"
+                    style={{ background: gradFor(t.teacherName), boxShadow: "0 3px 10px rgba(0,85,255,0.26)" }}>
+                    {t.teacherName?.substring(0, 2).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[14px] font-bold truncate" style={{ color: T1, letterSpacing: "-0.2px" }}>{t.teacherName}</div>
+                    <div className="text-[12px] font-normal truncate" style={{ color: T3 }}>
+                      {t.lastMessage.from === "parent" ? "✓ " : ""}{t.lastMessage.content}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-[5px] shrink-0">
+                    <div className="text-[10px] font-semibold" style={{ color: T4 }}>{fmtTime(t.lastMessage.createdAt)}</div>
+                    {unread > 0 && (
+                      <div className="min-w-[20px] h-[20px] rounded-full flex items-center justify-center text-[10px] font-bold text-white px-[5px]"
+                        style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: "0 2px 6px rgba(0,85,255,0.30)" }}>
+                        {unread}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="mx-5 mt-3 rounded-[22px] px-5 py-8 flex flex-col items-center gap-[10px] relative overflow-hidden"
+            style={{ background: CARD, boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+            <div className="absolute -top-10 -right-7 w-[150px] h-[150px] rounded-full pointer-events-none"
+              style={{ background: "radial-gradient(circle, rgba(0,85,255,0.05) 0%, transparent 70%)" }} />
+            <div className="w-16 h-16 rounded-[22px] flex items-center justify-center mb-[6px] relative z-10"
+              style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: `${SH_BTN}, 0 0 0 10px rgba(0,85,255,0.07)` }}>
+              <MessageSquare className="w-[30px] h-[30px]" style={{ color: "rgba(255,255,255,0.95)" }} strokeWidth={2.1} />
+            </div>
+            <div className="text-[17px] font-bold text-center relative z-10" style={{ color: T1, letterSpacing: "-0.3px" }}>No conversations yet</div>
+            <div className="text-[12px] text-center max-w-[210px] leading-[1.6] font-normal relative z-10" style={{ color: T3 }}>
+              Tap <strong style={{ color: B1, fontWeight: 700 }}>New Message</strong> to start a direct chat with your teacher.
+            </div>
+          </div>
+        )}
+
+        <div className="h-4" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col -m-3 md:-m-6 -mb-28 lg:-mb-8" style={{ fontFamily: "'Montserrat', sans-serif" }}>

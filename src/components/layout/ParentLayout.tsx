@@ -32,7 +32,7 @@ export const ParentLayout = () => {
             lg:pb-8          → no bottom nav on desktop
         */}
         <main
-          className="flex-1 overflow-y-auto overflow-x-hidden bg-slate-50/50 p-3 md:p-6 pb-28 lg:pb-8 flex flex-col"
+          className="flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-6 pb-28 lg:pb-8 flex flex-col bg-[#EEEEF3] md:bg-slate-50/50"
           style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'none' }}
         >
           <PageTransition>

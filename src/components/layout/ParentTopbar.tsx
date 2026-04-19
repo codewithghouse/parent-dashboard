@@ -1,13 +1,101 @@
 import { Bell, Menu } from "lucide-react";
 import { useAuth } from "../../lib/AuthContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ParentTopbarProps {
   onMenuClick: () => void;
 }
 
+const IND = "#30306E";
+
 export const ParentTopbar = ({ onMenuClick }: ParentTopbarProps) => {
   const { studentData, user } = useAuth();
+  const isMobile = useIsMobile();
+  const initial = studentData?.name?.[0] || user?.displayName?.[0] || "P";
 
+  // ══════════════════════════════
+  // MOBILE — Indigo Apple-style header
+  // ══════════════════════════════
+  if (isMobile) {
+    return (
+      <header
+        className="h-14 flex items-center justify-between px-4 sticky top-0 z-[60]"
+        style={{
+          fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+          background: "rgba(238,238,243,0.82)",
+          WebkitBackdropFilter: "saturate(220%) blur(24px)",
+          backdropFilter: "saturate(220%) blur(24px)",
+          borderBottom: "0.5px solid rgba(48,48,110,0.08)",
+        }}
+      >
+        {/* Left — menu + brand/live-dot */}
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            onClick={onMenuClick}
+            aria-label="Open menu"
+            className="w-9 h-9 -ml-1 rounded-full flex items-center justify-center active:scale-90 transition-transform"
+            style={{
+              background: "rgba(255,255,255,0.8)",
+              border: "0.5px solid rgba(48,48,110,0.12)",
+              boxShadow: "0 1px 4px rgba(48,48,110,0.08)",
+              WebkitBackdropFilter: "blur(12px)",
+              backdropFilter: "blur(12px)",
+            }}
+          >
+            <Menu className="w-[18px] h-[18px]" style={{ color: "rgba(48,48,110,0.55)" }} />
+          </button>
+
+          <div className="flex items-center gap-[7px] pl-1 min-w-0">
+            <span
+              className="w-[7px] h-[7px] rounded-full flex-shrink-0 animate-pulse"
+              style={{ background: "#12C04E", boxShadow: "0 0 0 2.5px rgba(18,192,78,0.2)" }}
+            />
+            <span
+              className="text-[15px] font-bold truncate"
+              style={{ color: IND, letterSpacing: "-0.2px" }}
+            >
+              {studentData?.schoolName || "Edullent"}
+            </span>
+          </div>
+        </div>
+
+        {/* Right — bell + avatar */}
+        <div className="flex items-center gap-[10px] flex-shrink-0">
+          <button
+            className="relative w-[38px] h-[38px] rounded-full flex items-center justify-center active:scale-90 transition-transform"
+            style={{
+              background: "rgba(255,255,255,0.8)",
+              border: "0.5px solid rgba(48,48,110,0.12)",
+              boxShadow: "0 1px 4px rgba(48,48,110,0.08), 0 4px 12px rgba(48,48,110,0.06)",
+              WebkitBackdropFilter: "blur(12px)",
+              backdropFilter: "blur(12px)",
+            }}
+            aria-label="Notifications"
+          >
+            <Bell className="w-[18px] h-[18px]" style={{ color: "rgba(48,48,110,0.55)" }} strokeWidth={1.8} />
+            <span
+              className="absolute top-[1px] right-[1px] w-[9px] h-[9px] rounded-full"
+              style={{ background: "#E5304A", border: "2px solid #fff" }}
+            />
+          </button>
+
+          <div
+            className="w-[38px] h-[38px] rounded-full flex items-center justify-center text-sm font-bold text-white"
+            style={{
+              background: "linear-gradient(140deg, #30306E 0%, #4444A0 100%)",
+              boxShadow: "0 2px 10px rgba(48,48,110,0.26), 0 0 0 2.5px rgba(255,255,255,0.8)",
+            }}
+          >
+            {initial.toUpperCase()}
+          </div>
+        </div>
+      </header>
+    );
+  }
+
+  // ══════════════════════════════
+  // DESKTOP — unchanged
+  // ══════════════════════════════
   return (
     <header className="h-16 bg-white/70 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-4 md:px-8 sticky top-0 z-[60]">
       <div className="flex items-center gap-3 min-w-0">
@@ -37,14 +125,14 @@ export const ParentTopbar = ({ onMenuClick }: ParentTopbarProps) => {
           <Bell className="w-5 h-5 text-slate-400 group-hover:text-primary transition-colors" />
           <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
         </button>
-        
+
         <div className="flex items-center gap-3 pl-3 md:pl-6 border-l border-slate-100">
           <div className="text-right hidden sm:block leading-none">
             <p className="text-sm font-black text-slate-800">{studentData?.name || user?.displayName || "Parent"}</p>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Guardian</p>
           </div>
           <div className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center font-black text-sm shadow-lg shadow-blue-900/20 ring-4 ring-blue-50">
-            {studentData?.name?.[0] || user?.displayName?.[0] || "P"}
+            {initial}
           </div>
         </div>
       </div>

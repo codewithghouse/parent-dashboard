@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import {
   AlertCircle, Clock, Trophy, Calendar, User,
-  Loader2, BellRing, CheckCircle, BookOpen, ShieldAlert, Sparkles
+  Loader2, BellRing, CheckCircle, BookOpen, ShieldAlert, Sparkles,
+  MessageSquare
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { db } from "@/lib/firebase";
 import {
@@ -33,6 +35,7 @@ interface ParsedAlert {
 const AlertsPage = () => {
   const { studentData } = useAuth();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(true);
   // Key scoped per user — prevents Parent A's dismissed list leaking to Parent B
@@ -495,6 +498,304 @@ const AlertsPage = () => {
     Attendance: "bg-emerald-50 text-emerald-600",
     General: "bg-slate-100 text-slate-500"
   }[c] || "bg-slate-100 text-slate-500");
+
+  // ═══════════════════════════════════════════════════════════════
+  // MOBILE — Blue Premium UI
+  // ═══════════════════════════════════════════════════════════════
+  if (isMobile) {
+    const B1 = "#0055FF", B2 = "#1166FF";
+    const BG = "#EEF4FF", BG2 = "#E0ECFF", CARD = "#FFFFFF";
+    const T1 = "#001040", T2 = "#002080", T3 = "#5070B0", T4 = "#99AACC";
+    const SH    = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.08), 0 10px 28px rgba(0,85,255,0.10)";
+    const SH_LG = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.11), 0 20px 48px rgba(0,85,255,0.13)";
+    const SH_BTN = "0 6px 22px rgba(0,85,255,0.40), 0 2px 5px rgba(0,85,255,0.20)";
+    const FONT = "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif";
+
+    const avatarChar = (studentData?.name?.[0] || "S").toUpperCase();
+
+    const isRecent = (ts: any) => {
+      const d = ts?.toDate?.() || null;
+      if (!d) return false;
+      return (Date.now() - d.getTime()) < 24 * 60 * 60 * 1000;
+    };
+
+    const fmtAlertDate = (ts: any) => {
+      if (isRecent(ts)) return "Recent";
+      const d = ts?.toDate?.();
+      if (!d) return "—";
+      return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    };
+
+    // Priority → visual theme
+    type Theme = {
+      stripe: string; iconGrad: string; iconShadow: string;
+      badgeBg: string; badgeBdr: string; badgeText: string;
+      emoji: string; label: string;
+    };
+    const themeFor = (p: ParsedAlert["priority"]): Theme => {
+      if (p === "High Priority") return {
+        stripe: "linear-gradient(180deg, #FF3355, #FF6688)",
+        iconGrad: "linear-gradient(135deg, #FF3355, #FF6688)",
+        iconShadow: "0 3px 12px rgba(255,51,85,0.28)",
+        badgeBg: "rgba(255,51,85,0.09)", badgeBdr: "rgba(255,51,85,0.20)", badgeText: "#FF3355",
+        emoji: "🔴", label: "High Priority",
+      };
+      if (p === "Medium Priority") return {
+        stripe: "linear-gradient(180deg, #FF8800, #FFCC22)",
+        iconGrad: "linear-gradient(135deg, #FF8800, #FFCC22)",
+        iconShadow: "0 3px 12px rgba(255,136,0,0.28)",
+        badgeBg: "rgba(255,136,0,0.09)", badgeBdr: "rgba(255,136,0,0.20)", badgeText: "#884400",
+        emoji: "🟡", label: "Medium Priority",
+      };
+      if (p === "Good News") return {
+        stripe: "linear-gradient(180deg, #00C853, #66EE88)",
+        iconGrad: "linear-gradient(135deg, #00C853, #66EE88)",
+        iconShadow: "0 3px 12px rgba(0,200,83,0.24)",
+        badgeBg: "rgba(0,200,83,0.09)", badgeBdr: "rgba(0,200,83,0.20)", badgeText: "#007830",
+        emoji: "🟢", label: "Great Work",
+      };
+      return {
+        stripe: "linear-gradient(180deg, #0055FF, #1166FF)",
+        iconGrad: "linear-gradient(135deg, #0055FF, #1166FF)",
+        iconShadow: "0 3px 12px rgba(0,85,255,0.26)",
+        badgeBg: "rgba(0,85,255,0.09)", badgeBdr: "rgba(0,85,255,0.20)", badgeText: "#0055FF",
+        emoji: "🔵", label: "General",
+      };
+    };
+
+    const iconFor = (a: ParsedAlert) => {
+      if (a.priority === "Good News") return CheckCircle;
+      if (a.category === "Attendance" && a.priority === "High Priority") return AlertCircle;
+      if (a.category === "Attendance") return Calendar;
+      if (a.source === "parent_notes") return MessageSquare;
+      if (a.source === "assignments" || a.category === "Academic") return BookOpen;
+      if (a.source === "risks") return ShieldAlert;
+      return AlertCircle;
+    };
+
+    const unreadCount = allAlerts.filter(a => isRecent(a.createdAt)).length;
+    const highCount = allAlerts.filter(a => a.priority === "High Priority").length;
+
+    if (loading) {
+      return (
+        <div className="-mx-3 -mt-3 flex items-center justify-center" style={{ background: BG, minHeight: "100vh", fontFamily: FONT }}>
+          <Loader2 className="w-8 h-8 animate-spin" style={{ color: B1 }} />
+        </div>
+      );
+    }
+
+    return (
+      <div className="-mx-3 -mt-3 md:mx-0 md:mt-0 animate-in fade-in duration-500"
+        style={{ background: BG, minHeight: "100vh", fontFamily: FONT }}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-[22px] pt-[14px]">
+          <div className="flex items-center gap-[7px]">
+            <div className="w-[7px] h-[7px] rounded-full animate-pulse" style={{ background: "#00CC55", boxShadow: "0 0 0 2.5px rgba(0,204,85,0.2)" }} />
+            <span className="text-[16px] font-bold" style={{ color: B1 }}>EduIntellect</span>
+          </div>
+          <div className="flex items-center gap-[10px]">
+            <div className="w-9 h-9 rounded-full flex items-center justify-center relative"
+              style={{ background: "rgba(255,255,255,0.88)", border: "0.5px solid rgba(0,85,255,0.16)", boxShadow: SH }}>
+              <BellRing className="w-[17px] h-[17px]" style={{ color: "rgba(0,85,255,0.60)" }} strokeWidth={1.8} />
+              {unreadCount > 0 && (
+                <span className="absolute top-[1px] right-[1px] w-2 h-2 rounded-full" style={{ background: "#FF3355", border: "1.5px solid white" }} />
+              )}
+            </div>
+            <div className="w-9 h-9 rounded-full flex items-center justify-center text-[13px] font-bold text-white"
+              style={{ background: `linear-gradient(140deg, ${B1}, ${B2})`, boxShadow: "0 4px 16px rgba(0,85,255,0.38), 0 0 0 2.5px rgba(255,255,255,0.85)" }}>
+              {avatarChar}
+            </div>
+          </div>
+        </div>
+
+        {/* Page head */}
+        <div className="pt-[18px] px-[22px]">
+          <div className="flex items-center gap-[10px] mb-1 flex-wrap">
+            <h1 className="text-[26px] font-bold" style={{ color: T1, letterSpacing: "-0.7px" }}>Alerts &amp; Notifications</h1>
+            {unreadCount > 0 && (
+              <div className="px-3 py-[5px] rounded-full text-[11px] font-bold text-white"
+                style={{ background: "linear-gradient(135deg, #FF3355, #FF6688)", boxShadow: "0 3px 10px rgba(255,51,85,0.30)", letterSpacing: "0.04em" }}>
+                {unreadCount} NEW
+              </div>
+            )}
+          </div>
+          <p className="text-[12px] font-normal" style={{ color: T3 }}>Stay updated with your child's activities</p>
+        </div>
+
+        {/* Mark All Read */}
+        {allAlerts.length > 0 && (
+          <button onClick={markAllRead}
+            className="mx-5 mt-4 w-[calc(100%-40px)] h-12 rounded-[16px] flex items-center justify-center gap-2 text-[14px] font-bold active:scale-[0.98] transition-transform"
+            style={{ background: CARD, border: "0.5px solid rgba(0,85,255,0.16)", color: B1, boxShadow: SH, letterSpacing: "-0.1px" }}>
+            <CheckCircle className="w-4 h-4" style={{ color: "rgba(0,85,255,0.7)" }} strokeWidth={2.2} />
+            Mark All Read
+          </button>
+        )}
+
+        {/* Filter Tabs */}
+        <div className="flex gap-[6px] px-5 pt-[14px] overflow-x-auto no-sb" style={{ scrollbarWidth: "none" }}>
+          {filterTabs.map((tab, i) => {
+            const active = activeTab === i;
+            return (
+              <button key={tab} onClick={() => setActiveTab(i)}
+                className="shrink-0 px-4 py-[9px] rounded-[14px] text-[12px] font-bold whitespace-nowrap active:scale-[0.94] transition-transform"
+                style={active
+                  ? { background: `linear-gradient(135deg, ${B1}, ${B2})`, color: "#fff", boxShadow: SH_BTN, letterSpacing: "0.02em" }
+                  : { background: CARD, color: T3, border: "0.5px solid rgba(0,85,255,0.12)", boxShadow: SH, letterSpacing: "0.02em" }}>
+                {tab} ({getTabCount(tab)})
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Alert cards OR empty state */}
+        {filteredAlerts.length === 0 ? (
+          <div className="mx-5 mt-4 rounded-[24px] px-5 py-10 flex flex-col items-center gap-[10px] relative overflow-hidden"
+            style={{ background: CARD, boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+            <div className="absolute -top-10 -right-7 w-[150px] h-[150px] rounded-full pointer-events-none"
+              style={{ background: "radial-gradient(circle, rgba(0,85,255,0.05) 0%, transparent 70%)" }} />
+            <div className="w-16 h-16 rounded-[22px] flex items-center justify-center mb-[6px] relative z-10"
+              style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: `${SH_BTN}, 0 0 0 10px rgba(0,85,255,0.07)` }}>
+              <BellRing className="w-[30px] h-[30px]" style={{ color: "rgba(255,255,255,0.95)" }} strokeWidth={2.1} />
+            </div>
+            <div className="text-[17px] font-bold text-center relative z-10" style={{ color: T1, letterSpacing: "-0.3px" }}>You're all caught up!</div>
+            <div className="text-[12px] text-center max-w-[230px] leading-[1.6] font-normal relative z-10" style={{ color: T3 }}>
+              No {filterTabs[activeTab] !== "All" ? `${filterTabs[activeTab].toLowerCase()} ` : ""}alerts right now. Check back later.
+            </div>
+          </div>
+        ) : (
+          filteredAlerts.map(alert => {
+            const theme = themeFor(alert.priority);
+            const Icon = iconFor(alert);
+            const actions = getActions(alert);
+            const recent = isRecent(alert.createdAt);
+            const primary = actions.find(a => a.primary);
+            const secondary = actions.find(a => !a.primary);
+            const primaryIsGood = alert.priority === "Good News";
+            const primaryGrad = primaryIsGood
+              ? "linear-gradient(135deg, #00C853, #22EE66)"
+              : `linear-gradient(135deg, ${B1}, ${B2})`;
+            const primaryShadow = primaryIsGood
+              ? "0 5px 16px rgba(0,200,83,0.30)"
+              : SH_BTN;
+
+            return (
+              <div key={alert.id} className="mx-5 mt-[14px] rounded-[24px] relative overflow-hidden active:scale-[0.98] transition-transform"
+                style={{ background: CARD, boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                {/* Left accent stripe */}
+                <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-[2px]" style={{ background: theme.stripe }} />
+                {/* Unread dot */}
+                {recent && (
+                  <div className="absolute top-4 right-4 w-2 h-2 rounded-full"
+                    style={{ background: B1, boxShadow: "0 0 0 2.5px rgba(0,85,255,0.20)" }} />
+                )}
+
+                <div className="px-[18px] py-[18px] pl-[22px]">
+                  {/* Top row */}
+                  <div className="flex items-start gap-[13px] mb-3">
+                    <div className="w-11 h-11 rounded-[14px] flex items-center justify-center shrink-0"
+                      style={{ background: theme.iconGrad, boxShadow: theme.iconShadow }}>
+                      <Icon className="w-[22px] h-[22px] text-white" strokeWidth={2.2} />
+                    </div>
+                    <div className="flex-1 min-w-0 pr-5">
+                      <div className="text-[15px] font-bold leading-[1.3] mb-[5px]" style={{ color: T1, letterSpacing: "-0.3px" }}>
+                        {alert.title}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-[6px]">
+                        <div className="px-[10px] py-1 rounded-full text-[10px] font-bold whitespace-nowrap"
+                          style={{ background: theme.badgeBg, color: theme.badgeText, border: `0.5px solid ${theme.badgeBdr}`, letterSpacing: "0.02em" }}>
+                          {theme.emoji} {theme.label}
+                        </div>
+                        <div className="px-[10px] py-1 rounded-full text-[10px] font-bold whitespace-nowrap"
+                          style={{
+                            background: alert.category === "Academic" ? "rgba(0,85,255,0.10)" : alert.category === "Attendance" ? "rgba(0,200,83,0.09)" : "rgba(0,85,255,0.08)",
+                            color: alert.category === "Academic" ? B1 : alert.category === "Attendance" ? "#007830" : T3,
+                            border: `0.5px solid ${alert.category === "Academic" ? "rgba(0,85,255,0.20)" : alert.category === "Attendance" ? "rgba(0,200,83,0.20)" : "rgba(0,85,255,0.12)"}`,
+                            letterSpacing: "0.02em",
+                          }}>
+                          {alert.category}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Message */}
+                  <div className="text-[13px] leading-[1.72] font-normal mb-[10px]"
+                    style={{ color: T2, letterSpacing: "-0.1px" }}>
+                    {alert.description}
+                  </div>
+
+                  {/* Date row */}
+                  <div className="flex items-center gap-[5px] text-[11px] font-semibold mb-[14px]" style={{ color: T4 }}>
+                    <Calendar className="w-3 h-3" strokeWidth={2.3} />
+                    {fmtAlertDate(alert.createdAt)}
+                  </div>
+
+                  {/* Divider */}
+                  <div className="h-[0.5px] mb-[14px]" style={{ background: "rgba(0,85,255,0.07)" }} />
+
+                  {/* Recommended Actions label */}
+                  <div className="flex items-center gap-[6px] text-[9px] font-bold uppercase tracking-[0.10em] mb-[10px]" style={{ color: T4 }}>
+                    <Sparkles className="w-[11px] h-[11px]" strokeWidth={2.5} />
+                    Recommended Actions
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex gap-2">
+                    {primary && (
+                      <button onClick={primary.onClick}
+                        className="flex-1 h-[42px] rounded-[13px] flex items-center justify-center gap-[6px] text-[12px] font-bold text-white active:scale-[0.95] transition-transform relative overflow-hidden"
+                        style={{ background: primaryGrad, boxShadow: primaryShadow, letterSpacing: "0.02em" }}>
+                        <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.14) 0%, transparent 52%)" }} />
+                        <span className="relative z-10 px-1 text-center truncate">{primary.label}</span>
+                      </button>
+                    )}
+                    {secondary && (
+                      <button onClick={secondary.onClick}
+                        className="flex-1 h-[42px] rounded-[13px] flex items-center justify-center gap-[6px] text-[12px] font-bold active:scale-[0.95] transition-transform"
+                        style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.16)", color: T2, boxShadow: SH, letterSpacing: "0.02em" }}>
+                        <span className="px-1 text-center truncate">{secondary.label}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+
+        {/* Summary dark card */}
+        {allAlerts.length > 0 && (
+          <div className="mx-5 mt-[14px] rounded-[24px] px-[22px] py-5 relative overflow-hidden"
+            style={{
+              background: "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)",
+              boxShadow: "0 8px 28px rgba(0,51,204,0.30), 0 0 0 0.5px rgba(255,255,255,0.14)",
+            }}>
+            <div className="absolute -top-10 -right-6 w-[160px] h-[160px] rounded-full pointer-events-none"
+              style={{ background: "radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 65%)" }} />
+            <div className="text-[9px] font-bold uppercase tracking-[0.12em] mb-[10px] relative z-10" style={{ color: "rgba(255,255,255,0.48)" }}>
+              Notification Summary
+            </div>
+            <div className="grid grid-cols-3 gap-[1px] rounded-[16px] overflow-hidden relative z-10" style={{ background: "rgba(255,255,255,0.12)" }}>
+              {[
+                { val: unreadCount, label: "Unread" },
+                { val: highCount, label: "High" },
+                { val: allAlerts.length, label: "Total" },
+              ].map(({ val, label }) => (
+                <div key={label} className="py-[13px] px-3 text-center" style={{ background: "rgba(255,255,255,0.08)" }}>
+                  <div className="text-[24px] font-bold text-white leading-none mb-1" style={{ letterSpacing: "-0.7px" }}>{val}</div>
+                  <div className="text-[9px] font-bold uppercase tracking-[0.09em]" style={{ color: "rgba(255,255,255,0.40)" }}>{label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="h-5" />
+      </div>
+    );
+  }
 
   return (
     <div className="animate-in fade-in duration-500">

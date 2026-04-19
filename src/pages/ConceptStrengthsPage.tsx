@@ -392,82 +392,70 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
   }
 
   /* ═══════════════════════════════════════════════════════════════
-     MOBILE — Navy + Cream Premium UI
+     MOBILE — Bright Blue Apple UI
      ═══════════════════════════════════════════════════════════════ */
   if (isMobile) {
-    const NAVY = "#28396C", NAVY2 = "#1E2D57", NAVY4 = "#3D5494";
-    const CREAM = "#FDFAF4", CREAM2 = "#F5EFE2", CREAM3 = "#EDE5D4";
-    const GREEN = "#2EBC71", GREEN2 = "#1E9A5A";
-    const ORANGE = "#F59C2A";
-    const RED = "#E85555";
-    const INDIGO = "#5B6FD4";
-    const TEAL = "#2AACBC";
-    const PINK = "#E85599";
-    const T1 = "#1A2340", T2 = "#4A5578", T3 = "#8892B0", T4 = "#C0C8DC";
-    const SEP = "rgba(40,57,108,0.07)";
-    const NAVY_BDR = "rgba(40,57,108,0.13)";
-    const SH = "0 0 0 0.5px rgba(40,57,108,0.06), 0 2px 8px rgba(40,57,108,0.06), 0 10px 28px rgba(40,57,108,0.08)";
+    const B1 = "#0055FF", B2 = "#1166FF", B3 = "#2277FF";
+    const BG = "#EEF4FF", BG2 = "#E0ECFF";
+    const GREEN = "#00C853", GREEN2 = "#00A040";
+    const ORANGE = "#FF8800";
+    const RED = "#FF3355";
+    const TEAL = "#00C4B4";
+    const PINK = "#FF3BA8";
+    const T1 = "#001040", T2 = "#002080", T3 = "#5070B0", T4 = "#99AACC";
+    const SEP = "rgba(0,85,255,0.07)";
+    const BLUE_BDR = "rgba(0,85,255,0.12)";
+    const SH = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.08), 0 10px 24px rgba(0,85,255,0.10)";
+    const SH_LG = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.11), 0 18px 44px rgba(0,85,255,0.13)";
+    const SH_BTN = "0 6px 20px rgba(0,85,255,0.40), 0 2px 5px rgba(0,85,255,0.22)";
 
-    const tabStyles: Record<FeatureTab, { gradient: string; icon: any; label: string }> = {
-      "strengths": { gradient: `linear-gradient(135deg, ${GREEN2}, ${GREEN})`, icon: CheckCircle2, label: "Strengths" },
-      "study-plan": { gradient: `linear-gradient(135deg, ${INDIGO}, #4A5CC8)`, icon: CalendarDays, label: "Study Plan" },
-      "explainer": { gradient: `linear-gradient(135deg, ${TEAL}, #1A8A9A)`, icon: BookOpenText, label: "Explain" },
-      "practice": { gradient: `linear-gradient(135deg, ${ORANGE}, #E88A15)`, icon: FlaskConical, label: "Practice" },
-      "doubt": { gradient: `linear-gradient(135deg, ${PINK}, #C03070)`, icon: HelpCircle, label: "Doubt Solver" },
+    const tabStyles: Record<FeatureTab, { gradient: string; shadow: string; icon: any; label: string }> = {
+      "strengths":  { gradient: `linear-gradient(135deg, ${GREEN}, #22EE66)`, shadow: "0 3px 12px rgba(0,200,83,0.30)", icon: CheckCircle2, label: "Strengths" },
+      "study-plan": { gradient: `linear-gradient(135deg, ${B1}, ${B2})`,       shadow: SH_BTN,                            icon: CalendarDays, label: "Study Plan" },
+      "explainer":  { gradient: `linear-gradient(135deg, ${TEAL}, #22DDCC)`,   shadow: "0 3px 12px rgba(0,196,180,0.30)", icon: BookOpenText, label: "Explain" },
+      "practice":   { gradient: `linear-gradient(135deg, ${ORANGE}, #FFAA22)`, shadow: "0 3px 12px rgba(255,136,0,0.30)", icon: FlaskConical, label: "Practice" },
+      "doubt":      { gradient: `linear-gradient(135deg, ${PINK}, #FF77CC)`,   shadow: "0 3px 12px rgba(255,59,168,0.30)", icon: HelpCircle,  label: "Doubt Solver" },
     };
 
     return (
       <div className="animate-in fade-in duration-500 -mx-3 -mt-3 md:mx-0 md:mt-0"
-        style={{ fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif", background: CREAM, minHeight: "100vh" }}>
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-3">
-          <div className="flex items-center gap-[6px]">
-            <div className="w-[6px] h-[6px] rounded-full animate-pulse" style={{ background: GREEN, boxShadow: "0 0 0 2px rgba(46,188,113,0.2)" }} />
-            <span className="text-[15px] font-bold tracking-[0.02em]" style={{ color: NAVY }}>EduIntellect</span>
-          </div>
-          <div className="flex items-center gap-[9px]">
-            <div className="w-[34px] h-[34px] rounded-full bg-white flex items-center justify-center relative"
-              style={{ boxShadow: "0 1px 4px rgba(40,57,108,0.1), 0 3px 10px rgba(40,57,108,0.06)" }}>
-              <Bell className="w-[17px] h-[17px]" style={{ color: "#4A5578" }} strokeWidth={1.8} />
-              <span className="absolute top-[1px] right-[1px] w-2 h-2 rounded-full" style={{ background: RED, border: "1.5px solid white" }} />
-            </div>
-            <div className="w-[34px] h-[34px] rounded-full flex items-center justify-center text-[13px] font-bold text-white"
-              style={{ background: `linear-gradient(140deg, ${NAVY2}, ${NAVY4})`, boxShadow: "0 2px 8px rgba(40,57,108,0.28)" }}>
-              {studentName?.[0]?.toUpperCase() || "S"}
-            </div>
-          </div>
-        </div>
+        style={{ fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif", background: BG, minHeight: "100vh" }}>
 
         {/* Page Head */}
         <div className="px-5 pt-4">
-          <div className="text-[9px] font-bold uppercase tracking-[0.12em] mb-1" style={{ color: "rgba(40,57,108,0.4)" }}>Parent Dashboard</div>
-          <div className="text-[23px] font-bold" style={{ color: T1, letterSpacing: "-0.5px" }}>Concept Strengths</div>
-          <div className="text-[12px] mt-[3px] font-normal" style={{ color: T3 }}>
-            AI-powered learning tools for <strong style={{ color: NAVY, fontWeight: 600 }}>{studentName}</strong>
+          <div className="text-[9px] font-bold uppercase tracking-[0.10em] mb-1 flex items-center gap-[6px]" style={{ color: T4 }}>
+            <span className="w-[5px] h-[5px] rounded-full" style={{ background: GREEN, boxShadow: "0 0 0 2px rgba(0,200,83,0.2)" }} />
+            Parent Dashboard
+          </div>
+          <div className="text-[24px] font-bold" style={{ color: T1, letterSpacing: "-0.6px" }}>Concept Strengths</div>
+          <div className="text-[12px] mt-[2px] font-normal" style={{ color: T3 }}>
+            AI-powered learning tools for <strong style={{ color: B1, fontWeight: 700 }}>{studentName}</strong>
           </div>
         </div>
 
-        {/* Horizontal Tabs */}
-        <div className="pt-[14px] overflow-hidden">
-          <div className="flex gap-2 px-5 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+        {/* Horizontal Feature Tabs */}
+        <div className="pt-[14px]">
+          <div className="flex gap-[6px] px-5 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
             {FEATURE_TABS.map(tab => {
               const ts = tabStyles[tab.key];
               const Icon = ts.icon;
               const isActive = activeFeature === tab.key;
               return (
                 <button key={tab.key} onClick={() => setActiveFeature(tab.key)}
-                  className="flex items-center gap-[6px] px-[14px] py-[9px] rounded-[14px] text-[12px] font-bold whitespace-nowrap shrink-0 active:scale-95 transition-transform"
+                  className="flex items-center gap-[5px] px-[14px] py-[8px] rounded-[14px] text-[12px] font-bold whitespace-nowrap shrink-0 active:scale-[0.94] transition-transform"
                   style={isActive ? {
                     background: ts.gradient, color: "#fff",
-                    border: "0.5px solid transparent",
-                    boxShadow: "0 3px 12px rgba(40,57,108,0.22)"
+                    boxShadow: ts.shadow,
+                    letterSpacing: "-0.1px",
+                    transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)"
                   } : {
-                    background: "#fff", color: T2,
-                    border: "0.5px solid rgba(40,57,108,0.08)",
-                    boxShadow: "0 1px 4px rgba(40,57,108,0.05)"
+                    background: "#fff", color: T3,
+                    border: `0.5px solid ${BLUE_BDR}`,
+                    boxShadow: SH,
+                    letterSpacing: "-0.1px",
+                    transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)"
                   }}>
-                  <Icon className="w-[13px] h-[13px]" strokeWidth={isActive ? 2 : 2.2} />
+                  <Icon className="w-[13px] h-[13px]" strokeWidth={isActive ? 2.5 : 2.2} />
                   {ts.label}
                 </button>
               );
@@ -476,31 +464,33 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
         </div>
 
         {analyzing && (
-          <div className="mx-[18px] mt-3 flex items-center gap-2 px-4 py-2 rounded-[12px]" style={{ background: "rgba(91,111,212,0.08)", border: "0.5px solid rgba(91,111,212,0.18)" }}>
-            <Loader2 className="w-[14px] h-[14px] animate-spin" style={{ color: INDIGO }} />
-            <span className="text-[11px] font-bold" style={{ color: INDIGO }}>AI syncing...</span>
+          <div className="mx-5 mt-3 flex items-center gap-2 px-4 py-2 rounded-[12px]" style={{ background: "rgba(0,85,255,0.08)", border: "0.5px solid rgba(0,85,255,0.18)" }}>
+            <Loader2 className="w-[14px] h-[14px] animate-spin" style={{ color: B1 }} />
+            <span className="text-[11px] font-bold" style={{ color: B1 }}>AI syncing...</span>
           </div>
         )}
 
         {/* ═══ TAB 1: STRENGTHS ═══ */}
         {activeFeature === "strengths" && (
           <>
-            {/* Teacher Filter Pills */}
+            {/* Teacher / Subject Pills */}
             {enrollments.length > 0 && (
-              <div className="flex gap-2 px-5 pt-[14px] flex-wrap">
+              <div className="flex gap-2 px-5 pt-[12px] overflow-x-auto" style={{ scrollbarWidth: "none" }}>
                 {enrollments.map(en => {
                   const name = en.subject || en.className || "General";
                   const isActive = activeSubject === name;
                   return (
                     <button key={en.id || name} onClick={() => setActiveSubject(name)}
-                      className="px-[14px] py-[7px] rounded-full text-[12px] font-bold active:scale-95 transition-transform"
+                      className="px-4 py-[8px] rounded-[14px] text-[12px] font-bold whitespace-nowrap shrink-0 active:scale-[0.92] transition-transform"
                       style={isActive ? {
-                        background: NAVY, color: "#fff",
-                        boxShadow: "0 3px 10px rgba(40,57,108,0.25)"
+                        background: `linear-gradient(135deg, ${B1}, ${B2})`, color: "#fff",
+                        boxShadow: SH_BTN,
+                        transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)"
                       } : {
-                        background: "#fff", color: T2,
-                        border: `0.5px solid ${SEP}`,
-                        boxShadow: "0 1px 4px rgba(40,57,108,0.05)"
+                        background: "#fff", color: T3,
+                        border: `0.5px solid ${BLUE_BDR}`,
+                        boxShadow: SH,
+                        transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)"
                       }}>
                       {name}
                     </button>
@@ -511,24 +501,31 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
 
             {/* Strong Card */}
             {currentData.strong.length > 0 && (
-              <div className="mx-[18px] mt-4 bg-white rounded-[20px] px-[18px] py-4" style={{ boxShadow: SH, border: "0.5px solid rgba(40,57,108,0.06)" }}>
-                <div className="flex items-center justify-between mb-[14px]">
-                  <div className="flex items-center gap-[9px]">
-                    <div className="w-8 h-8 rounded-[10px] flex items-center justify-center" style={{ background: "rgba(46,188,113,0.10)", border: "0.5px solid rgba(46,188,113,0.20)" }}>
-                      <CheckCircle2 className="w-4 h-4" style={{ color: GREEN }} strokeWidth={2.5} />
+              <div className="mx-5 mt-4 bg-white rounded-[22px] px-[18px] py-[18px] relative overflow-hidden"
+                style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                <div className="absolute -top-[30px] -right-5 w-[110px] h-[110px] rounded-full pointer-events-none"
+                  style={{ background: "radial-gradient(circle, rgba(0,200,83,0.05) 0%, transparent 70%)" }} />
+                <div className="flex items-center justify-between mb-4 relative z-10">
+                  <div className="flex items-center gap-2">
+                    <div className="w-[30px] h-[30px] rounded-[10px] flex items-center justify-center"
+                      style={{ background: "rgba(0,200,83,0.10)", border: "0.5px solid rgba(0,200,83,0.22)" }}>
+                      <CheckCircle2 className="w-[14px] h-[14px]" style={{ color: GREEN }} strokeWidth={2.5} />
                     </div>
                     <span className="text-[15px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>Strong</span>
                   </div>
-                  <span className="text-[15px] font-bold" style={{ color: GREEN2, letterSpacing: "-0.2px" }}>{currentData.strong.length}</span>
+                  <div className="w-7 h-7 rounded-[9px] flex items-center justify-center text-[13px] font-bold text-white"
+                    style={{ background: `linear-gradient(135deg, ${GREEN2}, ${GREEN})`, boxShadow: "0 2px 8px rgba(0,200,83,0.30)" }}>
+                    {currentData.strong.length}
+                  </div>
                 </div>
-                {currentData.strong.slice(0, 5).map((item, i) => (
-                  <div key={i} className={i < currentData.strong.slice(0, 5).length - 1 ? "mb-3" : ""}>
+                {currentData.strong.slice(0, 5).map((item, i, arr) => (
+                  <div key={i} className={i < arr.length - 1 ? "mb-3" : ""}>
                     <div className="flex items-center justify-between mb-[6px]">
-                      <span className="text-[13px] font-medium" style={{ color: T2 }}>{item.title}</span>
+                      <span className="text-[12px] font-bold" style={{ color: T2, letterSpacing: "-0.1px" }}>{item.title}</span>
                       <span className="text-[13px] font-bold" style={{ color: GREEN2 }}>{item.pct}%</span>
                     </div>
-                    <div className="h-[6px] rounded overflow-hidden" style={{ background: CREAM3 }}>
-                      <div className="h-full rounded" style={{ width: `${item.pct}%`, background: `linear-gradient(90deg, ${GREEN2}, ${GREEN})`, transition: "width 1s cubic-bezier(0.4,0,0.2,1)" }} />
+                    <div className="h-[7px] rounded-[4px] overflow-hidden" style={{ background: BG2 }}>
+                      <div className="h-full rounded-[4px]" style={{ width: `${item.pct}%`, background: `linear-gradient(90deg, ${GREEN}, #66EE88)`, transition: "width 1s cubic-bezier(0.4,0,0.2,1)" }} />
                     </div>
                   </div>
                 ))}
@@ -537,24 +534,31 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
 
             {/* Developing Card */}
             {currentData.developing.length > 0 && (
-              <div className="mx-[18px] mt-3 bg-white rounded-[20px] px-[18px] py-4" style={{ boxShadow: SH, border: "0.5px solid rgba(40,57,108,0.06)" }}>
-                <div className="flex items-center justify-between mb-[14px]">
-                  <div className="flex items-center gap-[9px]">
-                    <div className="w-8 h-8 rounded-[10px] flex items-center justify-center" style={{ background: "rgba(245,156,42,0.10)", border: "0.5px solid rgba(245,156,42,0.20)" }}>
-                      <CircleDashed className="w-4 h-4" style={{ color: ORANGE }} strokeWidth={2.5} />
+              <div className="mx-5 mt-3 bg-white rounded-[22px] px-[18px] py-[18px] relative overflow-hidden"
+                style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                <div className="absolute -top-[30px] -right-5 w-[110px] h-[110px] rounded-full pointer-events-none"
+                  style={{ background: "radial-gradient(circle, rgba(255,136,0,0.05) 0%, transparent 70%)" }} />
+                <div className="flex items-center justify-between mb-4 relative z-10">
+                  <div className="flex items-center gap-2">
+                    <div className="w-[30px] h-[30px] rounded-[10px] flex items-center justify-center"
+                      style={{ background: "rgba(255,136,0,0.10)", border: "0.5px solid rgba(255,136,0,0.22)" }}>
+                      <CircleDashed className="w-[14px] h-[14px]" style={{ color: ORANGE }} strokeWidth={2.5} />
                     </div>
                     <span className="text-[15px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>Developing</span>
                   </div>
-                  <span className="text-[15px] font-bold" style={{ color: ORANGE, letterSpacing: "-0.2px" }}>{currentData.developing.length}</span>
+                  <div className="w-7 h-7 rounded-[9px] flex items-center justify-center text-[13px] font-bold text-white"
+                    style={{ background: `linear-gradient(135deg, ${ORANGE}, #FFAA22)`, boxShadow: "0 2px 8px rgba(255,136,0,0.30)" }}>
+                    {currentData.developing.length}
+                  </div>
                 </div>
-                {currentData.developing.slice(0, 5).map((item, i) => (
-                  <div key={i} className={i < currentData.developing.slice(0, 5).length - 1 ? "mb-3" : ""}>
+                {currentData.developing.slice(0, 5).map((item, i, arr) => (
+                  <div key={i} className={i < arr.length - 1 ? "mb-3" : ""}>
                     <div className="flex items-center justify-between mb-[6px]">
-                      <span className="text-[13px] font-medium" style={{ color: T2 }}>{item.title}</span>
+                      <span className="text-[12px] font-bold" style={{ color: T2, letterSpacing: "-0.1px" }}>{item.title}</span>
                       <span className="text-[13px] font-bold" style={{ color: ORANGE }}>{item.pct}%</span>
                     </div>
-                    <div className="h-[6px] rounded overflow-hidden" style={{ background: CREAM3 }}>
-                      <div className="h-full rounded" style={{ width: `${item.pct}%`, background: `linear-gradient(90deg, #C87A10, ${ORANGE})`, transition: "width 1s cubic-bezier(0.4,0,0.2,1)" }} />
+                    <div className="h-[7px] rounded-[4px] overflow-hidden" style={{ background: BG2 }}>
+                      <div className="h-full rounded-[4px]" style={{ width: `${item.pct}%`, background: `linear-gradient(90deg, ${ORANGE}, #FFCC44)`, transition: "width 1s cubic-bezier(0.4,0,0.2,1)" }} />
                     </div>
                   </div>
                 ))}
@@ -563,34 +567,44 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
 
             {/* Needs Work Card */}
             {currentData.attention.length > 0 && (
-              <div className="mx-[18px] mt-3 bg-white rounded-[20px] px-[18px] py-4" style={{ boxShadow: SH, border: "0.5px solid rgba(40,57,108,0.06)" }}>
-                <div className="flex items-center justify-between mb-[14px]">
-                  <div className="flex items-center gap-[9px]">
-                    <div className="w-8 h-8 rounded-[10px] flex items-center justify-center" style={{ background: "rgba(232,85,85,0.09)", border: "0.5px solid rgba(232,85,85,0.18)" }}>
-                      <AlertCircle className="w-4 h-4" style={{ color: RED }} strokeWidth={2.5} />
+              <div className="mx-5 mt-3 bg-white rounded-[22px] px-[18px] py-[18px] relative overflow-hidden"
+                style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                <div className="absolute -top-[30px] -right-5 w-[110px] h-[110px] rounded-full pointer-events-none"
+                  style={{ background: "radial-gradient(circle, rgba(255,51,85,0.05) 0%, transparent 70%)" }} />
+                <div className="flex items-center justify-between mb-4 relative z-10">
+                  <div className="flex items-center gap-2">
+                    <div className="w-[30px] h-[30px] rounded-[10px] flex items-center justify-center"
+                      style={{ background: "rgba(255,51,85,0.10)", border: "0.5px solid rgba(255,51,85,0.22)" }}>
+                      <AlertCircle className="w-[14px] h-[14px]" style={{ color: RED }} strokeWidth={2.5} />
                     </div>
                     <span className="text-[15px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>Needs Work</span>
                   </div>
-                  <span className="text-[15px] font-bold" style={{ color: RED, letterSpacing: "-0.2px" }}>{currentData.attention.length}</span>
+                  <div className="w-7 h-7 rounded-[9px] flex items-center justify-center text-[13px] font-bold text-white"
+                    style={{ background: `linear-gradient(135deg, ${RED}, #FF6688)`, boxShadow: "0 2px 8px rgba(255,51,85,0.30)" }}>
+                    {currentData.attention.length}
+                  </div>
                 </div>
-                {currentData.attention.slice(0, 5).map((item, i) => (
-                  <div key={i} className={i < currentData.attention.slice(0, 5).length - 1 ? "mb-3" : ""}>
+                {currentData.attention.slice(0, 5).map((item, i, arr) => (
+                  <div key={i} className={i < arr.length - 1 ? "mb-3" : ""}>
                     <div className="flex items-center justify-between mb-[6px]">
-                      <span className="text-[13px] font-medium" style={{ color: T2 }}>{item.title}</span>
+                      <span className="text-[12px] font-bold" style={{ color: T2, letterSpacing: "-0.1px" }}>{item.title}</span>
                       <span className="text-[13px] font-bold" style={{ color: RED }}>{item.pct}%</span>
                     </div>
-                    <div className="h-[6px] rounded overflow-hidden" style={{ background: CREAM3 }}>
-                      <div className="h-full rounded" style={{ width: `${item.pct}%`, background: `linear-gradient(90deg, #B82020, ${RED})`, transition: "width 1s cubic-bezier(0.4,0,0.2,1)" }} />
+                    <div className="h-[7px] rounded-[4px] overflow-hidden" style={{ background: BG2 }}>
+                      <div className="h-full rounded-[4px]" style={{ width: `${item.pct}%`, background: `linear-gradient(90deg, ${RED}, #FF88AA)`, transition: "width 1s cubic-bezier(0.4,0,0.2,1)" }} />
                     </div>
                   </div>
                 ))}
                 {recommendedFocus && (
-                  <div className="mt-[14px] px-[14px] py-3 rounded-[14px] flex items-start gap-[9px]"
-                    style={{ background: "linear-gradient(135deg, #FFFBEE, #FFF8E0)", border: "0.5px solid rgba(245,156,42,0.2)" }}>
-                    <Lightbulb className="w-4 h-4 shrink-0 mt-[1px]" style={{ color: "#C07A10" }} strokeWidth={2} />
+                  <div className="mt-[14px] px-[14px] py-3 rounded-[16px] flex items-start gap-2"
+                    style={{ background: "rgba(255,136,0,0.07)", border: "0.5px solid rgba(255,136,0,0.20)" }}>
+                    <div className="w-[22px] h-[22px] rounded-[7px] flex items-center justify-center shrink-0 mt-[1px]"
+                      style={{ background: "rgba(255,136,0,0.15)", border: "0.5px solid rgba(255,136,0,0.25)" }}>
+                      <Lightbulb className="w-[12px] h-[12px]" style={{ color: ORANGE }} strokeWidth={2.5} />
+                    </div>
                     <div>
-                      <div className="text-[12px] font-bold mb-[3px]" style={{ color: "#C07A10" }}>Recommended Focus</div>
-                      <div className="text-[11px] leading-[1.55]" style={{ color: "rgba(0,0,0,0.45)" }}>{recommendedFocus}</div>
+                      <div className="text-[12px] font-bold mb-[3px]" style={{ color: ORANGE, letterSpacing: "-0.1px" }}>Recommended Focus</div>
+                      <div className="text-[11px] leading-[1.55] font-normal" style={{ color: "#884400" }}>{recommendedFocus}</div>
                     </div>
                   </div>
                 )}
@@ -598,7 +612,8 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
             )}
 
             {currentData.strong.length === 0 && currentData.developing.length === 0 && currentData.attention.length === 0 && (
-              <div className="mx-[18px] mt-5 text-center py-8">
+              <div className="mx-5 mt-5 bg-white rounded-[22px] text-center py-8 px-5"
+                style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
                 <p className="text-[13px]" style={{ color: T3 }}>No assessment data yet.</p>
               </div>
             )}
@@ -606,22 +621,23 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
             {/* Chart */}
             {chartData.length > 0 && subjectList.length > 0 && (
               <>
-                <div className="flex items-center gap-2 px-5 pt-[18px] text-[9px] font-bold uppercase tracking-[0.1em]" style={{ color: "rgba(40,57,108,0.35)" }}>
+                <div className="flex items-center gap-2 px-5 pt-[18px] text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: T4 }}>
                   Mastery Progress
-                  <div className="flex-1 h-[0.5px]" style={{ background: NAVY_BDR }} />
+                  <div className="flex-1 h-[0.5px]" style={{ background: BLUE_BDR }} />
                 </div>
-                <div className="mx-[18px] mt-3 bg-white rounded-[20px] p-[18px]" style={{ boxShadow: SH, border: "0.5px solid rgba(40,57,108,0.06)" }}>
+                <div className="mx-5 mt-3 bg-white rounded-[22px] px-[18px] py-[18px]"
+                  style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
                   <div className="text-[15px] font-bold mb-4" style={{ color: T1, letterSpacing: "-0.3px" }}>Concept Mastery Progress</div>
                   <div style={{ height: 180 }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={CREAM3} />
-                        <XAxis dataKey="month" tick={{ fontSize: 10, fill: T4 }} />
-                        <YAxis tick={{ fontSize: 10, fill: T4 }} domain={[0, 100]} />
-                        <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: `1px solid ${NAVY_BDR}`, fontFamily: "DM Sans" }} />
+                        <CartesianGrid strokeDasharray="0" vertical={false} stroke="rgba(0,85,255,0.07)" />
+                        <XAxis dataKey="month" tick={{ fontSize: 10, fill: T4 }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 10, fill: T4 }} domain={[0, 100]} axisLine={false} tickLine={false} />
+                        <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: `0.5px solid ${BLUE_BDR}`, fontFamily: "DM Sans", boxShadow: "0 4px 20px rgba(0,85,255,0.12)" }} />
                         <Legend wrapperStyle={{ fontSize: 11 }} />
                         {subjectList.slice(0, 3).map((sub, i) => (
-                          <Line key={sub} type="monotone" dataKey={sub} stroke={[GREEN, TEAL, RED, ORANGE, INDIGO][i]} strokeWidth={2.5} dot={{ r: 4, strokeWidth: 2, fill: "#fff" }} connectNulls />
+                          <Line key={sub} type="monotone" dataKey={sub} stroke={[GREEN, B1, RED, ORANGE, TEAL][i]} strokeWidth={2.5} dot={{ r: 4, strokeWidth: 2, fill: "#fff" }} connectNulls />
                         ))}
                       </LineChart>
                     </ResponsiveContainer>
@@ -635,15 +651,18 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
         {/* ═══ TAB 2: STUDY PLAN ═══ */}
         {activeFeature === "study-plan" && (
           <>
-            <div className="mx-[18px] mt-[18px] bg-white rounded-[22px] p-5" style={{ boxShadow: SH, border: "0.5px solid rgba(40,57,108,0.06)" }}>
-              <div className="flex items-start gap-[14px] mb-[18px]">
-                <div className="w-[46px] h-[46px] rounded-[15px] flex items-center justify-center shrink-0"
-                  style={{ background: "rgba(91,111,212,0.10)", border: "0.5px solid rgba(91,111,212,0.20)" }}>
-                  <CalendarDays className="w-[22px] h-[22px]" style={{ color: INDIGO }} strokeWidth={2} />
+            <div className="mx-5 mt-[18px] bg-white rounded-[22px] p-[18px] relative overflow-hidden"
+              style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+              <div className="absolute -top-[30px] -right-5 w-[120px] h-[120px] rounded-full pointer-events-none"
+                style={{ background: "radial-gradient(circle, rgba(0,85,255,0.05) 0%, transparent 70%)" }} />
+              <div className="flex items-center gap-3 mb-3 relative z-10">
+                <div className="w-[44px] h-[44px] rounded-[14px] flex items-center justify-center shrink-0"
+                  style={{ background: `linear-gradient(135deg, ${B1}, ${B3})`, boxShadow: "0 3px 12px rgba(0,85,255,0.28)" }}>
+                  <CalendarDays className="w-[22px] h-[22px] text-white" strokeWidth={2.2} />
                 </div>
                 <div>
-                  <div className="text-[16px] font-bold mb-1" style={{ color: T1, letterSpacing: "-0.3px" }}>AI Study Plan Maker</div>
-                  <div className="text-[12px] leading-[1.5]" style={{ color: T3 }}>
+                  <div className="text-[16px] font-bold mb-[2px]" style={{ color: T1, letterSpacing: "-0.3px" }}>AI Study Plan Maker</div>
+                  <div className="text-[11px] leading-[1.5] font-normal" style={{ color: T3 }}>
                     Based on {studentName}'s weak topics — personalised schedule for today &amp; tomorrow.
                   </div>
                 </div>
@@ -651,13 +670,15 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
 
               {weakTopics.length > 0 && (
                 <>
-                  <div className="text-[9px] font-bold uppercase tracking-[0.09em] mb-2" style={{ color: T4 }}>Weak Topics Detected</div>
-                  <div className="flex flex-wrap gap-[7px] mb-4">
+                  <div className="text-[9px] font-bold uppercase tracking-[0.10em] mb-2 relative z-10" style={{ color: T4 }}>Weak Topics Detected</div>
+                  <div className="flex flex-wrap gap-[7px] mb-4 relative z-10">
                     {weakTopics.slice(0, 4).map((t, i) => (
-                      <div key={i} className="px-3 py-[6px] rounded-full text-[12px] font-bold"
-                        style={{ background: i === 0 ? "rgba(232,85,85,0.09)" : "rgba(245,156,42,0.10)",
-                                 color: i === 0 ? RED : "#C07A10",
-                                 border: `0.5px solid ${i === 0 ? "rgba(232,85,85,0.18)" : "rgba(245,156,42,0.20)"}` }}>
+                      <div key={i} className="px-[13px] py-[5px] rounded-full text-[11px] font-bold"
+                        style={{
+                          background: i === 0 ? "rgba(255,51,85,0.10)" : "rgba(255,136,0,0.10)",
+                          color: i === 0 ? RED : "#884400",
+                          border: `0.5px solid ${i === 0 ? "rgba(255,51,85,0.22)" : "rgba(255,136,0,0.22)"}`
+                        }}>
                         {t}
                       </div>
                     ))}
@@ -666,10 +687,19 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
               )}
 
               <button onClick={handleGeneratePlan} disabled={generatingPlan}
-                className="w-full py-[15px] rounded-[16px] flex items-center justify-center gap-2 text-[15px] font-bold text-white disabled:opacity-60 active:scale-[0.97] transition-transform relative overflow-hidden"
-                style={{ background: `linear-gradient(135deg, ${INDIGO}, #4A5CC8)`, boxShadow: "0 5px 20px rgba(91,111,212,0.3)" }}>
-                <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 55%)" }} />
-                {generatingPlan ? <Loader2 className="relative z-10 w-4 h-4 animate-spin" /> : <Sparkles className="relative z-10 w-4 h-4" strokeWidth={2.2} />}
+                className="w-full h-12 rounded-[15px] flex items-center justify-center gap-2 text-[14px] font-bold text-white disabled:opacity-60 active:scale-[0.97] transition-transform relative overflow-hidden"
+                style={{
+                  background: `linear-gradient(135deg, ${B1}, ${B2})`,
+                  boxShadow: SH_BTN,
+                  letterSpacing: "-0.1px",
+                  transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)"
+                }}>
+                <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.14) 0%, transparent 52%)" }} />
+                {generatingPlan
+                  ? <Loader2 className="relative z-10 w-4 h-4 animate-spin" />
+                  : studyPlan
+                    ? <RefreshCw className="relative z-10 w-4 h-4" strokeWidth={2.2} />
+                    : <Sparkles className="relative z-10 w-4 h-4" strokeWidth={2.2} />}
                 <span className="relative z-10">{generatingPlan ? "Generating..." : studyPlan ? "Regenerate Plan" : "Generate Today's Plan"}</span>
               </button>
             </div>
@@ -677,30 +707,36 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
             {/* Today's Plan */}
             {studyPlan?.today && (
               <>
-                <div className="flex items-center gap-2 px-5 pt-[18px] text-[9px] font-bold uppercase tracking-[0.1em]" style={{ color: "rgba(40,57,108,0.35)" }}>
+                <div className="flex items-center gap-2 px-5 pt-[18px] text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: T4 }}>
                   Today's Plan
-                  <div className="flex-1 h-[0.5px]" style={{ background: NAVY_BDR }} />
+                  <div className="flex-1 h-[0.5px]" style={{ background: BLUE_BDR }} />
                 </div>
-                <div className="mx-[18px] mt-3 bg-white rounded-[20px] px-[18px] py-4 flex flex-col gap-3" style={{ boxShadow: SH, border: "0.5px solid rgba(40,57,108,0.06)" }}>
+                <div className="mx-5 mt-3 flex flex-col gap-2">
                   {studyPlan.today.map((slot: any, i: number) => {
                     const isFirst = i === 0, isLast = i === studyPlan.today.length - 1;
                     const priority = isFirst ? "High" : isLast ? "Low" : "Med";
                     const pColor = priority === "High" ? RED : priority === "Med" ? ORANGE : GREEN;
-                    const pBg = priority === "High" ? "rgba(232,85,85,0.09)" : priority === "Med" ? "rgba(245,156,42,0.10)" : "rgba(46,188,113,0.10)";
-                    const pBdr = priority === "High" ? "rgba(232,85,85,0.18)" : priority === "Med" ? "rgba(245,156,42,0.20)" : "rgba(46,188,113,0.20)";
+                    const pBg = priority === "High" ? "rgba(255,51,85,0.07)" : priority === "Med" ? "rgba(255,136,0,0.07)" : "rgba(0,200,83,0.10)";
+                    const pBdr = priority === "High" ? "rgba(255,51,85,0.16)" : priority === "Med" ? "rgba(255,136,0,0.16)" : "rgba(0,200,83,0.22)";
+                    const pIcoBg = priority === "High" ? "rgba(255,51,85,0.10)" : priority === "Med" ? "rgba(255,136,0,0.10)" : "rgba(0,200,83,0.10)";
+                    const pTagBg = priority === "High" ? "rgba(255,51,85,0.10)" : priority === "Med" ? "rgba(255,136,0,0.10)" : "rgba(0,200,83,0.10)";
+                    const pTagColor = priority === "High" ? RED : priority === "Med" ? "#884400" : "#007830";
+                    const pTagBdr = priority === "High" ? "rgba(255,51,85,0.22)" : priority === "Med" ? "rgba(255,136,0,0.22)" : "rgba(0,200,83,0.22)";
                     return (
-                      <div key={i} className="flex items-center gap-3 px-3 py-[10px] rounded-[13px]"
-                        style={{ background: CREAM2, border: `0.5px solid ${SEP}` }}>
+                      <div key={i} className="flex items-center gap-[11px] px-[14px] py-3 rounded-[16px] active:scale-[0.97] transition-transform cursor-pointer"
+                        style={{ background: pBg, border: `0.5px solid ${pBdr}`, transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
                         <div className="w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0"
-                          style={{ background: pBg, border: `0.5px solid ${pBdr}` }}>
-                          <Clock className="w-[14px] h-[14px]" style={{ color: pColor }} strokeWidth={2.2} />
+                          style={{ background: pIcoBg, border: `0.5px solid ${pBdr}` }}>
+                          <Clock className="w-[14px] h-[14px]" style={{ color: pColor }} strokeWidth={2.3} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-[13px] font-bold" style={{ color: T1 }}>{slot.topic} — {slot.activity?.split(" ").slice(0, 3).join(" ")}</div>
-                          <div className="text-[11px] mt-[1px]" style={{ color: T3 }}>{slot.time} · {slot.duration}</div>
+                          <div className="text-[13px] font-bold mb-[3px]" style={{ color: T1, letterSpacing: "-0.2px" }}>
+                            {slot.topic} — {slot.activity?.split(" ").slice(0, 3).join(" ")}
+                          </div>
+                          <div className="text-[10px]" style={{ color: T3 }}>{slot.time} · {slot.duration}</div>
                         </div>
-                        <div className="text-[11px] font-bold px-[9px] py-1 rounded-full"
-                          style={{ background: pBg, color: pColor, border: `0.5px solid ${pBdr}` }}>
+                        <div className="px-[10px] py-1 rounded-full text-[10px] font-bold shrink-0"
+                          style={{ background: pTagBg, color: pTagColor, border: `0.5px solid ${pTagBdr}` }}>
                           {priority}
                         </div>
                       </div>
@@ -715,43 +751,57 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
         {/* ═══ TAB 3: EXPLAINER ═══ */}
         {activeFeature === "explainer" && (
           <>
-            <div className="mx-[18px] mt-[18px] bg-white rounded-[22px] p-5" style={{ boxShadow: SH, border: "0.5px solid rgba(40,57,108,0.06)" }}>
-              <div className="flex items-start gap-[14px] mb-[18px]">
-                <div className="w-[46px] h-[46px] rounded-[15px] flex items-center justify-center shrink-0"
-                  style={{ background: "rgba(42,172,188,0.10)", border: "0.5px solid rgba(42,172,188,0.20)" }}>
-                  <BookOpenText className="w-[22px] h-[22px]" style={{ color: TEAL }} strokeWidth={2} />
+            <div className="mx-5 mt-[18px] bg-white rounded-[22px] p-[18px] relative overflow-hidden"
+              style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+              <div className="absolute -top-[30px] -right-5 w-[120px] h-[120px] rounded-full pointer-events-none"
+                style={{ background: "radial-gradient(circle, rgba(0,196,180,0.05) 0%, transparent 70%)" }} />
+              <div className="flex items-center gap-3 mb-3 relative z-10">
+                <div className="w-[44px] h-[44px] rounded-[14px] flex items-center justify-center shrink-0"
+                  style={{ background: `linear-gradient(135deg, ${TEAL}, #22DDCC)`, boxShadow: "0 3px 12px rgba(0,196,180,0.28)" }}>
+                  <BookOpenText className="w-[22px] h-[22px] text-white" strokeWidth={2.2} />
                 </div>
                 <div>
-                  <div className="text-[16px] font-bold mb-1" style={{ color: T1, letterSpacing: "-0.3px" }}>24/7 Concept Explainer</div>
-                  <div className="text-[12px] leading-[1.5]" style={{ color: T3 }}>
+                  <div className="text-[16px] font-bold mb-[2px]" style={{ color: T1, letterSpacing: "-0.3px" }}>24/7 Concept Explainer</div>
+                  <div className="text-[11px] leading-[1.5] font-normal" style={{ color: T3 }}>
                     Type any concept — AI explains it in simple language with a real-world example.
                   </div>
                 </div>
               </div>
 
-              <div className="relative mb-[14px]">
+              <div className="relative mb-[14px] z-10">
                 <input type="text" value={explainTopic} onChange={e => setExplainTopic(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && handleExplain()}
                   placeholder="e.g. Photosynthesis, Fractions, Newton's Law..."
-                  className="w-full py-[13px] pl-4 pr-[50px] rounded-[14px] text-[13px] font-normal outline-none"
-                  style={{ background: CREAM2, border: `0.5px solid ${SEP}`, color: T1, fontFamily: "DM Sans, sans-serif" }} />
+                  className="w-full py-[13px] pl-[14px] pr-[48px] rounded-[15px] text-[13px] font-normal outline-none"
+                  style={{
+                    background: BG, border: `0.5px solid ${BLUE_BDR}`,
+                    color: T1, fontFamily: "DM Sans, sans-serif",
+                    letterSpacing: "-0.1px"
+                  }} />
                 <button onClick={() => handleExplain()} disabled={generatingExplanation}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 w-[34px] h-[34px] rounded-[11px] flex items-center justify-center disabled:opacity-50"
-                  style={{ background: `linear-gradient(135deg, ${TEAL}, #1A8A9A)` }}>
+                  className="absolute right-[6px] top-1/2 -translate-y-1/2 w-[34px] h-[34px] rounded-[10px] flex items-center justify-center disabled:opacity-50 active:scale-[0.88] transition-transform"
+                  style={{
+                    background: `linear-gradient(135deg, ${TEAL}, #22DDCC)`,
+                    boxShadow: "0 2px 8px rgba(0,196,180,0.32)",
+                    transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)"
+                  }}>
                   {generatingExplanation ? <Loader2 className="w-4 h-4 text-white animate-spin" /> : <Send className="w-[14px] h-[14px] text-white" strokeWidth={2.5} />}
                 </button>
               </div>
 
               {weakTopics.length > 0 && (
-                <div className="mt-3">
-                  <div className="text-[9px] font-bold uppercase tracking-[0.09em] mb-2" style={{ color: T4 }}>Quick Picks — Your Weak Topics</div>
+                <div className="relative z-10">
+                  <div className="text-[9px] font-bold uppercase tracking-[0.10em] mb-2" style={{ color: T4 }}>Quick Picks — Your Weak Topics</div>
                   <div className="flex flex-wrap gap-[7px]">
                     {weakTopics.slice(0, 3).map((t, i) => (
                       <button key={i} onClick={() => handleExplain(t)}
-                        className="px-3 py-[6px] rounded-full text-[12px] font-bold active:scale-95 transition-transform"
-                        style={{ background: i === 0 ? "rgba(232,85,85,0.09)" : "rgba(245,156,42,0.10)",
-                                 color: i === 0 ? RED : "#C07A10",
-                                 border: `0.5px solid ${i === 0 ? "rgba(232,85,85,0.18)" : "rgba(245,156,42,0.20)"}` }}>
+                        className="px-[13px] py-[5px] rounded-full text-[11px] font-bold active:scale-[0.94] transition-transform"
+                        style={{
+                          background: i === 0 ? "rgba(255,51,85,0.10)" : i === 1 ? "rgba(255,136,0,0.10)" : "rgba(0,85,255,0.10)",
+                          color: i === 0 ? RED : i === 1 ? "#884400" : B1,
+                          border: `0.5px solid ${i === 0 ? "rgba(255,51,85,0.22)" : i === 1 ? "rgba(255,136,0,0.22)" : "rgba(0,85,255,0.20)"}`,
+                          transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)"
+                        }}>
                         {t}
                       </button>
                     ))}
@@ -760,30 +810,41 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
               )}
             </div>
 
-            {/* Explanation Result */}
+            {/* Explanation Result (dark blue) */}
             {explanation && (
-              <div className="mx-[18px] mt-3 bg-white rounded-[22px] p-5" style={{ boxShadow: SH, border: "0.5px solid rgba(40,57,108,0.06)" }}>
-                <div className="flex items-start gap-2 mb-3">
-                  <span className="text-[22px]">{explanation.emoji || "💡"}</span>
-                  <div>
-                    <div className="text-[9px] font-bold uppercase tracking-[0.09em]" style={{ color: TEAL }}>Simple Explanation</div>
-                    <p className="text-[13px] leading-[1.6] mt-1" style={{ color: T1 }}>{explanation.simple_explanation}</p>
-                  </div>
+              <div className="mx-5 mt-3 rounded-[22px] p-[18px] relative overflow-hidden"
+                style={{
+                  background: "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)",
+                  boxShadow: "0 8px 28px rgba(0,51,204,0.32), 0 0 0 0.5px rgba(255,255,255,0.14)",
+                }}>
+                <div className="absolute -top-[28px] -right-[18px] w-[120px] h-[120px] rounded-full pointer-events-none"
+                  style={{ background: "radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 65%)" }} />
+                <div className="absolute inset-0 pointer-events-none" style={{
+                  backgroundImage: "linear-gradient(rgba(255,255,255,0.014) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.014) 1px, transparent 1px)",
+                  backgroundSize: "24px 24px"
+                }} />
+                <div className="flex items-center gap-[6px] mb-2 relative z-10">
+                  <span className="text-[18px]">{explanation.emoji || "💡"}</span>
+                  <div className="text-[9px] font-bold uppercase tracking-[0.12em]" style={{ color: "rgba(255,255,255,0.55)" }}>AI Explanation Ready</div>
                 </div>
+                <p className="text-[14px] leading-[1.7] font-normal relative z-10" style={{ color: "rgba(255,255,255,0.92)", letterSpacing: "-0.1px" }}>
+                  {explanation.simple_explanation}
+                </p>
                 {explanation.real_world_example && (
-                  <div className="mt-3 px-[14px] py-3 rounded-[14px]" style={{ background: CREAM2, border: `0.5px solid ${SEP}` }}>
-                    <div className="text-[9px] font-bold uppercase tracking-[0.09em] mb-1" style={{ color: T3 }}>Real-world Example</div>
-                    <p className="text-[12px] leading-[1.55]" style={{ color: T2 }}>{explanation.real_world_example}</p>
+                  <div className="mt-3 px-[14px] py-3 rounded-[14px] relative z-10"
+                    style={{ background: "rgba(255,255,255,0.08)", border: "0.5px solid rgba(255,255,255,0.14)" }}>
+                    <div className="text-[9px] font-bold uppercase tracking-[0.10em] mb-1" style={{ color: "rgba(255,255,255,0.55)" }}>Real-world Example</div>
+                    <p className="text-[12px] leading-[1.55]" style={{ color: "rgba(255,255,255,0.85)" }}>{explanation.real_world_example}</p>
                   </div>
                 )}
                 {explanation.remember_points?.length > 0 && (
-                  <div className="mt-3">
-                    <div className="text-[9px] font-bold uppercase tracking-[0.09em] mb-2" style={{ color: T3 }}>Remember</div>
+                  <div className="mt-3 relative z-10">
+                    <div className="text-[9px] font-bold uppercase tracking-[0.10em] mb-2" style={{ color: "rgba(255,255,255,0.55)" }}>Remember</div>
                     {explanation.remember_points.map((p: string, i: number) => (
                       <div key={i} className="flex items-start gap-2 mb-2 last:mb-0">
                         <div className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 mt-[1px]"
-                          style={{ background: TEAL }}>{i + 1}</div>
-                        <p className="text-[12px] leading-[1.55]" style={{ color: T2 }}>{p}</p>
+                          style={{ background: "rgba(255,255,255,0.18)", border: "0.5px solid rgba(255,255,255,0.26)" }}>{i + 1}</div>
+                        <p className="text-[12px] leading-[1.55]" style={{ color: "rgba(255,255,255,0.82)" }}>{p}</p>
                       </div>
                     ))}
                   </div>
@@ -796,27 +857,34 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
         {/* ═══ TAB 4: PRACTICE ═══ */}
         {activeFeature === "practice" && (
           <>
-            <div className="mx-[18px] mt-[18px] bg-white rounded-[22px] p-5" style={{ boxShadow: SH, border: "0.5px solid rgba(40,57,108,0.06)" }}>
-              <div className="flex items-start gap-[14px] mb-[18px]">
-                <div className="w-[46px] h-[46px] rounded-[15px] flex items-center justify-center shrink-0"
-                  style={{ background: "rgba(245,156,42,0.10)", border: "0.5px solid rgba(245,156,42,0.20)" }}>
-                  <FlaskConical className="w-[22px] h-[22px]" style={{ color: ORANGE }} strokeWidth={2} />
+            <div className="mx-5 mt-[18px] bg-white rounded-[22px] p-[18px] relative overflow-hidden"
+              style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+              <div className="absolute -top-[30px] -right-5 w-[120px] h-[120px] rounded-full pointer-events-none"
+                style={{ background: "radial-gradient(circle, rgba(255,136,0,0.05) 0%, transparent 70%)" }} />
+              <div className="flex items-center gap-3 mb-3 relative z-10">
+                <div className="w-[44px] h-[44px] rounded-[14px] flex items-center justify-center shrink-0"
+                  style={{ background: `linear-gradient(135deg, ${ORANGE}, #FFAA22)`, boxShadow: "0 3px 12px rgba(255,136,0,0.28)" }}>
+                  <FlaskConical className="w-[22px] h-[22px] text-white" strokeWidth={2.2} />
                 </div>
                 <div>
-                  <div className="text-[16px] font-bold mb-1" style={{ color: T1, letterSpacing: "-0.3px" }}>Practice Problem Generator</div>
-                  <div className="text-[12px] leading-[1.5]" style={{ color: T3 }}>
+                  <div className="text-[16px] font-bold mb-[2px]" style={{ color: T1, letterSpacing: "-0.3px" }}>Practice Problem Generator</div>
+                  <div className="text-[11px] leading-[1.5] font-normal" style={{ color: T3 }}>
                     AI generates 5 dynamic questions on any topic — with answers you can reveal one at a time.
                   </div>
                 </div>
               </div>
-              <div className="flex gap-[10px] items-center">
+              <div className="flex gap-2 items-center relative z-10">
                 <input type="text" value={practiceTopic} onChange={e => setPracticeTopic(e.target.value)}
                   placeholder={`Topic (e.g. ${activeSubject || "Islamic Read"})`}
-                  className="flex-1 py-[13px] px-4 rounded-[14px] text-[13px] outline-none"
-                  style={{ background: CREAM2, border: `0.5px solid ${SEP}`, color: T1, fontFamily: "DM Sans, sans-serif" }} />
+                  className="flex-1 py-3 px-[14px] rounded-[14px] text-[13px] outline-none"
+                  style={{ background: BG, border: `0.5px solid ${BLUE_BDR}`, color: T1, fontFamily: "DM Sans, sans-serif" }} />
                 <button onClick={handleGenerateQuestions} disabled={generatingQuestions}
-                  className="py-[13px] px-4 rounded-[14px] text-[13px] font-bold text-white flex items-center gap-[6px] shrink-0 whitespace-nowrap disabled:opacity-60 active:scale-95 transition-transform"
-                  style={{ background: `linear-gradient(135deg, ${ORANGE}, #E88A15)`, boxShadow: "0 4px 14px rgba(245,156,42,0.28)" }}>
+                  className="py-3 px-[18px] rounded-[14px] text-[13px] font-bold text-white flex items-center gap-[5px] shrink-0 whitespace-nowrap disabled:opacity-60 active:scale-[0.93] transition-transform"
+                  style={{
+                    background: `linear-gradient(135deg, ${ORANGE}, #FFAA22)`,
+                    boxShadow: "0 3px 12px rgba(255,136,0,0.32)",
+                    transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)"
+                  }}>
                   {generatingQuestions ? <Loader2 className="w-[14px] h-[14px] animate-spin" /> : <RefreshCw className="w-[14px] h-[14px]" strokeWidth={2.2} />}
                   Generate
                 </button>
@@ -825,15 +893,18 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
 
             {/* Questions */}
             {questions.length > 0 && (
-              <div className="mx-[18px] mt-3 flex flex-col gap-3">
+              <div className="mx-5 mt-3 flex flex-col gap-3">
                 {questions.map((q: any, qi: number) => {
                   const selected = selectedAnswers[qi];
                   const revealed = revealedAnswers.has(qi);
                   return (
-                    <div key={qi} className="bg-white rounded-[18px] p-4" style={{ boxShadow: SH, border: "0.5px solid rgba(40,57,108,0.06)" }}>
+                    <div key={qi} className="bg-white rounded-[18px] p-4"
+                      style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
                       <div className="flex items-start gap-2 mb-3">
                         <div className="w-6 h-6 rounded-[8px] flex items-center justify-center text-[11px] font-bold text-white shrink-0"
-                          style={{ background: `linear-gradient(135deg, ${ORANGE}, #E88A15)` }}>{qi + 1}</div>
+                          style={{ background: `linear-gradient(135deg, ${ORANGE}, #FFAA22)`, boxShadow: "0 2px 6px rgba(255,136,0,0.28)" }}>
+                          {qi + 1}
+                        </div>
                         <p className="text-[13px] font-semibold leading-[1.5]" style={{ color: T1 }}>{q.question}</p>
                       </div>
                       <div className="flex flex-col gap-[6px]">
@@ -846,9 +917,9 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
                             <button key={oi} onClick={() => setSelectedAnswers({ ...selectedAnswers, [qi]: letter })} disabled={revealed}
                               className="text-left px-3 py-[10px] rounded-[10px] text-[12px] font-medium transition-colors"
                               style={{
-                                background: isCorrect ? "rgba(46,188,113,0.12)" : isWrong ? "rgba(232,85,85,0.12)" : isSelected ? "rgba(245,156,42,0.10)" : CREAM2,
+                                background: isCorrect ? "rgba(0,200,83,0.12)" : isWrong ? "rgba(255,51,85,0.12)" : isSelected ? "rgba(255,136,0,0.10)" : BG,
                                 color: isCorrect ? GREEN2 : isWrong ? RED : T2,
-                                border: `0.5px solid ${isCorrect ? "rgba(46,188,113,0.25)" : isWrong ? "rgba(232,85,85,0.25)" : isSelected ? "rgba(245,156,42,0.25)" : SEP}`,
+                                border: `0.5px solid ${isCorrect ? "rgba(0,200,83,0.25)" : isWrong ? "rgba(255,51,85,0.25)" : isSelected ? "rgba(255,136,0,0.25)" : BLUE_BDR}`,
                               }}>
                               {opt}
                             </button>
@@ -858,13 +929,14 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
                       {!revealed && selected && (
                         <button onClick={() => setRevealedAnswers(new Set([...revealedAnswers, qi]))}
                           className="mt-3 w-full py-[10px] rounded-[12px] text-[12px] font-bold flex items-center justify-center gap-2"
-                          style={{ background: CREAM2, color: T2, border: `0.5px solid ${SEP}` }}>
+                          style={{ background: BG, color: T2, border: `0.5px solid ${BLUE_BDR}` }}>
                           <Eye className="w-[13px] h-[13px]" /> Reveal Answer
                         </button>
                       )}
                       {revealed && q.explanation && (
-                        <div className="mt-3 px-3 py-[10px] rounded-[10px]" style={{ background: "rgba(42,172,188,0.06)", border: "0.5px solid rgba(42,172,188,0.15)" }}>
-                          <div className="text-[10px] font-bold uppercase tracking-[0.08em] mb-1" style={{ color: TEAL }}>Explanation</div>
+                        <div className="mt-3 px-3 py-[10px] rounded-[10px]"
+                          style={{ background: "rgba(0,196,180,0.06)", border: "0.5px solid rgba(0,196,180,0.18)" }}>
+                          <div className="text-[10px] font-bold uppercase tracking-[0.09em] mb-1" style={{ color: TEAL }}>Explanation</div>
                           <p className="text-[12px] leading-[1.5]" style={{ color: T2 }}>{q.explanation}</p>
                         </div>
                       )}
@@ -879,22 +951,25 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
         {/* ═══ TAB 5: DOUBT SOLVER ═══ */}
         {activeFeature === "doubt" && (
           <>
-            <div className="mx-[18px] mt-[18px] bg-white rounded-[22px] p-5" style={{ boxShadow: SH, border: "0.5px solid rgba(40,57,108,0.06)" }}>
-              <div className="flex items-start gap-[14px] mb-[18px]">
-                <div className="w-[46px] h-[46px] rounded-[15px] flex items-center justify-center shrink-0"
-                  style={{ background: "rgba(232,85,153,0.10)", border: "0.5px solid rgba(232,85,153,0.20)" }}>
-                  <HelpCircle className="w-[22px] h-[22px]" style={{ color: PINK }} strokeWidth={2} />
+            <div className="mx-5 mt-[18px] bg-white rounded-[22px] p-[18px] relative overflow-hidden"
+              style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+              <div className="absolute -top-[30px] -right-5 w-[120px] h-[120px] rounded-full pointer-events-none"
+                style={{ background: "radial-gradient(circle, rgba(255,59,168,0.05) 0%, transparent 70%)" }} />
+              <div className="flex items-center gap-3 mb-3 relative z-10">
+                <div className="w-[44px] h-[44px] rounded-[14px] flex items-center justify-center shrink-0"
+                  style={{ background: `linear-gradient(135deg, ${PINK}, #FF77CC)`, boxShadow: "0 3px 12px rgba(255,59,168,0.28)" }}>
+                  <HelpCircle className="w-[22px] h-[22px] text-white" strokeWidth={2.2} />
                 </div>
                 <div>
-                  <div className="text-[16px] font-bold mb-1" style={{ color: T1, letterSpacing: "-0.3px" }}>AI Doubt Solver</div>
-                  <div className="text-[12px] leading-[1.5]" style={{ color: T3 }}>
+                  <div className="text-[16px] font-bold mb-[2px]" style={{ color: T1, letterSpacing: "-0.3px" }}>AI Doubt Solver</div>
+                  <div className="text-[11px] leading-[1.5] font-normal" style={{ color: T3 }}>
                     Type your doubt OR upload a photo. AI guides step by step — teaches, doesn't just answer.
                   </div>
                 </div>
               </div>
 
               {doubtImagePreview && (
-                <div className="mb-3 relative rounded-[14px] overflow-hidden" style={{ border: `0.5px solid ${SEP}` }}>
+                <div className="mb-3 relative rounded-[14px] overflow-hidden z-10" style={{ border: `0.5px solid ${BLUE_BDR}` }}>
                   <img src={doubtImagePreview} alt="Doubt" className="w-full h-auto max-h-52 object-cover" />
                   <button onClick={() => { setDoubtImagePreview(""); setDoubtImageB64(""); }}
                     className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 text-white text-xs font-bold">×</button>
@@ -903,20 +978,36 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
 
               <textarea value={doubtText} onChange={e => setDoubtText(e.target.value)}
                 placeholder="Type your doubt here... e.g. 'I don't understand how to solve simultaneous equations'"
-                className="w-full py-[13px] px-4 rounded-[14px] text-[13px] outline-none resize-none min-h-[90px] leading-[1.6]"
-                style={{ background: CREAM2, border: `0.5px solid ${SEP}`, color: T1, fontFamily: "DM Sans, sans-serif" }} />
+                className="w-full py-[13px] px-[14px] rounded-[15px] text-[13px] outline-none resize-none min-h-[100px] leading-[1.6] relative z-10"
+                style={{
+                  background: BG,
+                  border: `0.5px solid ${BLUE_BDR}`,
+                  color: T1,
+                  fontFamily: "DM Sans, sans-serif",
+                  letterSpacing: "-0.1px"
+                }} />
 
-              <div className="flex gap-[10px] mt-3">
+              <div className="flex gap-2 mt-[14px] relative z-10">
                 <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
                 <button onClick={() => fileInputRef.current?.click()}
-                  className="flex-1 py-[13px] rounded-[14px] text-[13px] font-bold flex items-center justify-center gap-[7px] active:scale-95 transition-transform"
-                  style={{ background: CREAM2, color: T2, border: `0.5px solid ${SEP}` }}>
+                  className="flex-1 h-11 rounded-[13px] text-[13px] font-bold flex items-center justify-center gap-[6px] active:scale-[0.96] transition-transform"
+                  style={{
+                    background: BG,
+                    color: T2,
+                    border: `0.5px solid ${BLUE_BDR}`,
+                    boxShadow: SH,
+                    transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)"
+                  }}>
                   <Camera className="w-[15px] h-[15px]" strokeWidth={2} />
                   Upload Photo
                 </button>
                 <button onClick={handleDoubtSubmit} disabled={generatingDoubt || (!doubtText.trim() && !doubtImageB64)}
-                  className="flex-1 py-[13px] rounded-[14px] text-[13px] font-bold text-white flex items-center justify-center gap-[7px] disabled:opacity-50 active:scale-95 transition-transform"
-                  style={{ background: `linear-gradient(135deg, ${PINK}, #C03070)`, boxShadow: "0 4px 14px rgba(232,85,153,0.28)" }}>
+                  className="flex-[1.3] h-11 rounded-[13px] text-[13px] font-bold text-white flex items-center justify-center gap-[6px] disabled:opacity-50 active:scale-[0.96] transition-transform"
+                  style={{
+                    background: `linear-gradient(135deg, ${PINK}, #FF77CC)`,
+                    boxShadow: "0 4px 14px rgba(255,59,168,0.30)",
+                    transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)"
+                  }}>
                   {generatingDoubt ? <Loader2 className="w-[15px] h-[15px] animate-spin" /> : <Zap className="w-[15px] h-[15px]" strokeWidth={2.2} />}
                   Get Help
                 </button>
@@ -925,18 +1016,26 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
 
             {/* Hints */}
             {doubtHints.length > 0 && (
-              <div className="mx-[18px] mt-3 flex flex-col gap-[10px]">
+              <div className="mx-5 mt-3 flex flex-col gap-[10px]">
                 {doubtHints.slice(0, hintIndex + 1).map((hint, i) => (
-                  <div key={i} className="bg-white rounded-[18px] p-4 flex items-start gap-3" style={{ boxShadow: SH, border: "0.5px solid rgba(40,57,108,0.06)" }}>
+                  <div key={i} className="bg-white rounded-[18px] p-4 flex items-start gap-3"
+                    style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
                     <div className="w-7 h-7 rounded-[9px] flex items-center justify-center shrink-0 text-[12px] font-bold text-white"
-                      style={{ background: `linear-gradient(135deg, ${PINK}, #C03070)` }}>{i + 1}</div>
+                      style={{ background: `linear-gradient(135deg, ${PINK}, #FF77CC)`, boxShadow: "0 2px 8px rgba(255,59,168,0.28)" }}>
+                      {i + 1}
+                    </div>
                     <p className="text-[13px] leading-[1.55]" style={{ color: T2 }}>{hint}</p>
                   </div>
                 ))}
                 {hintIndex < doubtHints.length - 1 && (
                   <button onClick={() => setHintIndex(hintIndex + 1)}
-                    className="mx-auto mt-2 px-4 py-2 rounded-full text-[12px] font-bold flex items-center gap-2"
-                    style={{ background: "rgba(232,85,153,0.10)", color: PINK, border: `0.5px solid rgba(232,85,153,0.20)` }}>
+                    className="mx-auto mt-2 px-4 py-2 rounded-full text-[12px] font-bold flex items-center gap-2 active:scale-[0.94] transition-transform"
+                    style={{
+                      background: "rgba(255,59,168,0.10)",
+                      color: PINK,
+                      border: `0.5px solid rgba(255,59,168,0.22)`,
+                      transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)"
+                    }}>
                     <ChevronRight className="w-[13px] h-[13px]" />
                     Next Hint ({hintIndex + 2}/{doubtHints.length})
                   </button>

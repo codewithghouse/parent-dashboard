@@ -454,36 +454,53 @@ const DashboardPage = () => {
   const isPrevWeekReport = !!weeklyReport && !weekConfig.canGenerate && !localStorage.getItem(weekConfig.thisWeekKey);
 
   /* ═══════════════════════════════════════════════════════════════
-     MOBILE — Deep Purple Premium UI
+     MOBILE — Edullent Indigo Apple UI
      ═══════════════════════════════════════════════════════════════ */
   if (isMobile) {
+    // ── Indigo theme tokens ──
+    const IND = "#30306E";
+    const IND2 = "#4444A0";
+    const IND3 = "#6666C0";
+    const BG = "#EEEEF3";
+    const T1 = "rgba(48,48,110,0.90)";
+    const T2 = "rgba(48,48,110,0.70)";
+    const T3 = "rgba(48,48,110,0.42)";
+    const T4 = "rgba(48,48,110,0.25)";
+    const SEP = "rgba(48,48,110,0.06)";
+    const IND_BDR = "rgba(48,48,110,0.12)";
+    const IND_SOFT = "rgba(48,48,110,0.07)";
+    const GREEN = "#12C04E";
+    const GREEN_S = "rgba(18,192,78,0.10)";
+    const GREEN_B = "rgba(18,192,78,0.22)";
+    const ORANGE = "#F5A000";
+    const ORANGE_S = "rgba(245,160,0,0.10)";
+    const ORANGE_B = "rgba(245,160,0,0.22)";
+    const ROSE = "#FF6EA8";
+    const ROSE_S = "rgba(255,110,168,0.10)";
+    const DK = "#09092A";
+    const DK_CELL = "rgba(9,9,42,0.58)";
+    const SH = "0 0 0 0.5px rgba(48,48,110,0.06), 0 1px 3px rgba(48,48,110,0.04), 0 8px 20px rgba(48,48,110,0.07)";
+    const SH_LG = "0 0 0 0.5px rgba(48,48,110,0.08), 0 2px 8px rgba(48,48,110,0.06), 0 16px 36px rgba(48,48,110,0.10), 0 32px 56px rgba(48,48,110,0.06)";
+    const SH_BTN = "0 4px 14px rgba(48,48,110,0.28), 0 1px 4px rgba(48,48,110,0.18)";
+    // Academic Health ring
     const scorePct = Math.min(liveStats.avgScore, 100);
     const ringR = 40, ringCirc = 2 * Math.PI * ringR;
     const ringOffset = ringCirc - (scorePct / 100) * ringCirc;
-    // Purple theme constants
-    const PUR = "#6B35B8";
-    const PUR2 = "#8A55D4";
-    const LAV = "#C4A8E8";
-    const T1 = "#1A1128";
-    const T2 = "#5C4F78";
-    const T3 = "#9586AE";
-    const T4 = "#C0B2D4";
-    const SEP = "rgba(107,53,184,0.09)";
-    const CARD_SHADOW = "0 0 0 0.5px rgba(107,53,184,0.06), 0 2px 6px rgba(107,53,184,0.05), 0 12px 24px rgba(107,53,184,0.07)";
-    const CARD_SHADOW_LG = "0 0 0 0.5px rgba(107,53,184,0.08), 0 4px 16px rgba(107,53,184,0.07), 0 20px 40px rgba(107,53,184,0.10)";
-    const DK = "#120D1E";
-    const DK_CELL = "rgba(18,13,30,0.55)";
-    const attRingColor = liveStats.attendance >= 85 ? "#FF9F0A" : liveStats.attendance >= 70 ? "#FF9F0A" : "#FF453A";
-    const scoreRingColor = liveStats.avgScore >= 80 ? "#30D158" : liveStats.avgScore >= 60 ? PUR : "#FF453A";
+    // Status flags
+    const attOnTrack = liveStats.attendance >= 85;
+    const noPending = liveStats.pending === 0;
+    const isImproving = liveStats.trendPct > 0;
+    const isDeclining = liveStats.trendPct < 0;
+    const trendStable = liveStats.trendPct === 0;
 
     return (
-      <div className="animate-in fade-in duration-500 -mx-3 -mt-3 md:mx-0 md:mt-0" style={{ fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif", background: "#F2EEF9", minHeight: "100vh" }}>
+      <div className="animate-in fade-in duration-500 -mx-3 -mt-3 md:mx-0 md:mt-0" style={{ fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif", background: BG, minHeight: "100vh" }}>
 
         {/* ── Greeting ── */}
-        <div className="px-6 pt-[22px] pb-1">
-          <h1 className="text-[30px] font-bold leading-[1.12]" style={{ color: T1, letterSpacing: "-0.7px" }}>
+        <div className="px-6 pt-6 pb-0">
+          <h1 className="text-[32px] font-bold leading-[1.10]" style={{ color: T1, letterSpacing: "-0.8px" }}>
             {greeting},<br />
-            <span style={{ background: `linear-gradient(130deg, ${PUR}, #FF6FA3)`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+            <span style={{ background: `linear-gradient(130deg, ${IND} 0%, ${IND3} 100%)`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
               {parentFirstName}
             </span> 👋
           </h1>
@@ -491,44 +508,48 @@ const DashboardPage = () => {
         </div>
 
         {/* ── Academic Health Card ── */}
-        <div className="mx-5 mt-5 bg-white rounded-[28px] p-[22px] relative overflow-hidden" style={{ boxShadow: CARD_SHADOW_LG, border: "0.5px solid rgba(107,53,184,0.08)" }}>
-          <div className="absolute -top-[70px] -right-[50px] w-[220px] h-[220px] rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, rgba(107,53,184,0.07) 0%, transparent 70%)" }} />
-          <div className="absolute -bottom-[50px] left-[30px] w-[160px] h-[160px] rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, rgba(196,168,232,0.07) 0%, transparent 70%)" }} />
+        <div className="mx-5 mt-[22px] bg-white rounded-[28px] p-6 relative overflow-hidden"
+          style={{ boxShadow: SH_LG, border: `0.5px solid ${IND_BDR}` }}>
+          <div className="absolute -top-[70px] -right-[50px] w-[220px] h-[220px] rounded-full pointer-events-none"
+            style={{ background: "radial-gradient(circle, rgba(48,48,110,0.05) 0%, transparent 70%)" }} />
+          <div className="absolute -bottom-[50px] left-5 w-[160px] h-[160px] rounded-full pointer-events-none"
+            style={{ background: "radial-gradient(circle, rgba(48,48,110,0.03) 0%, transparent 70%)" }} />
           <div className="relative z-10">
-            <h3 className="text-[18px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Academic Health</h3>
+            <h3 className="text-[18px] font-bold" style={{ color: T1, letterSpacing: "-0.4px" }}>Academic Health</h3>
             <p className="text-[13px] mt-0.5" style={{ color: T3 }}>Overall performance indicator</p>
-            <div className="inline-flex items-center gap-[5px] mt-[14px] px-3 py-[5px] rounded-full text-[12px] font-semibold"
+            <div className="inline-flex items-center gap-[5px] mt-[14px] px-[13px] py-[5px] rounded-full text-[12px] font-semibold"
               style={{
-                background: liveStats.trendPct >= 0 ? "rgba(48,209,88,0.10)" : "rgba(255,69,58,0.10)",
-                color: liveStats.trendPct >= 0 ? "#1A7A36" : "#FF453A",
-                border: `0.5px solid ${liveStats.trendPct >= 0 ? "rgba(48,209,88,0.2)" : "rgba(255,69,58,0.2)"}`
+                background: trendStable || isImproving ? GREEN_S : ORANGE_S,
+                color: trendStable || isImproving ? "#0A6A2E" : "#905800",
+                border: `0.5px solid ${trendStable || isImproving ? GREEN_B : ORANGE_B}`,
+                letterSpacing: "-0.1px"
               }}>
-              <TrendingUp className={`w-3 h-3 ${liveStats.trendPct < 0 ? "rotate-180" : ""}`} />
-              {liveStats.trendPct === 0 ? "Stable performance" : liveStats.trendPct > 0 ? `Improved by ${liveStats.trendPct}%` : `Declined by ${Math.abs(liveStats.trendPct)}%`}
+              <TrendingUp className={`w-3 h-3 ${isDeclining ? "rotate-180" : ""}`} />
+              {trendStable ? "Stable performance" : isImproving ? `Improved by ${liveStats.trendPct}%` : `Declined by ${Math.abs(liveStats.trendPct)}%`}
             </div>
-            <div className="flex items-center justify-between mt-5">
-              <div>
-                <div className="text-[52px] font-bold leading-none" style={{ color: PUR, letterSpacing: "-2px" }}>
+            <div className="flex items-end justify-between mt-[22px]">
+              <div className="flex flex-col gap-1">
+                <div className="text-[56px] font-bold leading-none" style={{ color: IND, letterSpacing: "-3px" }}>
                   {liveStats.avgScore > 0 ? `${liveStats.avgScore}%` : "—"}
                 </div>
-                <div className="text-[10px] font-bold uppercase tracking-[0.08em] mt-[6px]" style={{ color: T4 }}>
+                <div className="text-[10px] font-bold uppercase tracking-[0.09em] mt-1" style={{ color: T4 }}>
                   {liveStats.avgScore >= 75 ? "Good Standing" : liveStats.avgScore > 0 ? "Needs Attention" : "No data yet"}
                 </div>
               </div>
-              <div className="relative w-[96px] h-[96px]">
+              <div className="relative w-[96px] h-[96px] shrink-0">
                 <svg viewBox="0 0 96 96" width="96" height="96" style={{ transform: "rotate(-90deg)" }}>
                   <defs>
-                    <linearGradient id="purGradMobile" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#A97FE8" />
-                      <stop offset="100%" stopColor={PUR} />
+                    <linearGradient id="indGradMobile" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor={IND3} />
+                      <stop offset="100%" stopColor={IND} />
                     </linearGradient>
                   </defs>
-                  <circle cx="48" cy="48" r={ringR} fill="none" stroke="#EDE8F5" strokeWidth="7" />
-                  <circle cx="48" cy="48" r={ringR} fill="none" stroke="url(#purGradMobile)" strokeWidth="7" strokeLinecap="round"
+                  <circle cx="48" cy="48" r={ringR} fill="none" stroke="rgba(48,48,110,0.09)" strokeWidth="7" />
+                  <circle cx="48" cy="48" r={ringR} fill="none" stroke="url(#indGradMobile)" strokeWidth="7" strokeLinecap="round"
                     strokeDasharray={ringCirc} strokeDashoffset={ringOffset}
                     style={{ transition: "stroke-dashoffset 1s cubic-bezier(0.4,0,0.2,1)" }} />
                 </svg>
-                <div className="absolute inset-0 flex items-center justify-center text-[16px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>
+                <div className="absolute inset-0 flex items-center justify-center text-[15px] font-bold" style={{ color: T1, letterSpacing: "-0.4px" }}>
                   {liveStats.avgScore > 0 ? `${liveStats.avgScore}%` : "—"}
                 </div>
               </div>
@@ -537,74 +558,79 @@ const DashboardPage = () => {
         </div>
 
         {/* ── Stats Grid 2×2 ── */}
-        <div className="grid grid-cols-2 gap-3 mx-5 mt-3">
+        <div className="grid grid-cols-2 gap-3 mx-5 mt-[14px]">
           {[
-            { icon: CheckCircle, iconColor: "#30D158", bg: "rgba(48,209,88,0.10)", border: "rgba(48,209,88,0.2)", label: "Attendance", value: `${liveStats.attendance}%`, status: liveStats.attendance >= 85 ? "On track ✓" : "Below target", statusColor: "#30D158" },
-            { icon: AlertCircle, iconColor: "#FF9F0A", bg: "rgba(255,159,10,0.10)", border: "rgba(255,159,10,0.2)", label: "Pending Work", value: liveStats.pending.toString(), status: "Due this week", statusColor: "#FF9F0A" },
-            { icon: Calendar, iconColor: PUR, bg: "rgba(107,53,184,0.10)", border: "rgba(107,53,184,0.18)", label: "Upcoming Tests", value: liveStats.tests.toString(), status: "Next 7 days", statusColor: T4 },
-            { icon: Star, iconColor: "#FF6FA3", bg: "rgba(255,111,163,0.10)", border: "rgba(255,111,163,0.2)", label: "Recent Grade", value: liveStats.recentGrade, status: liveStats.recentSubject, statusColor: T4 },
-          ].map(({ icon: Icon, iconColor, bg, border, label, value, status, statusColor }) => (
-            <div key={label} className="bg-white rounded-[22px] p-[18px] relative overflow-hidden active:scale-[0.95] transition-transform" style={{ boxShadow: CARD_SHADOW, border: "0.5px solid rgba(107,53,184,0.06)" }}>
-              <div className="w-[34px] h-[34px] rounded-[10px] flex items-center justify-center mb-[14px]" style={{ background: bg, border: `0.5px solid ${border}` }}>
+            { icon: CheckCircle, iconColor: GREEN, bg: GREEN_S, border: "rgba(18,192,78,0.20)", glow: "rgba(18,192,78,0.14)", label: "Attendance", value: `${liveStats.attendance}%`, status: attOnTrack ? "On track ✓" : "Below target", statusColor: attOnTrack ? GREEN : ORANGE },
+            { icon: AlertCircle, iconColor: ORANGE, bg: ORANGE_S, border: "rgba(245,160,0,0.20)", glow: "rgba(245,160,0,0.14)", label: "Pending Work", value: liveStats.pending.toString(), status: noPending ? "All clear ✓" : "Due this week", statusColor: noPending ? GREEN : ORANGE },
+            { icon: Calendar, iconColor: IND, bg: IND_SOFT, border: IND_BDR, glow: "rgba(48,48,110,0.09)", label: "Upcoming Tests", value: liveStats.tests.toString(), status: "Next 7 days", statusColor: T4 },
+            { icon: Star, iconColor: ROSE, bg: ROSE_S, border: "rgba(255,110,168,0.20)", glow: "rgba(255,110,168,0.14)", label: "Recent Grade", value: liveStats.recentGrade !== "N/A" ? liveStats.recentGrade : "—", status: liveStats.recentSubject, statusColor: T4 },
+          ].map(({ icon: Icon, iconColor, bg, border, glow, label, value, status, statusColor }) => (
+            <div key={label} className="bg-white rounded-[22px] px-4 pt-[18px] pb-[18px] relative overflow-hidden active:scale-[0.96] transition-transform"
+              style={{ boxShadow: SH, border: `0.5px solid ${IND_BDR}` }}>
+              <div className="absolute -top-[18px] -right-[18px] w-[72px] h-[72px] rounded-full pointer-events-none"
+                style={{ background: `radial-gradient(circle, ${glow} 0%, transparent 70%)`, opacity: 0.55 }} />
+              <div className="w-[34px] h-[34px] rounded-[11px] flex items-center justify-center mb-[14px] relative"
+                style={{ background: bg, border: `0.5px solid ${border}` }}>
                 <Icon className="w-[17px] h-[17px]" style={{ color: iconColor }} />
               </div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.07em]" style={{ color: T4 }}>{label}</div>
-              <div className="text-[28px] font-bold mt-[3px] leading-none" style={{ color: T1, letterSpacing: "-0.8px" }}>{value}</div>
-              <div className="text-[12px] font-medium mt-[5px]" style={{ color: statusColor }}>{status}</div>
+              <div className="text-[10px] font-bold uppercase tracking-[0.08em] relative" style={{ color: T4 }}>{label}</div>
+              <div className="text-[28px] font-bold mt-1 leading-none relative" style={{ color: T1, letterSpacing: "-0.8px" }}>{value}</div>
+              <div className="text-[12px] font-medium mt-[6px] relative truncate" style={{ color: statusColor }}>{status}</div>
             </div>
           ))}
         </div>
 
-        {/* ── AI Live Summary Dark Card ── */}
-        <div className="mx-5 mt-4 rounded-[28px] overflow-hidden relative" style={{ background: DK, boxShadow: "0 0 0 0.5px rgba(196,168,232,0.08), 0 8px 32px rgba(0,0,0,0.3)" }}>
-          {/* Purple ambient glow overlays */}
+        {/* ── AI Live Dark Card ── */}
+        <div className="mx-5 mt-4 rounded-[28px] overflow-hidden relative"
+          style={{ background: DK, boxShadow: "0 0 0 0.5px rgba(48,48,110,0.16), 0 12px 44px rgba(0,0,0,0.22), 0 4px 12px rgba(0,0,0,0.14)" }}>
+          {/* Indigo ambient glow overlays */}
           <div className="absolute inset-0 pointer-events-none" style={{
-            background: "radial-gradient(ellipse 280px 180px at 80% 0%, rgba(107,53,184,0.18) 0%, transparent 60%), radial-gradient(ellipse 200px 200px at -20% 80%, rgba(196,168,232,0.10) 0%, transparent 60%)"
+            background: "radial-gradient(ellipse 300px 200px at 85% 0%, rgba(48,48,110,0.32) 0%, transparent 60%), radial-gradient(ellipse 220px 220px at -20% 85%, rgba(102,102,192,0.12) 0%, transparent 60%), radial-gradient(ellipse 180px 180px at 50% 52%, rgba(48,48,110,0.06) 0%, transparent 60%)"
           }} />
           <div className="absolute inset-0 pointer-events-none" style={{
-            backgroundImage: "linear-gradient(rgba(196,168,232,0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(196,168,232,0.018) 1px, transparent 1px)",
-            backgroundSize: "32px 32px"
+            backgroundImage: "linear-gradient(rgba(180,180,230,0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(180,180,230,0.018) 1px, transparent 1px)",
+            backgroundSize: "30px 30px"
           }} />
 
           {/* Header */}
-          <div className="relative z-10 flex items-center justify-between px-5 pt-[18px] pb-[14px]" style={{ borderBottom: "0.5px solid rgba(196,168,232,0.08)" }}>
+          <div className="relative z-10 flex items-center justify-between px-5 pt-[18px] pb-[14px]" style={{ borderBottom: "0.5px solid rgba(180,180,230,0.08)" }}>
             <div className="flex items-center gap-2">
-              <span className="text-[15px] opacity-80">✦</span>
-              <span className="text-[11px] font-bold uppercase tracking-[0.1em]" style={{ color: `rgba(196,168,232,0.6)` }}>Edullent AI · Live</span>
+              <span className="text-[14px]" style={{ color: "rgba(180,180,230,0.7)" }}>✦</span>
+              <span className="text-[11px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.6)" }}>Edullent AI · Live</span>
             </div>
-            <div className="flex items-center gap-[5px] px-[10px] py-1 rounded-full" style={{ background: "rgba(48,209,88,0.1)", border: "0.5px solid rgba(48,209,88,0.25)" }}>
-              <div className="w-[5px] h-[5px] rounded-full animate-pulse" style={{ background: "#30D158" }} />
-              <span className="text-[10px] font-bold tracking-[0.06em]" style={{ color: "#30D158" }}>LIVE</span>
+            <div className="flex items-center gap-[5px] px-[11px] py-1 rounded-full" style={{ background: "rgba(18,192,78,0.10)", border: "0.5px solid rgba(18,192,78,0.24)" }}>
+              <div className="w-[5px] h-[5px] rounded-full animate-pulse" style={{ background: GREEN, boxShadow: "0 0 0 2px rgba(18,192,78,0.2)" }} />
+              <span className="text-[10px] font-bold tracking-[0.06em]" style={{ color: GREEN }}>LIVE</span>
             </div>
           </div>
 
           {dataLoading ? (
             <div className="relative z-10 flex items-center gap-3 py-10 justify-center">
-              <Loader2 className="w-5 h-5 animate-spin" style={{ color: LAV }} />
-              <span className="text-xs" style={{ color: `rgba(196,168,232,0.4)` }}>Loading {childFirstName}'s data...</span>
+              <Loader2 className="w-5 h-5 animate-spin" style={{ color: IND3 }} />
+              <span className="text-xs" style={{ color: "rgba(180,180,230,0.4)" }}>Loading {childFirstName}'s data...</span>
             </div>
           ) : (
             <>
               {/* 2×2 Metrics Grid */}
-              <div className="relative z-10 grid grid-cols-2" style={{ gap: "1px", background: "rgba(196,168,232,0.07)" }}>
+              <div className="relative z-10 grid grid-cols-2" style={{ gap: "1px", background: "rgba(180,180,230,0.07)" }}>
                 {/* Attendance */}
                 <div className="p-[18px] flex flex-col gap-[10px]" style={{ background: DK_CELL }}>
-                  <span className="text-[9px] font-bold uppercase tracking-[0.1em]" style={{ color: `rgba(196,168,232,0.35)` }}>Attendance</span>
+                  <span className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Attendance</span>
                   <div className="flex items-center gap-[10px]">
-                    <DonutRing pct={liveStats.attendance} color={attRingColor} size={56} stroke={5} />
+                    <DonutRing pct={liveStats.attendance} color={attOnTrack ? GREEN : ORANGE} size={56} stroke={5} />
                     <div className="flex flex-col gap-[3px]">
-                      <span className="text-[9px]" style={{ color: "rgba(255,255,255,0.3)" }}>Target</span>
-                      <span className="text-[11px] font-semibold" style={{ color: "rgba(255,255,255,0.6)" }}>85%</span>
-                      <div className="w-[52px] h-[3px] rounded-full mt-[2px] overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
-                        <div className="h-full rounded-full" style={{ width: `${liveStats.attendance}%`, background: attRingColor }} />
+                      <span className="text-[9px]" style={{ color: "rgba(255,255,255,0.28)" }}>Target</span>
+                      <span className="text-[11px] font-semibold" style={{ color: "rgba(255,255,255,0.58)" }}>85%</span>
+                      <div className="w-[52px] h-[3px] rounded-full mt-[2px] overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
+                        <div className="h-full rounded-full" style={{ width: `${Math.min(liveStats.attendance, 100)}%`, background: attOnTrack ? GREEN : ORANGE }} />
                       </div>
-                      <div className="inline-flex items-center gap-[3px] px-2 py-[3px] rounded-full mt-1 w-fit text-[10px] font-bold"
+                      <div className="inline-flex items-center gap-[3px] px-[9px] py-[3px] rounded-full mt-1 w-fit text-[10px] font-bold"
                         style={{
-                          background: liveStats.attendance >= 85 ? "rgba(48,209,88,0.15)" : "rgba(255,69,58,0.15)",
-                          color: liveStats.attendance >= 85 ? "#30D158" : "#FF6961",
-                          border: `0.5px solid ${liveStats.attendance >= 85 ? "rgba(48,209,88,0.2)" : "rgba(255,69,58,0.2)"}`
+                          background: attOnTrack ? "rgba(18,192,78,0.15)" : "rgba(232,51,74,0.15)",
+                          color: attOnTrack ? "#38DC78" : "#FF85AA",
+                          border: `0.5px solid ${attOnTrack ? "rgba(18,192,78,0.20)" : "rgba(232,51,74,0.20)"}`
                         }}>
-                        {liveStats.attendance >= 85 ? "✓ On Track" : "Needs Work"}
+                        {attOnTrack ? "✓ On Track" : "Needs Work"}
                       </div>
                     </div>
                   </div>
@@ -612,24 +638,24 @@ const DashboardPage = () => {
 
                 {/* Avg Score */}
                 <div className="p-[18px] flex flex-col gap-[10px]" style={{ background: DK_CELL }}>
-                  <span className="text-[9px] font-bold uppercase tracking-[0.1em]" style={{ color: `rgba(196,168,232,0.35)` }}>Avg Score</span>
+                  <span className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Avg Score</span>
                   <div className="flex items-center gap-[10px]">
-                    <DonutRing pct={liveStats.avgScore} color={scoreRingColor} size={56} stroke={5} />
+                    <DonutRing pct={liveStats.avgScore} color={liveStats.avgScore >= 80 ? GREEN : liveStats.avgScore >= 60 ? IND3 : "#FF6961"} size={56} stroke={5} />
                     <div>
-                      <div className="inline-flex items-center px-2 py-[3px] rounded-full text-[10px] font-bold"
+                      <div className="inline-flex items-center px-[9px] py-[3px] rounded-full text-[10px] font-bold"
                         style={{
-                          background: liveStats.avgScore >= 60 ? "rgba(196,168,232,0.15)" : "rgba(255,69,58,0.15)",
-                          color: liveStats.avgScore >= 60 ? LAV : "#FF6961",
-                          border: `0.5px solid ${liveStats.avgScore >= 60 ? "rgba(196,168,232,0.25)" : "rgba(255,69,58,0.2)"}`
+                          background: liveStats.avgScore >= 80 ? "rgba(18,192,78,0.15)" : liveStats.avgScore >= 60 ? "rgba(170,170,220,0.15)" : "rgba(232,51,74,0.15)",
+                          color: liveStats.avgScore >= 80 ? "#38DC78" : liveStats.avgScore >= 60 ? "#AAAADC" : "#FF85AA",
+                          border: `0.5px solid ${liveStats.avgScore >= 80 ? "rgba(18,192,78,0.20)" : liveStats.avgScore >= 60 ? "rgba(170,170,220,0.24)" : "rgba(232,51,74,0.20)"}`
                         }}>
                         {liveStats.avgScore >= 80 ? "Excellent" : liveStats.avgScore >= 60 ? "Good" : liveStats.avgScore > 0 ? "Needs Work" : "No Data"}
                       </div>
                       <div className="flex gap-1 mt-2">
                         {["C", "B", "A", "A+"].map(g => {
-                          const active = liveStats.avgScore >= (g === "A+" ? 90 : g === "A" ? 80 : g === "B" ? 70 : 0);
+                          const active = liveStats.avgScore >= (g === "A+" ? 90 : g === "A" ? 80 : g === "B" ? 60 : 0);
                           return (
                             <div key={g} className="w-[26px] h-[26px] rounded-[7px] flex items-center justify-center text-[11px] font-bold"
-                              style={{ background: active ? "rgba(255,69,58,0.2)" : "rgba(255,255,255,0.05)", color: active ? "#FF6961" : "rgba(255,255,255,0.2)" }}>
+                              style={{ background: active ? "rgba(232,51,74,0.22)" : "rgba(255,255,255,0.05)", color: active ? "#FF85AA" : "rgba(255,255,255,0.18)" }}>
                               {g}
                             </div>
                           );
@@ -641,35 +667,36 @@ const DashboardPage = () => {
 
                 {/* Assignments */}
                 <div className="p-[18px] flex flex-col gap-[10px]" style={{ background: DK_CELL }}>
-                  <span className="text-[9px] font-bold uppercase tracking-[0.1em]" style={{ color: `rgba(196,168,232,0.35)` }}>Assignments</span>
-                  <div className="text-[34px] font-bold leading-none text-white" style={{ letterSpacing: "-1px" }}>{liveStats.pending}</div>
-                  <div className="text-[11px]" style={{ color: "rgba(255,255,255,0.35)" }}>pending</div>
-                  <div className="inline-flex items-center gap-[3px] px-2 py-[3px] rounded-full w-fit text-[10px] font-bold"
+                  <span className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Assignments</span>
+                  <div className="text-[34px] font-bold leading-none text-white" style={{ letterSpacing: "-1.2px" }}>{liveStats.pending}</div>
+                  <div className="text-[11px]" style={{ color: "rgba(255,255,255,0.32)", letterSpacing: "-0.1px" }}>pending</div>
+                  <div className="inline-flex items-center gap-[3px] px-[9px] py-[3px] rounded-full w-fit text-[10px] font-bold"
                     style={{
-                      background: liveStats.pending === 0 ? "rgba(48,209,88,0.15)" : "rgba(255,159,10,0.15)",
-                      color: liveStats.pending === 0 ? "#30D158" : "#FF9F0A",
-                      border: `0.5px solid ${liveStats.pending === 0 ? "rgba(48,209,88,0.2)" : "rgba(255,159,10,0.2)"}`
+                      background: noPending ? "rgba(18,192,78,0.15)" : "rgba(245,160,0,0.15)",
+                      color: noPending ? "#38DC78" : "#F5A000",
+                      border: `0.5px solid ${noPending ? "rgba(18,192,78,0.20)" : "rgba(245,160,0,0.20)"}`
                     }}>
-                    {liveStats.pending === 0 ? "✓ All Done" : `${liveStats.pending} to complete`}
+                    {noPending ? "✓ All Done" : `${liveStats.pending} to complete`}
                   </div>
                 </div>
 
                 {/* Recent Test */}
                 <div className="p-[18px] flex flex-col gap-[10px]" style={{ background: DK_CELL }}>
-                  <span className="text-[9px] font-bold uppercase tracking-[0.1em]" style={{ color: `rgba(196,168,232,0.35)` }}>Recent Test</span>
-                  <div className="text-[34px] font-bold leading-none text-white" style={{ letterSpacing: "-1px" }}>
+                  <span className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Recent Test</span>
+                  <div className="text-[34px] font-bold leading-none text-white" style={{ letterSpacing: "-1.2px" }}>
                     {liveStats.recentGrade !== "N/A" ? liveStats.recentGrade : "—"}
                   </div>
-                  <div className="text-[11px]" style={{ color: "rgba(255,255,255,0.35)" }}>{liveStats.recentSubject}</div>
+                  <div className="text-[11px] truncate" style={{ color: "rgba(255,255,255,0.32)", letterSpacing: "-0.1px" }}>{liveStats.recentSubject}</div>
                   <div className="flex gap-1">
                     {["C", "B", "A", "A+"].map(g => {
-                      const gradeSteps = ["C", "B", "A", "A+"];
+                      const gradeSteps = ["C", "B", "A-", "A", "A+"];
                       const gradeIdx = gradeSteps.indexOf(liveStats.recentGrade);
-                      const idx = gradeSteps.indexOf(g);
-                      const active = idx <= gradeIdx && gradeIdx >= 0;
+                      const chipMap: Record<string, number> = { C: 0, B: 1, A: 3, "A+": 4 };
+                      const chipIdx = chipMap[g];
+                      const active = gradeIdx >= 0 && chipIdx <= gradeIdx;
                       return (
                         <div key={g} className="w-[26px] h-[26px] rounded-[7px] flex items-center justify-center text-[11px] font-bold"
-                          style={{ background: active ? "rgba(255,69,58,0.2)" : "rgba(255,255,255,0.05)", color: active ? "#FF6961" : "rgba(255,255,255,0.2)" }}>
+                          style={{ background: active ? "rgba(232,51,74,0.22)" : "rgba(255,255,255,0.05)", color: active ? "#FF85AA" : "rgba(255,255,255,0.18)" }}>
                           {g}
                         </div>
                       );
@@ -679,17 +706,17 @@ const DashboardPage = () => {
               </div>
 
               {/* AI Insight Strip */}
-              <div className="relative z-10 px-[18px] py-[14px] flex items-start gap-[10px]" style={{ borderTop: "0.5px solid rgba(196,168,232,0.07)", background: "rgba(255,255,255,0.015)" }}>
+              <div className="relative z-10 px-[18px] py-[14px] flex items-start gap-[10px]" style={{ borderTop: "0.5px solid rgba(180,180,230,0.07)", background: "rgba(255,255,255,0.016)" }}>
                 <span className="text-[16px] mt-0.5">🤖</span>
                 {aiInsights?.child_summary_narrative ? (
-                  <p className="text-[12px] leading-[1.6]" style={{ color: `rgba(196,168,232,0.55)`, letterSpacing: "-0.1px" }}>
-                    <strong style={{ color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>{studentData?.name}</strong>{" "}
+                  <p className="text-[12px] leading-[1.65]" style={{ color: "rgba(180,180,230,0.52)", letterSpacing: "-0.1px" }}>
+                    <strong style={{ color: "rgba(255,255,255,0.86)", fontWeight: 600 }}>{studentData?.name}</strong>{" "}
                     {aiInsights.child_summary_narrative.replace(studentData?.name || "", "").trim()}
                   </p>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <Loader2 className="w-3 h-3 animate-spin" style={{ color: LAV }} />
-                    <p className="text-[11px] italic" style={{ color: `rgba(196,168,232,0.4)` }}>AI summary generating...</p>
+                    <Loader2 className="w-3 h-3 animate-spin" style={{ color: IND3 }} />
+                    <p className="text-[11px] italic" style={{ color: "rgba(180,180,230,0.4)" }}>AI summary generating...</p>
                   </div>
                 )}
               </div>
@@ -697,40 +724,53 @@ const DashboardPage = () => {
           )}
         </div>
 
-        {/* ── Profile Card ── */}
-        <div className="mx-5 mt-[18px] bg-white rounded-[28px] p-[22px] relative overflow-hidden" style={{ boxShadow: CARD_SHADOW_LG, border: "0.5px solid rgba(107,53,184,0.07)" }}>
-          <div className="absolute -top-[50px] -right-[30px] w-[180px] h-[180px] rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, rgba(107,53,184,0.06) 0%, transparent 70%)" }} />
-          <div className="w-[68px] h-[68px] rounded-[22px] flex items-center justify-center text-[24px] font-bold text-white mb-4"
-            style={{ background: `linear-gradient(140deg, #4A1A9A, ${PUR2})`, boxShadow: "0 4px 20px rgba(107,53,184,0.32)" }}>
-            {studentInitials}
-          </div>
-          <div className="text-[22px] font-bold" style={{ color: T1, letterSpacing: "-0.5px" }}>{studentData?.name || "Student"}</div>
-          <div className="text-[14px] mt-[3px]" style={{ color: T3 }}>
-            {studentMeta.className !== "—" ? `Grade ${studentMeta.className}` : studentData?.grade ? `Grade ${studentData.grade}` : ""}
-            {teacherInfo.name !== "—" ? ` — ${teacherInfo.name}` : ""}
-          </div>
-          <div className="grid grid-cols-2 mt-[18px] rounded-[14px] overflow-hidden" style={{ gap: "1px", background: SEP }}>
-            <div className="px-[14px] py-[13px]" style={{ background: "#F2EEF9" }}>
-              <div className="text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: T4 }}>Class Teacher</div>
-              <div className="text-[15px] font-semibold mt-[3px]" style={{ color: T1, letterSpacing: "-0.2px" }}>{teacherInfo.name}</div>
+        {/* ── Profile Card (Indigo gradient) ── */}
+        <div className="mx-5 mt-5 rounded-[28px] p-6 relative overflow-hidden"
+          style={{
+            background: `linear-gradient(140deg, ${IND} 0%, ${IND2} 100%)`,
+            boxShadow: "0 10px 36px rgba(48,48,110,0.22), 0 0 0 0.5px rgba(255,255,255,0.18)",
+            border: "0.5px solid rgba(255,255,255,0.18)"
+          }}>
+          <div className="absolute -top-[55px] -right-[35px] w-[210px] h-[210px] rounded-full pointer-events-none"
+            style={{ background: "radial-gradient(circle, rgba(255,255,255,0.11) 0%, transparent 70%)" }} />
+          <div className="absolute inset-0 pointer-events-none" style={{
+            backgroundImage: "linear-gradient(rgba(255,255,255,0.014) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.014) 1px, transparent 1px)",
+            backgroundSize: "26px 26px"
+          }} />
+
+          <div className="relative z-10">
+            <div className="w-[68px] h-[68px] rounded-[22px] flex items-center justify-center text-[24px] font-bold text-white mb-4"
+              style={{ background: "rgba(255,255,255,0.18)", border: "0.5px solid rgba(255,255,255,0.26)", boxShadow: "0 4px 20px rgba(0,0,0,0.18)" }}>
+              {studentInitials}
             </div>
-            <div className="px-[14px] py-[13px]" style={{ background: "#F2EEF9" }}>
-              <div className="text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: T4 }}>Academic Year</div>
-              <div className="text-[15px] font-semibold mt-[3px]" style={{ color: T1, letterSpacing: "-0.2px" }}>2025–26</div>
+            <div className="text-[22px] font-bold text-white" style={{ letterSpacing: "-0.6px" }}>{studentData?.name || "Student"}</div>
+            <div className="text-[14px] mt-[3px]" style={{ color: "rgba(255,255,255,0.52)" }}>
+              {studentMeta.className !== "—" ? `Grade ${studentMeta.className}` : studentData?.grade ? `Grade ${studentData.grade}` : "Grade —"}
+              {teacherInfo.name !== "—" ? ` — ${teacherInfo.name}` : ""}
+            </div>
+            <div className="grid grid-cols-2 mt-5 rounded-[15px] overflow-hidden" style={{ gap: "1px", background: "rgba(255,255,255,0.10)" }}>
+              <div className="px-[15px] py-[13px]" style={{ background: "rgba(255,255,255,0.07)" }}>
+                <div className="text-[10px] font-bold uppercase tracking-[0.09em]" style={{ color: "rgba(255,255,255,0.38)" }}>Class Teacher</div>
+                <div className="text-[15px] font-semibold mt-1 text-white" style={{ letterSpacing: "-0.2px" }}>{teacherInfo.name}</div>
+              </div>
+              <div className="px-[15px] py-[13px]" style={{ background: "rgba(255,255,255,0.07)" }}>
+                <div className="text-[10px] font-bold uppercase tracking-[0.09em]" style={{ color: "rgba(255,255,255,0.38)" }}>Academic Year</div>
+                <div className="text-[15px] font-semibold mt-1 text-white" style={{ letterSpacing: "-0.2px" }}>2025–26</div>
+              </div>
             </div>
           </div>
         </div>
 
         {/* ── Recent Alerts ── */}
-        <div className="mx-5 mt-3 bg-white rounded-[22px] p-5" style={{ boxShadow: CARD_SHADOW, border: "0.5px solid rgba(107,53,184,0.06)" }}>
-          <h3 className="text-[18px] font-bold mb-5" style={{ color: T1, letterSpacing: "-0.3px" }}>Recent Alerts</h3>
+        <div className="mx-5 mt-[14px] bg-white rounded-[22px] p-5" style={{ boxShadow: SH, border: `0.5px solid ${IND_BDR}` }}>
+          <h3 className="text-[18px] font-bold mb-5" style={{ color: T1, letterSpacing: "-0.4px" }}>Recent Alerts</h3>
           {recentAlerts.length > 0 ? (
             <div className="space-y-3">
               {recentAlerts.map(alert => (
                 <div key={alert.id} className="flex items-start gap-3 p-3 rounded-xl"
-                  style={{ background: alert.urgent ? "rgba(255,159,10,0.08)" : "rgba(48,209,88,0.08)" }}>
+                  style={{ background: alert.urgent ? "rgba(245,160,0,0.08)" : "rgba(18,192,78,0.08)" }}>
                   <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-                    style={{ background: alert.urgent ? "rgba(255,159,10,0.15)" : "rgba(48,209,88,0.15)", color: alert.urgent ? "#FF9F0A" : "#30D158" }}>
+                    style={{ background: alert.urgent ? "rgba(245,160,0,0.15)" : "rgba(18,192,78,0.15)", color: alert.urgent ? ORANGE : GREEN }}>
                     {alert.urgent ? <Clock className="w-3.5 h-3.5" /> : <CheckCircle className="w-3.5 h-3.5" />}
                   </div>
                   <div>
@@ -741,8 +781,9 @@ const DashboardPage = () => {
               ))}
             </div>
           ) : (
-            <div className="flex flex-col items-center gap-[10px] py-4">
-              <div className="w-[52px] h-[52px] rounded-[16px] flex items-center justify-center" style={{ background: "#F2EEF9", border: `0.5px solid ${SEP}` }}>
+            <div className="flex flex-col items-center gap-[10px] p-4">
+              <div className="w-[54px] h-[54px] rounded-[17px] flex items-center justify-center"
+                style={{ background: IND_SOFT, border: `0.5px solid ${IND_BDR}`, boxShadow: "0 0 0 5px rgba(48,48,110,0.03)" }}>
                 <ShieldCheck className="w-6 h-6" style={{ color: T4 }} />
               </div>
               <p className="text-[14px]" style={{ color: T3 }}>No alerts right now</p>
@@ -751,28 +792,30 @@ const DashboardPage = () => {
         </div>
 
         {/* ── Weekly AI Report Card ── */}
-        <div className="mx-5 mt-4 bg-white rounded-[22px] p-[18px]" style={{ boxShadow: CARD_SHADOW, border: "0.5px solid rgba(107,53,184,0.06)" }}>
+        <div className="mx-5 mt-[14px] bg-white rounded-[22px] px-5 py-[18px]" style={{ boxShadow: SH, border: `0.5px solid ${IND_BDR}` }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-[42px] h-[42px] rounded-[13px] flex items-center justify-center" style={{ background: "rgba(107,53,184,0.10)", border: "0.5px solid rgba(107,53,184,0.18)" }}>
-                <BookOpen className="w-[18px] h-[18px]" style={{ color: PUR }} />
+              <div className="w-[42px] h-[42px] rounded-[14px] flex items-center justify-center"
+                style={{ background: IND_SOFT, border: `0.5px solid ${IND_BDR}` }}>
+                <BookOpen className="w-[18px] h-[18px]" style={{ color: IND }} />
               </div>
               <div>
-                <div className="text-[15px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>Weekly AI Report</div>
-                <div className="text-[12px] mt-[1px]" style={{ color: T3 }}>
-                  {isPrevWeekReport ? "Last week's report" : weekConfig.canGenerate ? "Generate this week's report" : "New report available Friday"}
+                <div className="text-[15px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Weekly AI Report</div>
+                <div className="text-[12px] mt-0.5" style={{ color: T3 }}>
+                  {isPrevWeekReport ? "Last week's report" : weekConfig.canGenerate ? (weeklyReport ? "This week's digest" : "Generate this week's report") : "New report available Friday"}
                 </div>
               </div>
             </div>
             {weekConfig.canGenerate && !weeklyReport ? (
               <button onClick={handleGenerateWeeklyReport} disabled={weeklyLoading || dataLoading}
-                className="flex items-center gap-2 px-3 py-2 rounded-[11px] text-[12px] font-semibold text-white disabled:opacity-50"
-                style={{ background: PUR }}>
+                className="flex items-center gap-2 px-3 py-2 rounded-[12px] text-[12px] font-semibold text-white disabled:opacity-50"
+                style={{ background: IND, boxShadow: "0 2px 8px rgba(48,48,110,0.28)" }}>
                 {weeklyLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                 {weeklyLoading ? "..." : "Generate"}
               </button>
             ) : !weekConfig.canGenerate ? (
-              <div className="flex items-center gap-1 px-[11px] py-[7px] rounded-[11px] text-[11px] font-semibold" style={{ background: "#F2EEF9", color: T3, border: `0.5px solid ${SEP}` }}>
+              <div className="flex items-center gap-1 px-[11px] py-[7px] rounded-[12px] text-[11px] font-semibold whitespace-nowrap"
+                style={{ background: "#E5E5EC", color: T3, border: `0.5px solid ${IND_BDR}` }}>
                 <Clock className="w-[11px] h-[11px]" />
                 Fri{weekConfig.daysLeft > 0 ? ` · ${weekConfig.daysLeft}d` : ""}
               </div>
@@ -781,7 +824,7 @@ const DashboardPage = () => {
 
           {weeklyLoading && (
             <div className="flex flex-col items-center py-6 gap-3">
-              <Loader2 className="w-6 h-6 animate-spin" style={{ color: PUR }} />
+              <Loader2 className="w-6 h-6 animate-spin" style={{ color: IND }} />
               <p className="text-xs" style={{ color: T3 }}>Analysing {childFirstName}'s week...</p>
             </div>
           )}
@@ -789,7 +832,7 @@ const DashboardPage = () => {
           {!weeklyReport && !weeklyLoading && (
             <div className="flex items-start gap-2 mt-[14px] pt-[14px]" style={{ borderTop: `0.5px solid ${SEP}` }}>
               <Clock className="w-[14px] h-[14px] shrink-0 mt-0.5" style={{ color: T4 }} />
-              <p className="text-[13px] leading-[1.55]" style={{ color: T3, letterSpacing: "-0.1px" }}>
+              <p className="text-[13px] leading-[1.6]" style={{ color: T3, letterSpacing: "-0.1px" }}>
                 {weekConfig.canGenerate
                   ? `Tap "Generate" to get ${childFirstName}'s weekly digest.`
                   : `You can generate ${childFirstName}'s weekly report every Friday, Saturday & Sunday.`}
@@ -807,80 +850,104 @@ const DashboardPage = () => {
           )}
         </div>
 
-        {/* ── AI Message (when report exists) ── */}
+        {/* ── AI Message (Indigo gradient) ── */}
         {weeklyReport && !weeklyLoading && (
-          <div className="mx-5 mt-3 rounded-[22px] p-[18px]" style={{ background: "linear-gradient(140deg, #F0EBFF, #E8E0FF)", border: "0.5px solid rgba(107,53,184,0.18)", boxShadow: "0 2px 16px rgba(107,53,184,0.08)" }}>
-            <div className="flex items-center gap-[6px] text-[10px] font-bold uppercase tracking-[0.1em] mb-3" style={{ color: PUR }}>
-              <Sparkles className="w-3 h-3" />
-              AI Message
+          <div className="mx-5 mt-3 rounded-[24px] px-[22px] py-5 relative overflow-hidden"
+            style={{
+              background: `linear-gradient(138deg, ${IND} 0%, ${IND2} 100%)`,
+              border: "0.5px solid rgba(48,48,110,0.22)",
+              boxShadow: "0 6px 28px rgba(48,48,110,0.22), 0 2px 8px rgba(48,48,110,0.14)"
+            }}>
+            <div className="absolute -top-8 -right-5 w-[160px] h-[160px] rounded-full pointer-events-none"
+              style={{ background: "radial-gradient(circle, rgba(255,255,255,0.10) 0%, transparent 65%)" }} />
+            <div className="absolute inset-0 pointer-events-none" style={{
+              backgroundImage: "linear-gradient(rgba(255,255,255,0.014) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.014) 1px, transparent 1px)",
+              backgroundSize: "26px 26px"
+            }} />
+            <div className="relative z-10">
+              <div className="flex items-center gap-[6px] text-[10px] font-bold uppercase tracking-[0.10em] mb-3" style={{ color: "rgba(255,255,255,0.52)" }}>
+                <Sparkles className="w-3 h-3" />
+                AI Message
+              </div>
+              <p className="text-[14px] leading-[1.72] font-normal" style={{ color: "rgba(255,255,255,0.92)", letterSpacing: "-0.1px" }}>
+                {weeklyReport.message}
+              </p>
             </div>
-            <p className="text-[14px] leading-[1.7] font-normal" style={{ color: T1, letterSpacing: "-0.1px" }}>
-              {weeklyReport.message}
-            </p>
           </div>
         )}
 
-        {/* ── Detail Sections (when report exists) ── */}
+        {/* ── Detail Sections ── */}
         {weeklyReport && !weeklyLoading && (
-          <div className="mx-5 mt-3 bg-white rounded-[22px] overflow-hidden" style={{ boxShadow: CARD_SHADOW, border: "0.5px solid rgba(107,53,184,0.06)" }}>
+          <div className="mx-5 mt-3 bg-white rounded-[22px] overflow-hidden" style={{ boxShadow: SH, border: `0.5px solid ${IND_BDR}` }}>
             {[
               { tag: "Attendance", text: weeklyReport.attendance_summary },
               { tag: "Tests", text: weeklyReport.test_analysis },
               { tag: "Assignments", text: weeklyReport.assignment_status },
             ].map(({ tag, text }, i, arr) => (
-              <div key={tag} className="px-[18px] py-[14px] flex flex-col gap-1"
+              <div key={tag} className="px-[18px] py-[15px] flex flex-col gap-[5px]"
                 style={{ borderBottom: i < arr.length - 1 ? `0.5px solid ${SEP}` : "none" }}>
-                <span className="text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: "#A97FE8" }}>{tag}</span>
-                <p className="text-[13px] leading-[1.55]" style={{ color: T2 }}>{text}</p>
+                <span className="text-[10px] font-bold uppercase tracking-[0.09em]" style={{ color: IND3 }}>{tag}</span>
+                <p className="text-[13px] leading-[1.58]" style={{ color: T2, letterSpacing: "-0.1px" }}>{text}</p>
               </div>
             ))}
           </div>
         )}
 
-        {/* ── Performance Alert (when report exists) ── */}
+        {/* ── Overall Performance Card ── */}
         {weeklyReport?.overall_performance && (
-          <div className="mx-5 mt-3 rounded-[22px] p-[18px] flex items-start justify-between gap-[14px]"
-            style={{ background: "linear-gradient(140deg, #FFF7F0, #FFF0E8)", border: "0.5px solid rgba(255,159,10,0.2)", boxShadow: "0 2px 14px rgba(255,159,10,0.07)" }}>
-            <div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.08em] mb-1" style={{ color: "#FF9F0A" }}>Overall Performance</div>
+          <div className="mx-5 mt-[14px] bg-white rounded-[22px] px-5 py-[18px] flex items-start justify-between gap-[14px] relative overflow-hidden"
+            style={{ border: `0.5px solid ${ORANGE_B}`, boxShadow: SH }}>
+            <div className="absolute -top-4 -right-4 w-[60px] h-[60px] rounded-full pointer-events-none"
+              style={{ background: "radial-gradient(circle, rgba(245,160,0,0.10) 0%, transparent 70%)" }} />
+            <div className="relative z-10">
+              <div className="text-[10px] font-bold uppercase tracking-[0.09em] mb-[5px]" style={{ color: ORANGE }}>Overall Performance</div>
               <div className="text-[17px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>{weeklyReport.overall_performance.verdict}</div>
-              <p className="text-[12px] mt-[5px] leading-[1.55]" style={{ color: "rgba(0,0,0,0.5)" }}>{weeklyReport.overall_performance.score_context}</p>
+              <p className="text-[12px] mt-[5px] leading-[1.58]" style={{ color: T3, letterSpacing: "-0.1px" }}>{weeklyReport.overall_performance.score_context}</p>
             </div>
-            <div className="flex items-center gap-1 px-[14px] py-[9px] bg-white rounded-[14px] text-[12px] font-bold shrink-0"
-              style={{ border: "0.5px solid rgba(48,209,88,0.2)", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", color: weeklyReport.overall_performance.trend === "Declining" ? "#FF9F0A" : "#30D158" }}>
+            <div className="flex items-center gap-1 px-[14px] py-[9px] rounded-[14px] text-[12px] font-bold shrink-0 relative z-10"
+              style={{
+                background: weeklyReport.overall_performance.trend === "Declining" ? ORANGE_S : GREEN_S,
+                border: `0.5px solid ${weeklyReport.overall_performance.trend === "Declining" ? ORANGE_B : GREEN_B}`,
+                color: weeklyReport.overall_performance.trend === "Declining" ? "#905800" : "#0A6A2E",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.04)"
+              }}>
               <TrendingUp className={`w-3 h-3 ${weeklyReport.overall_performance.trend === "Declining" ? "rotate-180" : ""}`} />
               {weeklyReport.overall_performance.trend}
             </div>
           </div>
         )}
 
-        {/* ── AI Improvement Tips (when report exists) ── */}
+        {/* ── AI Improvement Tips ── */}
         {weeklyReport?.improvement_tips?.length > 0 && (
           <>
-            <div className="px-6 pt-5 pb-0 text-[10px] font-bold uppercase tracking-[0.1em]" style={{ color: T4 }}>
+            <div className="px-6 pt-5 pb-0 text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: T4 }}>
               AI Improvement Tips
             </div>
             {weeklyReport.improvement_tips.map((t: { tip: string; reason: string }, i: number) => (
-              <div key={i} className="mx-5 mt-[10px] bg-white rounded-[20px] p-4 flex items-start gap-[14px] active:scale-[0.97] transition-transform" style={{ boxShadow: CARD_SHADOW, border: "0.5px solid rgba(107,53,184,0.06)" }}>
-                <div className="w-10 h-10 rounded-[13px] flex items-center justify-center shrink-0 text-[20px]"
-                  style={{ background: i === 0 ? "rgba(255,204,0,0.1)" : "rgba(107,53,184,0.10)", border: `0.5px solid ${i === 0 ? "rgba(255,204,0,0.2)" : "rgba(107,53,184,0.18)"}` }}>
+              <div key={i} className="mx-5 mt-[10px] bg-white rounded-[20px] px-[18px] py-4 flex items-start gap-[14px] active:scale-[0.97] transition-transform"
+                style={{ boxShadow: SH, border: `0.5px solid ${IND_BDR}` }}>
+                <div className="w-[42px] h-[42px] rounded-[13px] flex items-center justify-center shrink-0 text-[20px]"
+                  style={{
+                    background: i === 0 ? "rgba(255,215,0,0.12)" : IND_SOFT,
+                    border: `0.5px solid ${i === 0 ? "rgba(255,215,0,0.22)" : IND_BDR}`
+                  }}>
                   {i === 0 ? "💡" : "🎯"}
                 </div>
                 <div>
-                  <div className="text-[14px] font-semibold leading-[1.3]" style={{ color: T1, letterSpacing: "-0.2px" }}>{t.tip}</div>
-                  <p className="text-[12px] mt-[3px] leading-[1.45]" style={{ color: T3 }}>{t.reason}</p>
+                  <div className="text-[14px] font-semibold leading-[1.35]" style={{ color: T1, letterSpacing: "-0.2px" }}>{t.tip}</div>
+                  <p className="text-[12px] mt-[3px] leading-[1.5]" style={{ color: T3, letterSpacing: "-0.1px" }}>{t.reason}</p>
                 </div>
               </div>
             ))}
           </>
         )}
 
-        {/* ── Download PDF Button (when report exists) ── */}
+        {/* ── Download PDF Button ── */}
         {weeklyReport && !weeklyLoading && (
           <button onClick={handleDownloadPDF} disabled={pdfDownloading}
-            className="mx-5 mt-[18px] w-[calc(100%-40px)] rounded-[18px] py-[17px] flex items-center justify-center gap-[9px] text-[16px] font-bold text-white disabled:opacity-50 active:scale-[0.97] transition-transform relative overflow-hidden"
-            style={{ background: `linear-gradient(135deg, ${PUR}, #4A1A9A)`, boxShadow: "0 8px 32px rgba(107,53,184,0.3), 0 2px 8px rgba(0,0,0,0.12)", letterSpacing: "-0.2px" }}>
-            <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 55%)" }} />
+            className="mx-5 mt-5 w-[calc(100%-40px)] rounded-[18px] py-[17px] flex items-center justify-center gap-[9px] text-[16px] font-bold text-white disabled:opacity-50 active:scale-[0.97] transition-transform relative overflow-hidden"
+            style={{ background: `linear-gradient(135deg, ${IND} 0%, #1C1C4A 100%)`, boxShadow: SH_BTN, letterSpacing: "-0.2px" }}>
+            <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.13) 0%, transparent 52%)" }} />
             <span className="relative z-10 flex items-center gap-[9px]">
               {pdfDownloading ? (
                 <><Loader2 className="w-[17px] h-[17px] animate-spin" /> Generating PDF...</>
@@ -892,40 +959,45 @@ const DashboardPage = () => {
         )}
 
         {/* ── AI Parenting Tips ── */}
-        <div className="mx-5 mt-5 mb-2">
-          <div className="bg-white rounded-[22px] overflow-hidden" style={{ boxShadow: CARD_SHADOW, border: "0.5px solid rgba(107,53,184,0.06)" }}>
-            {/* Header */}
-            <div className="flex items-center gap-3 px-[18px] py-4" style={{ borderBottom: `0.5px solid ${SEP}` }}>
-              <span className="text-[22px]">💡</span>
-              <div>
-                <div className="text-[16px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>AI Parenting Tips</div>
-                <div className="text-[12px] mt-[1px]" style={{ color: T3 }}>Based on {childFirstName}'s current data</div>
-              </div>
+        <div className="mx-5 mt-5 mb-2 bg-white rounded-[22px] overflow-hidden" style={{ boxShadow: SH, border: `0.5px solid ${IND_BDR}` }}>
+          {/* Indigo-gradient header */}
+          <div className="flex items-center gap-3 px-5 py-4 relative overflow-hidden"
+            style={{ background: `linear-gradient(135deg, ${IND} 0%, ${IND2} 100%)`, borderBottom: `0.5px solid ${IND_BDR}` }}>
+            <div className="absolute -top-7 -right-4 w-[120px] h-[120px] rounded-full pointer-events-none"
+              style={{ background: "radial-gradient(circle, rgba(255,255,255,0.09) 0%, transparent 65%)" }} />
+            <div className="absolute inset-0 pointer-events-none" style={{
+              backgroundImage: "linear-gradient(rgba(255,255,255,0.014) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.014) 1px, transparent 1px)",
+              backgroundSize: "24px 24px"
+            }} />
+            <span className="text-[22px] relative z-10">💡</span>
+            <div className="relative z-10">
+              <div className="text-[16px] font-bold text-white" style={{ letterSpacing: "-0.3px" }}>AI Parenting Tips</div>
+              <div className="text-[12px] mt-0.5" style={{ color: "rgba(255,255,255,0.52)" }}>Based on {childFirstName}'s current data</div>
             </div>
-
-            {/* Tips list */}
-            {(() => {
-              const tips = aiInsights?.parenting_tips?.length > 0 ? aiInsights.parenting_tips : smartTips;
-              return tips.length > 0 ? tips.map((item: { tip: string; reason: string }, i: number) => (
-                <div key={i} className="px-[18px] py-[15px] flex items-start gap-[14px]"
-                  style={{ borderBottom: i < tips.length - 1 ? `0.5px solid ${SEP}` : "none" }}>
-                  <div className="w-7 h-7 rounded-[9px] flex items-center justify-center text-[12px] font-bold shrink-0 mt-[1px]"
-                    style={{ background: "rgba(107,53,184,0.10)", color: PUR, border: "0.5px solid rgba(107,53,184,0.18)" }}>
-                    {i + 1}
-                  </div>
-                  <div>
-                    <div className="text-[13px] font-semibold" style={{ color: T1, letterSpacing: "-0.2px" }}>{item.tip}</div>
-                    <p className="text-[12px] mt-[3px] leading-[1.45]" style={{ color: T3 }}>{item.reason}</p>
-                  </div>
-                </div>
-              )) : (
-                <div className="px-[18px] py-6 flex items-center gap-3">
-                  <Loader2 className="w-4 h-4 animate-spin" style={{ color: PUR }} />
-                  <p className="text-sm italic" style={{ color: T3 }}>Loading {childFirstName}'s tips...</p>
-                </div>
-              );
-            })()}
           </div>
+
+          {/* Tips list */}
+          {(() => {
+            const tips = aiInsights?.parenting_tips?.length > 0 ? aiInsights.parenting_tips : smartTips;
+            return tips.length > 0 ? tips.map((item: { tip: string; reason: string }, i: number) => (
+              <div key={i} className="px-[18px] py-[15px] flex items-start gap-[14px]"
+                style={{ borderBottom: i < tips.length - 1 ? `0.5px solid ${SEP}` : "none" }}>
+                <div className="w-7 h-7 rounded-[9px] flex items-center justify-center text-[12px] font-bold shrink-0 mt-0.5"
+                  style={{ background: IND_SOFT, border: `0.5px solid ${IND_BDR}`, color: IND }}>
+                  {i + 1}
+                </div>
+                <div>
+                  <div className="text-[13px] font-semibold" style={{ color: T1, letterSpacing: "-0.2px" }}>{item.tip}</div>
+                  <p className="text-[12px] mt-[3px] leading-[1.5]" style={{ color: T3, letterSpacing: "-0.1px" }}>{item.reason}</p>
+                </div>
+              </div>
+            )) : (
+              <div className="px-[18px] py-6 flex items-center gap-3">
+                <Loader2 className="w-4 h-4 animate-spin" style={{ color: IND }} />
+                <p className="text-sm italic" style={{ color: T3 }}>Loading {childFirstName}'s tips...</p>
+              </div>
+            );
+          })()}
         </div>
 
         <div className="h-6" />
