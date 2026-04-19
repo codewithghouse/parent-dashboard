@@ -15,7 +15,7 @@ export function registerSW() {
       window.dispatchEvent(new CustomEvent('sw-registered', { detail: reg }));
 
       // Check for waiting worker (update available on page load)
-      if (reg.waiting) {
+      if (reg.waiting && navigator.serviceWorker.controller) {
         window.dispatchEvent(new CustomEvent('sw-update-available', { detail: reg }));
       }
 
@@ -34,10 +34,41 @@ export function registerSW() {
   });
 }
 
-/** Tell the waiting SW to take over immediately, then reload */
+/**
+ * Tell the waiting SW to take over immediately, then reload.
+ *
+ * Robustness:
+ * 1. Always wire the controllerchange→reload handler BEFORE messaging the SW
+ *    (avoids missing the event if activation is fast).
+ * 2. If `reg.waiting` is null (e.g. the new SW already auto-activated by the
+ *    time the user clicks Reload), just reload immediately — that was the bug
+ *    where the button silently did nothing.
+ * 3. 3-second safety timeout: if controllerchange never fires (some browsers/
+ *    edge cases skip it), force-reload anyway so the user is never stuck.
+ */
 export function applyUpdate(reg: ServiceWorkerRegistration) {
+  let reloaded = false;
+  const reload = () => {
+    if (reloaded) return;
+    reloaded = true;
+    window.location.reload();
+  };
+
+  // Wire the handler first
+  navigator.serviceWorker.addEventListener('controllerchange', reload, { once: true });
+
   if (reg.waiting) {
-    reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-    navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload());
+    try {
+      reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+    } catch (err) {
+      console.warn('[SW] postMessage failed, reloading anyway:', err);
+      reload();
+      return;
+    }
+    // Safety net: if controllerchange doesn't fire within 3s, reload anyway.
+    setTimeout(reload, 3000);
+  } else {
+    // No waiting worker — the update was already activated. Just reload.
+    reload();
   }
 }

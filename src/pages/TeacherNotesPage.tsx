@@ -361,8 +361,10 @@ const TeacherNotesPage = () => {
     if (selectedTeacher) {
       return (
         <>
-          <div className="flex-1 flex flex-col -m-3 md:m-0 -mb-28 md:mb-0 animate-in fade-in duration-500"
-            style={{ background: BG, fontFamily: FONT }}>
+          <div
+            className="flex-1 flex flex-col -m-3 md:m-0 mb-[calc(-88px-env(safe-area-inset-bottom)-1rem)] md:mb-0 pb-[calc(88px+env(safe-area-inset-bottom)+0.5rem)] md:pb-0 animate-in fade-in duration-500"
+            style={{ background: BG, fontFamily: FONT }}
+          >
 
             <div className="mx-5 mt-3 shrink-0">{statRow(true)}</div>
 
@@ -727,7 +729,10 @@ const TeacherNotesPage = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col -m-3 md:-m-6 -mb-28 lg:-mb-8" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+    <div
+      className="flex-1 flex flex-col -m-3 md:-m-6 mb-[calc(-88px-env(safe-area-inset-bottom)-1rem)] pb-[calc(88px+env(safe-area-inset-bottom)+0.5rem)] lg:-mb-8 lg:pb-0"
+      style={{ fontFamily: "'Montserrat', sans-serif" }}
+    >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap');
         .wa-scroll::-webkit-scrollbar { width: 6px; }
