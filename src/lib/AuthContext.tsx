@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import {
   onAuthStateChanged,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   signOut,
   User
@@ -9,6 +11,7 @@ import {
 import { auth, db } from './firebase';
 import { collection, query, where, getDocs, updateDoc, doc, onSnapshot, getDoc } from 'firebase/firestore';
 import { syncClaimsAndRefreshToken } from './syncClaims';
+import { isIOSStandalone } from './platform';
 
 interface AuthContextType {
   user: User | null;
@@ -28,6 +31,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [error, setError] = useState<string | null>(null);
   // Track student listener so we can clean it up when auth changes
   const unsubStudentRef = useRef<(() => void) | null>(null);
+
+  // Resolve any pending redirect sign-in (iOS standalone path) before we
+  // attach the auth listener — otherwise the user can briefly flash to the
+  // login screen after returning from the Google redirect.
+  useEffect(() => {
+    getRedirectResult(auth).catch((err) => {
+      console.warn('[Auth] getRedirectResult failed:', err?.message || err);
+    });
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -120,8 +132,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const provider = new GoogleAuthProvider();
     try {
       setError(null);
+      // iOS standalone PWA blocks popups → must use redirect flow.
+      // Everywhere else we keep the popup so the user stays in-context.
+      if (isIOSStandalone()) {
+        await signInWithRedirect(auth, provider);
+        return; // page navigates away; resolution happens in getRedirectResult
+      }
       await signInWithPopup(auth, provider);
     } catch (err: any) {
+      // Popup blocked / closed by user is non-fatal; let caller decide messaging.
+      // For other browsers that block popups we fall back to redirect.
+      if (err?.code === 'auth/popup-blocked' || err?.code === 'auth/operation-not-supported-in-this-environment') {
+        try {
+          await signInWithRedirect(auth, provider);
+          return;
+        } catch (redirectErr: any) {
+          setError(redirectErr.message);
+          throw redirectErr;
+        }
+      }
       setError(err.message);
       throw err;
     }

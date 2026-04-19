@@ -19,8 +19,12 @@ export const ParentTopbar = ({ onMenuClick }: ParentTopbarProps) => {
   if (isMobile) {
     return (
       <header
-        className="h-14 flex items-center justify-between px-4 sticky top-0 z-[60]"
+        className="flex items-center justify-between px-4 sticky top-0 z-[60]"
         style={{
+          // status-bar-style is black-translucent → content runs under the notch
+          // unless we add safe-area-inset-top here.
+          paddingTop: "env(safe-area-inset-top)",
+          height: "calc(56px + env(safe-area-inset-top))",
           fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif",
           background: "rgba(238,238,243,0.82)",
           WebkitBackdropFilter: "saturate(220%) blur(24px)",

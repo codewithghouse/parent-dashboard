@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import {
   Loader2, Send, CheckCheck, MessageSquare, Mail, Search, Smile,
-  ChevronLeft, GraduationCap, Plus, X, Star, Paperclip
+  ChevronLeft, GraduationCap, Plus, X, Star, Paperclip,
+  Phone, MoreVertical, Clock, Sparkles, Bell,
 } from "lucide-react";
 import { db } from "../lib/firebase";
 import {
@@ -198,20 +199,55 @@ const TeacherNotesPage = () => {
     const B1 = "#0055FF", B2 = "#1166FF", B3 = "#2277FF";
     const BG = "#EEF4FF", BG2 = "#E0ECFF", BG3 = "#F5F9FF", CARD = "#FFFFFF";
     const T1 = "#001040", T2 = "#002080", T3 = "#5070B0", T4 = "#99AACC";
-    const ORANGE = "#FF8800", GOLD = "#FFAA00";
+    const ORANGE = "#FF8800", GOLD = "#FFAA00", GREEN = "#00C853", RED = "#FF3355";
+    const SEP = "rgba(0,85,255,0.07)";
     const SH    = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.08), 0 10px 26px rgba(0,85,255,0.10)";
     const SH_LG = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.11), 0 18px 44px rgba(0,85,255,0.13)";
-    const SH_BTN = "0 6px 22px rgba(0,85,255,0.42), 0 2px 6px rgba(0,85,255,0.22)";
+    const SH_BTN = "0 6px 22px rgba(0,85,255,0.40), 0 2px 5px rgba(0,85,255,0.20)";
     const FONT = "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif";
 
     const avatarChar = (studentData?.name?.[0] || "S").toUpperCase();
+
+    // Per-teacher avatar palette (cycled by first char of name)
     const teacherGrads = [
-      "linear-gradient(135deg, #0044EE, #2277FF)",
-      "linear-gradient(135deg, #002DBB, #0055FF)",
-      "linear-gradient(135deg, #0033CC, #1166FF)",
-      "linear-gradient(135deg, #0055FF, #4499FF)",
+      { bg: "linear-gradient(135deg, #00C853, #22EE66)", sh: "0 3px 10px rgba(0,200,83,0.24)", tagBg: "rgba(0,85,255,0.10)", tagBdr: "rgba(0,85,255,0.16)", tagFg: B1 },
+      { bg: "linear-gradient(135deg, #FF8800, #FFCC22)", sh: "0 3px 10px rgba(255,136,0,0.24)", tagBg: "rgba(255,136,0,0.10)", tagBdr: "rgba(255,136,0,0.22)", tagFg: "#884400" },
+      { bg: `linear-gradient(135deg, ${B1}, ${B3})`,     sh: "0 3px 10px rgba(0,85,255,0.24)",  tagBg: "rgba(0,85,255,0.10)", tagBdr: "rgba(0,85,255,0.16)", tagFg: B1 },
+      { bg: "linear-gradient(135deg, #8844CC, #BB77FF)", sh: "0 3px 10px rgba(136,68,204,0.24)", tagBg: "rgba(136,68,204,0.10)", tagBdr: "rgba(136,68,204,0.22)", tagFg: "#6622AA" },
     ];
-    const gradFor = (name?: string) => teacherGrads[((name?.charCodeAt(0) || 0) % teacherGrads.length + teacherGrads.length) % teacherGrads.length];
+    const gradIdx  = (name?: string) => ((name?.charCodeAt(0) || 0) % teacherGrads.length + teacherGrads.length) % teacherGrads.length;
+    const gradFor  = (name?: string) => teacherGrads[gradIdx(name)].bg;
+    const gradSet  = (name?: string) => teacherGrads[gradIdx(name)];
+
+    // Merge conversations with available teachers — show teachers without any messages too
+    const mergedConversations = (() => {
+      const map = new Map<string, any>(teacherConversations.map(t => [t.teacherId, t]));
+      availableTeachers.forEach((t: any) => {
+        if (!map.has(t.id)) {
+          map.set(t.id, {
+            teacherId:   t.id,
+            teacherName: t.name,
+            subject:     t.subject || "General",
+            lastMessage: null,
+          });
+        }
+      });
+      return Array.from(map.values())
+        .filter(t => (t.teacherName || "").toLowerCase().includes(searchQuery.toLowerCase()))
+        .sort((a, b) => {
+          const am = a.lastMessage?.createdAt?.toMillis?.() || 0;
+          const bm = b.lastMessage?.createdAt?.toMillis?.() || 0;
+          return bm - am;
+        });
+    })();
+
+    const startChatWith = (t: any) => {
+      setSelectedTeacher({
+        teacherId:   t.teacherId,
+        teacherName: t.teacherName,
+        subject:     t.subject || "General",
+      });
+    };
 
     // Shared rate modal (rendered alongside chat view)
     const rateModalMobile = showRateModal && selectedTeacher && (

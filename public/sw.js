@@ -13,7 +13,7 @@
  *   - Push notifications ready
  */
 
-const CACHE_VERSION  = 'v2';
+const CACHE_VERSION  = 'v3';
 const STATIC_CACHE   = `edullent-static-${CACHE_VERSION}`;
 const API_CACHE      = `edullent-api-${CACHE_VERSION}`;
 const STORAGE_CACHE  = `edullent-storage-${CACHE_VERSION}`;
@@ -129,34 +129,50 @@ async function cacheFirst(request, cacheName) {
 // ── Fetch ────────────────────────────────────────────────────────────────────
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+  const req = event.request;
 
   // Skip non-GET and chrome-extension requests
-  if (event.request.method !== 'GET') return;
+  if (req.method !== 'GET') return;
   if (url.protocol === 'chrome-extension:') return;
   if (url.protocol === 'data:') return;
 
-  if (isFirebaseAPI(url)) {
-    event.respondWith(networkFirst(event.request, API_CACHE, 8000));
-  } else if (isFirebaseStorage(url)) {
-    event.respondWith(cacheFirst(event.request, STORAGE_CACHE));
-  } else if (isStaticAsset(url)) {
-    event.respondWith(cacheFirst(event.request, STATIC_CACHE));
-  } else if (url.origin === self.location.origin) {
-    // App shell navigation — network first, fall back to cached index, then offline page
-    event.respondWith(
-      fetch(event.request).catch(async () => {
-        const cache  = await caches.open(STATIC_CACHE);
+  // SPA navigation — any HTML page request (deep link refresh, share-link open).
+  // Always serve cached app shell so the React router can resolve the route,
+  // and fall through to network for the actual data fetch. Catches the case
+  // where hosting returns 404 for /attendance because there's no real file.
+  const isNavigation = req.mode === 'navigate' ||
+    (req.headers.get('accept') || '').includes('text/html');
+  if (isNavigation && url.origin === self.location.origin) {
+    event.respondWith((async () => {
+      try {
+        const fresh = await fetch(req);
+        if (fresh && fresh.ok) return fresh;
+        // Non-OK (e.g. 404 from static host) → fall through to cached shell
+        throw new Error(`nav status ${fresh && fresh.status}`);
+      } catch {
+        const cache = await caches.open(STATIC_CACHE);
         const cached = await cache.match('/index.html') || await cache.match('/');
         if (cached) return cached;
-        // Ultimate fallback: inline offline page (never white screen)
         return new Response(OFFLINE_HTML, {
           status: 200,
           headers: { 'Content-Type': 'text/html; charset=utf-8' },
         });
-      })
-    );
+      }
+    })());
+    return;
+  }
+
+  if (isFirebaseAPI(url)) {
+    event.respondWith(networkFirst(req, API_CACHE, 8000));
+  } else if (isFirebaseStorage(url)) {
+    event.respondWith(cacheFirst(req, STORAGE_CACHE));
+  } else if (isStaticAsset(url)) {
+    event.respondWith(cacheFirst(req, STATIC_CACHE));
+  } else if (url.origin === self.location.origin) {
+    // Same-origin non-HTML, non-static (rare) — network first
+    event.respondWith(networkFirst(req, API_CACHE));
   } else {
-    event.respondWith(networkFirst(event.request, API_CACHE));
+    event.respondWith(networkFirst(req, API_CACHE));
   }
 });
 
