@@ -13,7 +13,7 @@
  *   - Push notifications ready
  */
 
-const CACHE_VERSION  = 'v11';
+const CACHE_VERSION  = 'v12';
 const STATIC_CACHE   = `edullent-static-${CACHE_VERSION}`;
 const API_CACHE      = `edullent-api-${CACHE_VERSION}`;
 const STORAGE_CACHE  = `edullent-storage-${CACHE_VERSION}`;
