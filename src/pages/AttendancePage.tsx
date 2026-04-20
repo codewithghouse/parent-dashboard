@@ -37,7 +37,10 @@ const AttendancePage = () => {
       const aCount = uniqueLogs.filter((l: any) => l.status === "absent").length;
       const lCount = uniqueLogs.filter((l: any) => l.status === "late").length;
       const total = pCount + aCount + lCount;
-      setStats({ present: pCount, absent: aCount, late: lCount, percentage: total === 0 ? 100 : Math.round(((pCount + lCount) / total) * 100) });
+      // Don't fake 100% when there are zero records — that misled parents into
+      // thinking the student had perfect attendance even before any class day
+      // had been marked. 0 conveys "no data" without implying a positive value.
+      setStats({ present: pCount, absent: aCount, late: lCount, percentage: total === 0 ? 0 : Math.round(((pCount + lCount) / total) * 100) });
 
       const now = new Date();
       const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -391,16 +394,33 @@ const AttendancePage = () => {
           <div className="text-[16px] font-bold mb-4" style={{ color: T1, letterSpacing: "-0.3px" }}>Recent Absences</div>
 
           {recentAbsences.length === 0 ? (
-            <div className="flex flex-col items-center gap-[10px] pt-5 pb-2">
-              <div className="w-[60px] h-[60px] rounded-[20px] flex items-center justify-center"
-                style={{ background: GREEN_S, border: `0.5px solid ${GREEN_B}`, boxShadow: "0 0 0 8px rgba(0,200,83,0.05)" }}>
-                <CheckCircle className="w-7 h-7" style={{ color: GREEN }} strokeWidth={2.2} />
+            // Only celebrate "perfect attendance" when there's ACTUAL attendance
+            // data to back it up. Otherwise (new student, no class days marked
+            // yet, etc.) say so honestly — the previous version cheered for
+            // students whose attendance had never been recorded.
+            attendanceLogs.length === 0 ? (
+              <div className="flex flex-col items-center gap-[10px] pt-5 pb-2">
+                <div className="w-[60px] h-[60px] rounded-[20px] flex items-center justify-center"
+                  style={{ background: "rgba(48,48,110,0.06)", border: `0.5px solid rgba(48,48,110,0.12)` }}>
+                  <CalendarIcon className="w-7 h-7" style={{ color: T4 }} strokeWidth={2.2} />
+                </div>
+                <div className="text-[14px] font-semibold" style={{ color: T3 }}>No attendance recorded yet</div>
+                <div className="text-[12px] text-center max-w-[220px] leading-[1.55] font-normal" style={{ color: T4 }}>
+                  Once your child's teacher starts marking attendance, the records will appear here.
+                </div>
               </div>
-              <div className="text-[14px] font-semibold" style={{ color: T3 }}>Perfect attendance! 🎉</div>
-              <div className="text-[12px] text-center max-w-[200px] leading-[1.55] font-normal" style={{ color: T4 }}>
-                No absences recorded this month. Keep it up!
+            ) : (
+              <div className="flex flex-col items-center gap-[10px] pt-5 pb-2">
+                <div className="w-[60px] h-[60px] rounded-[20px] flex items-center justify-center"
+                  style={{ background: GREEN_S, border: `0.5px solid ${GREEN_B}`, boxShadow: "0 0 0 8px rgba(0,200,83,0.05)" }}>
+                  <CheckCircle className="w-7 h-7" style={{ color: GREEN }} strokeWidth={2.2} />
+                </div>
+                <div className="text-[14px] font-semibold" style={{ color: T3 }}>Perfect attendance! 🎉</div>
+                <div className="text-[12px] text-center max-w-[200px] leading-[1.55] font-normal" style={{ color: T4 }}>
+                  No absences recorded this month. Keep it up!
+                </div>
               </div>
-            </div>
+            )
           ) : (
             recentAbsences.map((a: any, i: number, arr: any[]) => {
               const isAbsent = a.status === "absent";

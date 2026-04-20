@@ -319,17 +319,36 @@ const PerformancePage = () => {
     return (
       <SubjectPerformanceDetail
         subject={s.name}
-        teacher={subFeedback?.teacherName || "Class Teacher"}
+        // Honest "—" instead of a generic "Class Teacher" string when the
+        // subject's teacher hasn't been resolved from Firestore.
+        teacher={subFeedback?.teacherName || "—"}
         grade={s.grade}
         average={s.progress}
-        topics={processedTopics.length > 0 ? processedTopics : [{ name: "Overall", score: s.progress }]}
-        testScores={s.raw.map((r: any) => ({
-          name: r.testName || "Assessment",
-          date: r.timestamp ? new Date(r.timestamp.seconds * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "Recent",
-          score: `${r.score}/${r.maxScore || 100}`,
-          status: r.percentage >= 75 ? "success" : r.percentage >= 60 ? "warning" : "error"
-        }))}
-        feedback={subFeedback?.content || `${studentData?.name?.split(" ")[0] || "The student"} is progressing well. Detailed feedback will be updated after the next assessment.`}
+        // Only render synthesized "Overall" topic if there are no real topic
+        // breakdowns AND we actually have a score to show — otherwise empty.
+        topics={
+          processedTopics.length > 0
+            ? processedTopics
+            : (s.progress > 0 ? [{ name: "Overall", score: s.progress }] : [])
+        }
+        testScores={s.raw.map((r: any) => {
+          // Derive a denominator only when Firestore has a real maxScore;
+          // never fake "/100" when the actual max could be 25, 50, etc.
+          const max = Number(r.maxScore);
+          const scoreLabel = Number.isFinite(max) && max > 0 ? `${r.score}/${max}` : `${r.score}`;
+          return {
+            name: r.testName || "Untitled assessment",
+            date: r.timestamp
+              ? new Date(r.timestamp.seconds * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+              : "—",
+            score: scoreLabel,
+            status: r.percentage >= 75 ? "success" : r.percentage >= 60 ? "warning" : "error",
+          };
+        })}
+        // No fabricated "is progressing well" placeholder — when the teacher
+        // hasn't written feedback, say so explicitly so the parent knows
+        // there's nothing to read yet (and doesn't mistake it for real input).
+        feedback={subFeedback?.content || "No teacher feedback recorded yet for this subject."}
         resources={resources.slice(0, 3)}
         onBack={() => setSelectedSubject(null)}
       />

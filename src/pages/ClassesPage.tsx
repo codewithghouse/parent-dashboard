@@ -9,6 +9,7 @@ import { useAuth } from "../lib/AuthContext";
 import { db } from "../lib/firebase";
 import { doc as fbDoc, getDoc as fbGetDoc } from "firebase/firestore";
 import { subscribeEnrollments } from "../lib/enrollmentQuery";
+import { useSchoolSettings, resolveAcademicYear } from "@/hooks/useSchoolSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 // Index-based vibrant fallback colors (so every card is colorful even if subject unknown)
@@ -62,6 +63,11 @@ const ClassesPage = () => {
   const { studentData } = useAuth();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const settings = useSchoolSettings();
+  // Real academic year: school's configured value first, then date-derived.
+  // Was hardcoded as "2025 – 26" / "2025-26" in two places — same year for
+  // every parent, every year. Now resolves correctly per school.
+  const academicYear = resolveAcademicYear(settings);
   const [enrollments, setEnrollments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -73,15 +79,19 @@ const ClassesPage = () => {
       const raw = docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
 
       const enriched = await Promise.all(raw.map(async (en: any) => {
-        let teacherName = en.teacherName || "Faculty";
+        // Don't substitute a fake-looking "Faculty" string when the teacher
+        // hasn't been resolved yet — render an honest "Teacher unassigned"
+        // (downstream UI shows initials "—" instead of garbage).
+        let teacherName: string | null = en.teacherName || null;
         if (en.teacherId) {
           try {
             const snap = await fbGetDoc(fbDoc(db, "teachers", en.teacherId));
-            if (snap.exists()) teacherName = snap.data().name;
-          } catch { /* keep fallback */ }
+            if (snap.exists()) teacherName = snap.data().name || teacherName;
+          } catch { /* keep what we have */ }
         }
-        const initials = teacherName.split(" ").map((n: string) => n[0]).join("").toUpperCase().substring(0, 2);
-        return { ...en, teacherName, initials };
+        const initials = (teacherName || "")
+          .split(" ").map((n: string) => n[0]).join("").toUpperCase().substring(0, 2) || "—";
+        return { ...en, teacherName: teacherName || "Teacher unassigned", initials };
       }));
 
       setEnrollments(enriched);
@@ -178,8 +188,11 @@ const ClassesPage = () => {
               const hero = BLUE_HEROES[idx % BLUE_HEROES.length];
               const avatar = BLUE_AVATARS[idx % BLUE_AVATARS.length];
               const className = en.className || en.classGroup || en.classSection || en.class || en.section || null;
-              const schedule = en.schedule || "08:30 – 09:30 AM";
-              const year = en.academicYear || "2025 – 26";
+              // Real schedule from Firestore — was hardcoded "08:30 – 09:30 AM"
+              // for every card, every subject. Now shows "—" until the school
+              // populates the schedule field on the enrollment/class doc.
+              const schedule = en.schedule || "—";
+              const year = en.academicYear || academicYear;
               const isClassTeacher = !!en.isClassTeacher || !!en.classTeacher;
 
               return (
@@ -350,7 +363,7 @@ const ClassesPage = () => {
               {enrollments.map((en, idx, arr) => {
                 const subject = resolveSubject(en);
                 const avatar = BLUE_AVATARS[idx % BLUE_AVATARS.length];
-                const schedule = en.schedule || "08:30 – 09:30 AM";
+                const schedule = en.schedule || "—";
                 return (
                   <div key={en.id}
                     className="flex items-center gap-[13px] px-[18px] py-[14px] cursor-pointer active:bg-[#EEF4FF] transition-colors"
@@ -475,8 +488,8 @@ const ClassesPage = () => {
 
                   {/* Details Grid */}
                   <div className="grid grid-cols-2 gap-3 mb-5">
-                    <InfoChip icon={Clock} label="Schedule" value={en.schedule || "08:30 – 09:30 AM"} lightBg={theme.light} textColor={theme.text} />
-                    <InfoChip icon={School} label="Year" value={en.academicYear || "2025-26"} lightBg={theme.light} textColor={theme.text} />
+                    <InfoChip icon={Clock} label="Schedule" value={en.schedule || "—"} lightBg={theme.light} textColor={theme.text} />
+                    <InfoChip icon={School} label="Year" value={en.academicYear || academicYear} lightBg={theme.light} textColor={theme.text} />
                   </div>
 
                   {/* Spacer + CTA */}

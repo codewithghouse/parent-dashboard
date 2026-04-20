@@ -8,10 +8,13 @@ import { doc, updateDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useSchoolSettings, resolveAcademicYear } from "@/hooks/useSchoolSettings";
 
 const SettingsPage = () => {
   const { studentData, user } = useAuth();
   const isMobile = useIsMobile();
+  const settings = useSchoolSettings();
+  const academicYear = resolveAcademicYear(settings);
   const [isUpdating, setIsUpdating] = useState(false);
   const [profileForm, setProfileForm] = useState({
     name: "",
@@ -376,7 +379,7 @@ const SettingsPage = () => {
               { lbl: "Roll No", val: studentData?.rollNo || "—" },
               { lbl: "Sync ID", val: (studentData?.id || "").substring(0, 8) || "—" },
               { lbl: "Class",   val: studentData?.className ? `${studentData.className}${(studentData as any)?.section ? ` · ${(studentData as any).section}` : ""}` : studentData?.grade ? `Grade ${studentData.grade}` : "—" },
-              { lbl: "Year",    val: "2025 – 26" },
+              { lbl: "Year",    val: academicYear },
             ].map((row, i, arr) => (
               <div key={row.lbl} className="flex items-center justify-between px-4 py-[13px]"
                 style={{ borderBottom: i < arr.length - 1 ? "0.5px solid rgba(255,255,255,0.08)" : "none" }}>

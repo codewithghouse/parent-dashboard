@@ -99,13 +99,11 @@ Give encouraging, constructive pre-submission feedback.
 Return JSON: { emoji: "one emoji", overall: "short encouraging sentence", strengths: ["s1","s2"], improvements: ["i1","i2"], tip: "one final tip" }`
       );
       setInstantFeedback(result);
-    } catch {
-      setInstantFeedback({
-        emoji: "✨", overall: "Great effort completing this assignment!",
-        strengths: ["Assignment completed and ready to submit", "Good initiative in getting it done"],
-        improvements: ["Review key points one final time", "Ensure all parts of the question are addressed"],
-        tip: "Take a quick final look before submitting — small checks make a big difference!"
-      });
+    } catch (err) {
+      // AI failed — surface it honestly instead of returning fabricated
+      // "AI feedback" that the parent will believe is real.
+      console.error("[AssignmentsPage] AI feedback generation failed:", err);
+      setInstantFeedback({ error: "AI feedback unavailable. Please try again later." });
     } finally { setGeneratingFeedback(false); }
   };
 
@@ -125,14 +123,12 @@ Give 4-5 progressive Socratic hints — nudges, not answers.
 Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (near solution — still no direct answer)"] }`
       );
       setHints(result.hints || []);
-    } catch {
-      setHints([
-        `Read the assignment question again: what is it really asking you to do?`,
-        `Identify the key words or numbers. What subject area does this connect to?`,
-        `Think about a similar example you've seen in class. How did that work?`,
-        `Try breaking the problem into smaller steps — what's the very first thing you'd do?`,
-        `Almost there! Write out your reasoning step by step and see if it leads you to an answer.`,
-      ]);
+    } catch (err) {
+      // AI failed — don't fall back to canned generic hints; that misleads
+      // the parent into thinking AI generated something tailored.
+      console.error("[AssignmentsPage] AI hints generation failed:", err);
+      toast.error("Couldn't generate hints right now. Please try again.");
+      setHints([]);
     } finally { setGeneratingHints(false); }
   };
 
@@ -661,6 +657,11 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
                         <Loader2 className="w-4 h-4 text-indigo-500 animate-spin flex-shrink-0" />
                         <p className="text-xs text-indigo-600 font-semibold">Analysing your submission...</p>
                       </div>
+                    ) : instantFeedback?.error ? (
+                      <div className="p-5 bg-rose-50 flex items-start gap-3">
+                        <Sparkles className="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5" />
+                        <p className="text-xs text-rose-700 font-semibold">{instantFeedback.error}</p>
+                      </div>
                     ) : instantFeedback && (
                       <div className="p-5 space-y-4 bg-white">
                         <div className="flex items-center gap-3">
@@ -788,8 +789,33 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
                      </div>
                      <p className="text-sm font-bold text-slate-400 line-clamp-2">{a.description}</p>
                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-1 font-bold">
-                        <div className="flex items-center gap-2"><User className="w-4 h-4 text-slate-300"/><span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{a.teacherName || "Institutional Faculty"}</span></div>
-                        <div className="flex items-center gap-2 text-rose-500"><Clock className="w-4 h-4"/><span className="text-[10px] font-black uppercase tracking-widest">Due Mar 28</span></div>
+                        <div className="flex items-center gap-2"><User className="w-4 h-4 text-slate-300"/><span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{a.teacherName || "Teacher unassigned"}</span></div>
+                        {(() => {
+                          // Render the actual due date from Firestore (`dueDate`/`dueOn`/`deadline`).
+                          // Previously hardcoded as "Due Mar 28" — every assignment showed the
+                          // same date which was obvious nonsense to parents.
+                          const raw = a.dueDate || a.dueOn || a.deadline;
+                          if (!raw) {
+                            return (
+                              <div className="flex items-center gap-2 text-slate-400"><Clock className="w-4 h-4"/><span className="text-[10px] font-black uppercase tracking-widest">No due date</span></div>
+                            );
+                          }
+                          const d = raw?.toDate?.() || new Date(raw);
+                          if (Number.isNaN(d.getTime())) {
+                            return (
+                              <div className="flex items-center gap-2 text-slate-400"><Clock className="w-4 h-4"/><span className="text-[10px] font-black uppercase tracking-widest">No due date</span></div>
+                            );
+                          }
+                          const isOverdue = d.getTime() < Date.now();
+                          return (
+                            <div className={`flex items-center gap-2 ${isOverdue ? "text-rose-500" : "text-slate-500"}`}>
+                              <Clock className="w-4 h-4"/>
+                              <span className="text-[10px] font-black uppercase tracking-widest">
+                                Due {d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+                              </span>
+                            </div>
+                          );
+                        })()}
                      </div>
                    </div>
                    <div className="flex flex-col gap-3 w-full md:w-[200px]">
@@ -962,6 +988,11 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
                           <div className="p-5 flex items-center gap-3 bg-indigo-50">
                             <Loader2 className="w-4 h-4 text-indigo-500 animate-spin flex-shrink-0" />
                             <p className="text-xs text-indigo-600 font-semibold">Analysing your submission...</p>
+                          </div>
+                        ) : instantFeedback?.error ? (
+                          <div className="p-5 bg-rose-50 flex items-start gap-3">
+                            <Sparkles className="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5" />
+                            <p className="text-xs text-rose-700 font-semibold">{instantFeedback.error}</p>
                           </div>
                         ) : instantFeedback && (
                           <div className="p-5 space-y-4 bg-white">

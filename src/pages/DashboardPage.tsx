@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, getDocs, Timestamp } from "firebase/firestore";
 import { subscribeEnrollments } from "@/lib/enrollmentQuery";
+import { useSchoolSettings, resolveAcademicYear } from "@/hooks/useSchoolSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 function timeAgo(date: Date): string {
@@ -150,6 +151,9 @@ function ScoreArc({ pct, color, size = 80 }: { pct: number; color: string; size?
 const DashboardPage = () => {
   const { studentData, user } = useAuth();
   const isMobile = useIsMobile();
+  const settings = useSchoolSettings();
+  // Real academic year — replaces two hardcoded "2025-26" strings.
+  const academicYear = resolveAcademicYear(settings);
   const [aiInsights, setAiInsights] = useState<any>(null);
   // Initial defaults must NOT look like real data. attendance:100 was showing
   // "100% attendance" for brand-new students who had zero records — making
@@ -881,7 +885,7 @@ const DashboardPage = () => {
               </div>
               <div className="px-[15px] py-[13px]" style={{ background: "rgba(255,255,255,0.07)" }}>
                 <div className="text-[10px] font-bold uppercase tracking-[0.09em]" style={{ color: "rgba(255,255,255,0.38)" }}>Academic Year</div>
-                <div className="text-[15px] font-semibold mt-1 text-white" style={{ letterSpacing: "-0.2px" }}>2025–26</div>
+                <div className="text-[15px] font-semibold mt-1 text-white" style={{ letterSpacing: "-0.2px" }}>{academicYear}</div>
               </div>
             </div>
           </div>
@@ -1236,7 +1240,7 @@ const DashboardPage = () => {
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-1">Academic Year</p>
-              <p className="text-sm font-semibold text-slate-700">2025-26</p>
+              <p className="text-sm font-semibold text-slate-700">{academicYear}</p>
             </div>
           </div>
         </div>
