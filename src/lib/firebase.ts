@@ -4,6 +4,7 @@ import {
   indexedDBLocalPersistence,
   browserLocalPersistence,
   browserSessionPersistence,
+  browserPopupRedirectResolver,
 } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
@@ -54,12 +55,18 @@ if (typeof window !== "undefined" && import.meta.env.VITE_RECAPTCHA_SITE_KEY) {
 
 // indexedDB-first so iOS standalone PWA keeps the session across cold-starts.
 // (browserLocalPersistence is unreliable on iOS standalone; sessionPersistence is the last-ditch fallback.)
+//
+// CRITICAL: when using initializeAuth (instead of getAuth), `popupRedirectResolver`
+// MUST be passed explicitly — otherwise signInWithPopup / signInWithRedirect
+// throw `auth/argument-error` with no popup ever opening. getAuth() includes this
+// resolver by default; initializeAuth does NOT.
 export const auth = initializeAuth(app, {
   persistence: [
     indexedDBLocalPersistence,
     browserLocalPersistence,
     browserSessionPersistence,
   ],
+  popupRedirectResolver: browserPopupRedirectResolver,
 });
 export const db = getFirestore(app);
 export const storage = getStorage(app);
