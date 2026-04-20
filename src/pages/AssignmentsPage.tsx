@@ -47,6 +47,8 @@ const AssignmentsPage = () => {
     setLoading(true);
     let unsubAssignments: Unsubscribe | null = null;
 
+    const schoolId = studentData.schoolId;
+
     const setupAssignmentListener = (classIds: string[]) => {
         if (unsubAssignments) unsubAssignments();
         if (classIds.length === 0) {
@@ -55,14 +57,16 @@ const AssignmentsPage = () => {
             return;
         }
         const assignmentsRef = collection(db, "assignments");
-        const q = query(assignmentsRef, where("classId", "in", classIds));
+        // CRITICAL: filter by schoolId server-side — without it, a colliding
+        // classId across schools would surface another school's assignments.
+        const q = schoolId
+          ? query(assignmentsRef, where("schoolId", "==", schoolId), where("classId", "in", classIds))
+          : query(assignmentsRef, where("classId", "in", classIds));
         unsubAssignments = onSnapshot(q, (snap) => {
             setAssignments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             setLoading(false);
         });
     };
-
-    const schoolId = studentData.schoolId;
 
     // Single scoped enrollment listener — triggers assignment reload on change
     const enrollQ = schoolId

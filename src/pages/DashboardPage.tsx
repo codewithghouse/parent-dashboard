@@ -150,14 +150,34 @@ const DashboardPage = () => {
   const { studentData, user } = useAuth();
   const isMobile = useIsMobile();
   const [aiInsights, setAiInsights] = useState<any>(null);
-  const [liveStats, setLiveStats] = useState({
-    attendance: 100,
-    pending: 0,
-    tests: 0,
+  // Initial defaults must NOT look like real data. attendance:100 was showing
+  // "100% attendance" for brand-new students who had zero records — making
+  // the dashboard appear to have data that didn't exist in Firestore.
+  // Use null to mean "no data yet"; UI renders "—" instead of a fake percentage.
+  const [liveStats, setLiveStats] = useState<{
+    attendance: number | null;
+    pending: number | null;
+    tests: number | null;
+    avgScore: number;
+    recentGrade: string;
+    recentSubject: string;
+    trendPct: number;
+    hasAttendanceData: boolean;
+    hasAssignmentData: boolean;
+    hasTestData: boolean;
+    hasScoreData: boolean;
+  }>({
+    attendance: null,
+    pending: null,
+    tests: null,
     avgScore: 0,
     recentGrade: "N/A",
-    recentSubject: "General",
+    recentSubject: "—",
     trendPct: 0,
+    hasAttendanceData: false,
+    hasAssignmentData: false,
+    hasTestData: false,
+    hasScoreData: false,
   });
   const [recentAlerts, setRecentAlerts] = useState<any[]>([]);
   const [teacherInfo, setTeacherInfo] = useState({ name: "—" });
@@ -189,29 +209,70 @@ const DashboardPage = () => {
     // 1. Attendance — single listener (was 2)
     const u1 = onSnapshot(sq("attendance"), snap => {
       const records = snap.docs.map(d => d.data());
+      if (records.length === 0) {
+        // No attendance recorded yet. Don't fake a "100%" — show empty state.
+        setLiveStats(prev => ({ ...prev, attendance: null, hasAttendanceData: false }));
+        return;
+      }
       const present = records.filter((r: any) => r.status === "present" || r.status === "late").length;
-      const pct = records.length === 0 ? 100 : Math.round((present / records.length) * 100);
-      setLiveStats(prev => ({ ...prev, attendance: pct }));
+      const pct = Math.round((present / records.length) * 100);
+      setLiveStats(prev => ({ ...prev, attendance: pct, hasAttendanceData: true }));
     });
 
     // 2. Enrollments → assignments + tests (single listener, was 2 + unbounded classIds)
     let enSnap: any = null;
     const processEnroll = async () => {
       const docs = enSnap?.docs || [];
-      if (!docs.length) { setDataLoading(false); return; }
+      if (!docs.length) {
+        // No enrollments → student not in any class → no pending/tests data exists.
+        // Mark explicitly as "no data" so UI can render empty state instead of "0".
+        setLiveStats(prev => ({
+          ...prev,
+          pending: null,
+          tests: null,
+          hasAssignmentData: false,
+          hasTestData: false,
+        }));
+        setTeacherInfo({ name: "—" });
+        setStudentMeta({ className: "—", rollNo: "—" });
+        setDataLoading(false);
+        return;
+      }
       const first = docs[0].data();
-      setTeacherInfo({ name: first.teacherName || "Class Teacher" });
-      setStudentMeta({ className: first.className || studentData?.grade || "—", rollNo: first.rollNo || studentData?.rollNo || "—" });
+      setTeacherInfo({ name: first.teacherName || "—" });
+      setStudentMeta({
+        className: first.className || studentData?.grade || "—",
+        rollNo: first.rollNo || studentData?.rollNo || "—",
+      });
       const classIds = [...new Set(docs.map((d: any) => d.data().classId).filter(Boolean))] as string[];
-      if (!classIds.length) { setDataLoading(false); return; }
+      if (!classIds.length) {
+        setLiveStats(prev => ({
+          ...prev,
+          pending: null,
+          tests: null,
+          hasAssignmentData: false,
+          hasTestData: false,
+        }));
+        setDataLoading(false);
+        return;
+      }
 
       // Chunk classIds to handle >10 (Firestore "in" operator limit)
       const chunks: string[][] = [];
       for (let i = 0; i < classIds.length; i += 10) chunks.push(classIds.slice(i, i + 10));
 
+      // CRITICAL: every assignments/tests query MUST include schoolId — otherwise
+      // a colliding classId across schools leaks another school's data into this
+      // parent's dashboard. Same pattern enforced via Firestore rules but we
+      // belt-and-braces it client-side too.
+      const buildQ = (coll: string, ids: string[]) =>
+        schoolId
+          ? query(collection(db, coll), where("schoolId", "==", schoolId), where("classId", "in", ids))
+          : query(collection(db, coll), where("classId", "in", ids));
+
       const [aSnaps, tSnaps, subSnap] = await Promise.all([
-        Promise.all(chunks.map(c => getDocs(query(collection(db, "assignments"), where("classId", "in", c))))),
-        Promise.all(chunks.map(c => getDocs(query(collection(db, "tests"), where("classId", "in", c))))),
+        Promise.all(chunks.map(c => getDocs(buildQ("assignments", c)))),
+        Promise.all(chunks.map(c => getDocs(buildQ("tests", c)))),
         getDocs(sq("submissions")),
       ]);
       const allAssignments = aSnaps.flatMap(s => s.docs);
@@ -220,8 +281,17 @@ const DashboardPage = () => {
       const pending = allAssignments.filter(d => !subIds.has(d.id)).length;
       const today = new Date().toISOString().split("T")[0];
       const nw = new Date(); nw.setDate(nw.getDate() + 7);
-      const tests = allTests.filter(d => { const dt = d.data().date; return dt >= today && dt <= nw.toISOString().split("T")[0]; }).length;
-      setLiveStats(prev => ({ ...prev, pending, tests }));
+      const tests = allTests.filter(d => {
+        const dt = d.data().date;
+        return dt >= today && dt <= nw.toISOString().split("T")[0];
+      }).length;
+      setLiveStats(prev => ({
+        ...prev,
+        pending,
+        tests,
+        hasAssignmentData: allAssignments.length > 0,
+        hasTestData: allTests.length > 0,
+      }));
       setDataLoading(false);
     };
     const u2 = onSnapshot(sq("enrollments"), s => { enSnap = s; processEnroll(); });
@@ -236,7 +306,18 @@ const DashboardPage = () => {
       });
       const all = Array.from(new Map([...testRes, ...gbRes].map(d => [d.id, d])).values())
         .sort((a, b) => (b.timestamp?.toDate()?.getTime() || 0) - (a.timestamp?.toDate()?.getTime() || 0));
-      if (!all.length) return;
+      if (!all.length) {
+        // No scores at all → keep defaults but mark as "no data" so UI knows.
+        setLiveStats(prev => ({
+          ...prev,
+          avgScore: 0,
+          recentGrade: "N/A",
+          recentSubject: "—",
+          trendPct: 0,
+          hasScoreData: false,
+        }));
+        return;
+      }
       const avg = all.reduce((s, r) => s + (parseFloat(r.score) || 0), 0) / all.length;
       const latest = all[0];
       const grade = (s: number) => s >= 90 ? "A+" : s >= 80 ? "A" : s >= 70 ? "A-" : s >= 60 ? "B" : "C";
@@ -249,7 +330,14 @@ const DashboardPage = () => {
         const prevAvg = prev3.reduce((a, b) => a + b, 0) / prev3.length;
         trendPct = Math.round(recentAvg - prevAvg);
       }
-      setLiveStats(prev => ({ ...prev, avgScore: Math.round(avg), recentGrade: grade(parseFloat(latest.score) || 0), recentSubject: latest.className || latest.subject || "General", trendPct }));
+      setLiveStats(prev => ({
+        ...prev,
+        avgScore: Math.round(avg),
+        recentGrade: grade(parseFloat(latest.score) || 0),
+        recentSubject: latest.className || latest.subject || "—",
+        trendPct,
+        hasScoreData: true,
+      }));
     };
     const u3 = onSnapshot(sq("results"), s => { rSnap = s; processResults(); });
     const u4 = onSnapshot(sq("gradebook_scores"), s => { gSnap = s; processResults(); });
@@ -327,7 +415,9 @@ const DashboardPage = () => {
       const attLate = attDocs.filter((d: any) => d.status === "late").length;
       const attAbsent = attDocs.filter((d: any) => d.status === "absent").length;
       const attTotal = attDocs.length;
-      const attPct = attTotal === 0 ? 100 : Math.round(((attPresent + attLate) / attTotal) * 100);
+      // Don't fake 100% when there are zero attendance records this week —
+      // 0 conveys "no data" without misleading the parent.
+      const attPct = attTotal === 0 ? 0 : Math.round(((attPresent + attLate) / attTotal) * 100);
 
       // Fetch this week's results (scoped, no full history scan)
       const resSnap = await rq("results");
@@ -341,14 +431,23 @@ const DashboardPage = () => {
           return { subject: d.subject || d.className || "General", score, max, grade: pct >= 90 ? "A+" : pct >= 80 ? "A" : pct >= 70 ? "B+" : pct >= 60 ? "B" : "C" };
         });
 
+      // Fetch this week's submissions to get accurate counts (no hardcoded "+2").
+      const subSnap = await rq("submissions", [where("submittedAt", ">=", Timestamp.fromDate(weekStart))]);
+      const submittedThisWeek = subSnap.docs.length;
+      const pendingNow = liveStats.pending ?? 0;
+
       const reportData = {
         child_name: studentData.name,
-        grade: studentData.grade || "8",
+        grade: studentData.grade || "—",
         week_start: weekStartStr,
         week_end: weekEndStr,
         attendance: { present: attPresent, absent: attAbsent, late: attLate, total: attTotal, pct: attPct },
         tests: weekTests,
-        assignments: { total: liveStats.pending + 2, submitted: 2, pending: liveStats.pending },
+        assignments: {
+          total: submittedThisWeek + pendingNow,
+          submitted: submittedThisWeek,
+          pending: pendingNow,
+        },
         overall_avg: liveStats.avgScore,
         recent_alerts: recentAlerts.map(a => a.title).slice(0, 3),
       };
@@ -424,15 +523,27 @@ const DashboardPage = () => {
 
   useEffect(() => {
     if (!studentData?.id || dataLoading) return;
+    // Skip AI insight call if there's no real data — feeding "null"/zero stats
+    // to the AI produces hallucinated narratives about a student that hasn't
+    // done anything yet.
+    const noDataYet =
+      !liveStats.hasAttendanceData &&
+      !liveStats.hasAssignmentData &&
+      !liveStats.hasTestData &&
+      !liveStats.hasScoreData;
+    if (noDataYet) {
+      setAiInsights(null);
+      return;
+    }
     ParentAIController.getDashboardInsights({
       child_name: studentData.name,
-      attendance: `${liveStats.attendance}%`,
-      avg_score: `${liveStats.avgScore}%`,
-      pending_assignments: liveStats.pending,
-      upcoming_tests: liveStats.tests,
+      attendance: liveStats.attendance === null ? "No data" : `${liveStats.attendance}%`,
+      avg_score: liveStats.avgScore > 0 ? `${liveStats.avgScore}%` : "No data",
+      pending_assignments: liveStats.pending ?? 0,
+      upcoming_tests: liveStats.tests ?? 0,
       recent_grade: liveStats.recentGrade,
       recent_subject: liveStats.recentSubject,
-      grade: studentData.grade || "8",
+      grade: studentData.grade || "—",
       recent_alerts: recentAlerts.map(a => a.title).slice(0, 3),
     }).then(r => { if (r.status === "success") setAiInsights(r.data); }).catch(() => {});
   }, [studentData?.id, dataLoading]);
@@ -452,6 +563,12 @@ const DashboardPage = () => {
   const studentInitials = getInitials(studentData?.name || "AS");
   const weekConfig = getWeekConfig();
   const isPrevWeekReport = !!weeklyReport && !weekConfig.canGenerate && !localStorage.getItem(weekConfig.thisWeekKey);
+
+  // Null-safe display strings — used by BOTH mobile and desktop branches.
+  // Defined here (function scope) so neither return path duplicates the logic.
+  const attDisplay = liveStats.attendance === null ? "—" : `${liveStats.attendance}%`;
+  const pendingDisplay = liveStats.pending === null ? "—" : liveStats.pending.toString();
+  const testsDisplay = liveStats.tests === null ? "—" : liveStats.tests.toString();
 
   /* ═══════════════════════════════════════════════════════════════
      MOBILE — Edullent Indigo Apple UI
@@ -486,8 +603,8 @@ const DashboardPage = () => {
     const scorePct = Math.min(liveStats.avgScore, 100);
     const ringR = 40, ringCirc = 2 * Math.PI * ringR;
     const ringOffset = ringCirc - (scorePct / 100) * ringCirc;
-    // Status flags
-    const attOnTrack = liveStats.attendance >= 85;
+    // Status flags — null means "no data", which is NOT the same as 0% / on-track.
+    const attOnTrack = liveStats.attendance !== null && liveStats.attendance >= 85;
     const noPending = liveStats.pending === 0;
     const isImproving = liveStats.trendPct > 0;
     const isDeclining = liveStats.trendPct < 0;
@@ -560,9 +677,9 @@ const DashboardPage = () => {
         {/* ── Stats Grid 2×2 ── */}
         <div className="grid grid-cols-2 gap-3 mx-5 mt-[14px]">
           {[
-            { icon: CheckCircle, iconColor: GREEN, bg: GREEN_S, border: "rgba(18,192,78,0.20)", glow: "rgba(18,192,78,0.14)", label: "Attendance", value: `${liveStats.attendance}%`, status: attOnTrack ? "On track ✓" : "Below target", statusColor: attOnTrack ? GREEN : ORANGE },
-            { icon: AlertCircle, iconColor: ORANGE, bg: ORANGE_S, border: "rgba(245,160,0,0.20)", glow: "rgba(245,160,0,0.14)", label: "Pending Work", value: liveStats.pending.toString(), status: noPending ? "All clear ✓" : "Due this week", statusColor: noPending ? GREEN : ORANGE },
-            { icon: Calendar, iconColor: IND, bg: IND_SOFT, border: IND_BDR, glow: "rgba(48,48,110,0.09)", label: "Upcoming Tests", value: liveStats.tests.toString(), status: "Next 7 days", statusColor: T4 },
+            { icon: CheckCircle, iconColor: GREEN, bg: GREEN_S, border: "rgba(18,192,78,0.20)", glow: "rgba(18,192,78,0.14)", label: "Attendance", value: attDisplay, status: liveStats.attendance === null ? "No records yet" : attOnTrack ? "On track ✓" : "Below target", statusColor: liveStats.attendance === null ? T4 : attOnTrack ? GREEN : ORANGE },
+            { icon: AlertCircle, iconColor: ORANGE, bg: ORANGE_S, border: "rgba(245,160,0,0.20)", glow: "rgba(245,160,0,0.14)", label: "Pending Work", value: pendingDisplay, status: liveStats.pending === null ? "No assignments yet" : noPending ? "All clear ✓" : "Due this week", statusColor: liveStats.pending === null ? T4 : noPending ? GREEN : ORANGE },
+            { icon: Calendar, iconColor: IND, bg: IND_SOFT, border: IND_BDR, glow: "rgba(48,48,110,0.09)", label: "Upcoming Tests", value: testsDisplay, status: liveStats.tests === null ? "No tests scheduled" : "Next 7 days", statusColor: T4 },
             { icon: Star, iconColor: ROSE, bg: ROSE_S, border: "rgba(255,110,168,0.20)", glow: "rgba(255,110,168,0.14)", label: "Recent Grade", value: liveStats.recentGrade !== "N/A" ? liveStats.recentGrade : "—", status: liveStats.recentSubject, statusColor: T4 },
           ].map(({ icon: Icon, iconColor, bg, border, glow, label, value, status, statusColor }) => (
             <div key={label} className="bg-white rounded-[22px] px-4 pt-[18px] pb-[18px] relative overflow-hidden active:scale-[0.96] transition-transform"
@@ -617,20 +734,20 @@ const DashboardPage = () => {
                 <div className="p-[18px] flex flex-col gap-[10px]" style={{ background: DK_CELL }}>
                   <span className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Attendance</span>
                   <div className="flex items-center gap-[10px]">
-                    <DonutRing pct={liveStats.attendance} color={attOnTrack ? GREEN : ORANGE} size={56} stroke={5} />
+                    <DonutRing pct={liveStats.attendance ?? 0} color={attOnTrack ? GREEN : ORANGE} size={56} stroke={5} />
                     <div className="flex flex-col gap-[3px]">
                       <span className="text-[9px]" style={{ color: "rgba(255,255,255,0.28)" }}>Target</span>
                       <span className="text-[11px] font-semibold" style={{ color: "rgba(255,255,255,0.58)" }}>85%</span>
                       <div className="w-[52px] h-[3px] rounded-full mt-[2px] overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
-                        <div className="h-full rounded-full" style={{ width: `${Math.min(liveStats.attendance, 100)}%`, background: attOnTrack ? GREEN : ORANGE }} />
+                        <div className="h-full rounded-full" style={{ width: `${Math.min(liveStats.attendance ?? 0, 100)}%`, background: attOnTrack ? GREEN : ORANGE }} />
                       </div>
                       <div className="inline-flex items-center gap-[3px] px-[9px] py-[3px] rounded-full mt-1 w-fit text-[10px] font-bold"
                         style={{
-                          background: attOnTrack ? "rgba(18,192,78,0.15)" : "rgba(232,51,74,0.15)",
-                          color: attOnTrack ? "#38DC78" : "#FF85AA",
-                          border: `0.5px solid ${attOnTrack ? "rgba(18,192,78,0.20)" : "rgba(232,51,74,0.20)"}`
+                          background: liveStats.attendance === null ? "rgba(255,255,255,0.05)" : attOnTrack ? "rgba(18,192,78,0.15)" : "rgba(232,51,74,0.15)",
+                          color: liveStats.attendance === null ? "rgba(180,180,230,0.5)" : attOnTrack ? "#38DC78" : "#FF85AA",
+                          border: `0.5px solid ${liveStats.attendance === null ? "rgba(180,180,230,0.10)" : attOnTrack ? "rgba(18,192,78,0.20)" : "rgba(232,51,74,0.20)"}`
                         }}>
-                        {attOnTrack ? "✓ On Track" : "Needs Work"}
+                        {liveStats.attendance === null ? "No data" : attOnTrack ? "✓ On Track" : "Needs Work"}
                       </div>
                     </div>
                   </div>
@@ -668,15 +785,17 @@ const DashboardPage = () => {
                 {/* Assignments */}
                 <div className="p-[18px] flex flex-col gap-[10px]" style={{ background: DK_CELL }}>
                   <span className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Assignments</span>
-                  <div className="text-[34px] font-bold leading-none text-white" style={{ letterSpacing: "-1.2px" }}>{liveStats.pending}</div>
-                  <div className="text-[11px]" style={{ color: "rgba(255,255,255,0.32)", letterSpacing: "-0.1px" }}>pending</div>
+                  <div className="text-[34px] font-bold leading-none text-white" style={{ letterSpacing: "-1.2px" }}>{pendingDisplay}</div>
+                  <div className="text-[11px]" style={{ color: "rgba(255,255,255,0.32)", letterSpacing: "-0.1px" }}>
+                    {liveStats.pending === null ? "no data" : "pending"}
+                  </div>
                   <div className="inline-flex items-center gap-[3px] px-[9px] py-[3px] rounded-full w-fit text-[10px] font-bold"
                     style={{
-                      background: noPending ? "rgba(18,192,78,0.15)" : "rgba(245,160,0,0.15)",
-                      color: noPending ? "#38DC78" : "#F5A000",
-                      border: `0.5px solid ${noPending ? "rgba(18,192,78,0.20)" : "rgba(245,160,0,0.20)"}`
+                      background: liveStats.pending === null ? "rgba(255,255,255,0.05)" : noPending ? "rgba(18,192,78,0.15)" : "rgba(245,160,0,0.15)",
+                      color: liveStats.pending === null ? "rgba(180,180,230,0.5)" : noPending ? "#38DC78" : "#F5A000",
+                      border: `0.5px solid ${liveStats.pending === null ? "rgba(180,180,230,0.10)" : noPending ? "rgba(18,192,78,0.20)" : "rgba(245,160,0,0.20)"}`
                     }}>
-                    {noPending ? "✓ All Done" : `${liveStats.pending} to complete`}
+                    {liveStats.pending === null ? "No assignments yet" : noPending ? "✓ All Done" : `${liveStats.pending} to complete`}
                   </div>
                 </div>
 
@@ -1072,9 +1191,9 @@ const DashboardPage = () => {
       {/* 4 Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-5">
         {[
-          { icon: CheckCircle, colorCls: "bg-emerald-50 text-emerald-600", tagCls: "text-emerald-600", label: "Attendance", value: `${liveStats.attendance}%`, tag: liveStats.attendance >= 85 ? "On track" : "Below target" },
-          { icon: AlertCircle, colorCls: "bg-amber-50 text-amber-600", tagCls: "text-amber-500", label: "Pending Work", value: liveStats.pending.toString(), tag: "Due this week" },
-          { icon: Calendar, colorCls: "bg-indigo-50 text-indigo-600", tagCls: "text-slate-400", label: "Upcoming Tests", value: liveStats.tests.toString(), tag: "Next 7 days" },
+          { icon: CheckCircle, colorCls: "bg-emerald-50 text-emerald-600", tagCls: "text-emerald-600", label: "Attendance", value: attDisplay, tag: liveStats.attendance === null ? "No records yet" : liveStats.attendance >= 85 ? "On track" : "Below target" },
+          { icon: AlertCircle, colorCls: "bg-amber-50 text-amber-600", tagCls: "text-amber-500", label: "Pending Work", value: pendingDisplay, tag: liveStats.pending === null ? "No assignments yet" : "Due this week" },
+          { icon: Calendar, colorCls: "bg-indigo-50 text-indigo-600", tagCls: "text-slate-400", label: "Upcoming Tests", value: testsDisplay, tag: liveStats.tests === null ? "No tests scheduled" : "Next 7 days" },
           { icon: Star, colorCls: "bg-emerald-50 text-emerald-600", tagCls: "text-emerald-600", label: "Recent Grade", value: liveStats.recentGrade, tag: liveStats.recentSubject },
         ].map(({ icon: Icon, colorCls, tagCls, label, value, tag }) => (
           <div key={label} className="bg-white border border-slate-100 rounded-2xl p-4 md:p-5 shadow-sm hover:shadow-md transition-all group">
@@ -1173,13 +1292,15 @@ const DashboardPage = () => {
 
               {/* ① Attendance */}
               {(() => {
-                const attColor = liveStats.attendance >= 85 ? "#f59e0b" : liveStats.attendance >= 70 ? "#f59e0b" : "#ef4444";
+                const attVal = liveStats.attendance ?? 0;
+                const noAtt = liveStats.attendance === null;
+                const attColor = noAtt ? "#475569" : attVal >= 85 ? "#f59e0b" : attVal >= 70 ? "#f59e0b" : "#ef4444";
                 return (
                   <div className="rounded-2xl p-4 flex flex-col"
                     style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", minHeight: 160 }}>
                     <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-3">Attendance</span>
                     <div className="flex items-center gap-4 flex-1">
-                      <DonutRing pct={liveStats.attendance} color={attColor} size={90} stroke={9} />
+                      <DonutRing pct={attVal} color={attColor} size={90} stroke={9} />
                       <div className="flex-1 space-y-2">
                         <div>
                           <div className="text-[9px] text-slate-500 mb-1">Target &nbsp; <span className="text-slate-400 font-bold">85%</span></div>
@@ -1187,14 +1308,15 @@ const DashboardPage = () => {
                         </div>
                         <div>
                           <div className="text-[9px] text-slate-500 mb-1">Current</div>
-                          <MiniBar pct={liveStats.attendance} color={attColor} />
+                          <MiniBar pct={attVal} color={attColor} />
                         </div>
                         <div className={`mt-1 text-[9px] font-bold px-2 py-0.5 rounded-full w-fit ${
-                          liveStats.attendance >= 85 ? "bg-emerald-500/15 text-emerald-400"
-                          : liveStats.attendance >= 70 ? "bg-amber-500/15 text-amber-400"
+                          noAtt ? "bg-slate-500/15 text-slate-400"
+                          : attVal >= 85 ? "bg-emerald-500/15 text-emerald-400"
+                          : attVal >= 70 ? "bg-amber-500/15 text-amber-400"
                           : "bg-red-500/15 text-red-400"
                         }`}>
-                          {liveStats.attendance >= 85 ? "On Track" : liveStats.attendance >= 70 ? "Improve" : "Critical"}
+                          {noAtt ? "No data yet" : attVal >= 85 ? "On Track" : attVal >= 70 ? "Improve" : "Critical"}
                         </div>
                       </div>
                     </div>
@@ -1237,36 +1359,47 @@ const DashboardPage = () => {
               })()}
 
               {/* ③ Assignments */}
-              <div className="rounded-2xl p-4 flex flex-col"
-                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", minHeight: 140 }}>
-                <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-2">Assignments</span>
-                <div className="flex-1 flex flex-col justify-between">
-                  <div className="flex items-end gap-2">
-                    <span className={`text-4xl font-black leading-none ${liveStats.pending > 3 ? "text-red-400" : liveStats.pending > 0 ? "text-amber-400" : "text-emerald-400"}`}
-                      style={{ textShadow: liveStats.pending === 0 ? "0 0 20px #10b98180" : "none" }}>
-                      {liveStats.pending}
-                    </span>
-                    <span className="text-[11px] text-slate-500 mb-1 font-medium">pending</span>
+              {(() => {
+                const noAsg = liveStats.pending === null;
+                const pVal = liveStats.pending ?? 0;
+                const tVal = liveStats.tests ?? 0;
+                return (
+                  <div className="rounded-2xl p-4 flex flex-col"
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", minHeight: 140 }}>
+                    <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-2">Assignments</span>
+                    <div className="flex-1 flex flex-col justify-between">
+                      <div className="flex items-end gap-2">
+                        <span className={`text-4xl font-black leading-none ${noAsg ? "text-slate-500" : pVal > 3 ? "text-red-400" : pVal > 0 ? "text-amber-400" : "text-emerald-400"}`}
+                          style={{ textShadow: !noAsg && pVal === 0 ? "0 0 20px #10b98180" : "none" }}>
+                          {pendingDisplay}
+                        </span>
+                        <span className="text-[11px] text-slate-500 mb-1 font-medium">{noAsg ? "no data" : "pending"}</span>
+                      </div>
+                      <div className="space-y-2">
+                        {noAsg ? (
+                          <div className="flex items-center gap-1.5 bg-slate-500/10 border border-slate-500/20 rounded-full px-3 py-1.5 w-fit">
+                            <span className="text-[10px] font-bold text-slate-400">No assignments yet</span>
+                          </div>
+                        ) : pVal === 0 ? (
+                          <div className="flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/25 rounded-full px-3 py-1.5 w-fit">
+                            <span className="text-[10px] font-bold text-emerald-400">All Done ✓</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 bg-amber-500/15 border border-amber-500/25 rounded-full px-3 py-1.5 w-fit">
+                            <span className="text-[10px] font-bold text-amber-400">{pVal} to complete</span>
+                          </div>
+                        )}
+                        {tVal > 0 && (
+                          <div className="flex items-center gap-1.5 bg-indigo-500/10 rounded-full px-2.5 py-1 w-fit">
+                            <BookOpen className="w-2.5 h-2.5 text-indigo-400" />
+                            <span className="text-[9px] text-indigo-300 font-semibold">{tVal} upcoming test{tVal > 1 ? "s" : ""}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    {liveStats.pending === 0 ? (
-                      <div className="flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/25 rounded-full px-3 py-1.5 w-fit">
-                        <span className="text-[10px] font-bold text-emerald-400">All Done ✓</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1.5 bg-amber-500/15 border border-amber-500/25 rounded-full px-3 py-1.5 w-fit">
-                        <span className="text-[10px] font-bold text-amber-400">{liveStats.pending} to complete</span>
-                      </div>
-                    )}
-                    {liveStats.tests > 0 && (
-                      <div className="flex items-center gap-1.5 bg-indigo-500/10 rounded-full px-2.5 py-1 w-fit">
-                        <BookOpen className="w-2.5 h-2.5 text-indigo-400" />
-                        <span className="text-[9px] text-indigo-300 font-semibold">{liveStats.tests} upcoming test{liveStats.tests > 1 ? "s" : ""}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
 
               {/* ④ Recent Test */}
               {(() => {

@@ -186,25 +186,39 @@ const PerformancePage = () => {
     }
 
     // 4. gradebook_scores — fetch by classId (need enrollment first)
+    //
+    // CRITICAL: include schoolId in the server-side query. Previously the query
+    // only filtered by classId, then filtered to the current student CLIENT-side.
+    // That meant Firestore briefly returned every student's gradebook for the
+    // class to the browser before the filter ran — a leak both for performance
+    // and for security (an attacker reading the network response sees all
+    // classmates' marks).
     let u4r = () => {};
     const fetchGradebook = async () => {
       try {
         const enrolSnap = await getDocs(byId("enrollments"));
         const classIds = [...new Set(enrolSnap.docs.map(d => d.data().classId).filter(Boolean))] as string[];
         if (classIds.length > 0) {
-          // Fetch gradebook scores for the student's classes
           const chunks: string[][] = [];
           for (let i = 0; i < classIds.length; i += 10) chunks.push(classIds.slice(i, i + 10));
-          const gbSnaps = await Promise.all(
-            chunks.map(ch => getDocs(query(collection(db, "gradebook_scores"), where("classId", "in", ch))))
-          );
-          // Filter to only this student's scores
-          const studentGbDocs = gbSnaps
-            .flatMap(s => s.docs)
-            .filter(d => {
-              const data = d.data();
-              return data.studentId === sid || (email && data.studentEmail?.toLowerCase() === email);
-            });
+          const buildGbQ = (ch: string[]) =>
+            studentData?.schoolId
+              ? query(
+                  collection(db, "gradebook_scores"),
+                  where("schoolId", "==", studentData.schoolId),
+                  where("classId", "in", ch),
+                  where("studentId", "==", sid),
+                )
+              : query(
+                  collection(db, "gradebook_scores"),
+                  where("classId", "in", ch),
+                  where("studentId", "==", sid),
+                );
+          const gbSnaps = await Promise.all(chunks.map(ch => getDocs(buildGbQ(ch))));
+          // Server already filtered to this student. Only keep email-fallback
+          // for legacy gradebook rows that may have used studentEmail instead
+          // of studentId.
+          const studentGbDocs = gbSnaps.flatMap(s => s.docs);
           if (studentGbDocs.length > 0) {
             snap3Cache = { docs: studentGbDocs };
             processScores();
