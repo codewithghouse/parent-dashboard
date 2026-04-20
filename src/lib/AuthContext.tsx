@@ -147,12 +147,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
-    // Force account chooser even when one Google account is already signed in
-    // on the device — otherwise iOS auto-picks an account that may not be
-    // whitelisted in our Firestore students collection.
-    provider.setCustomParameters({ prompt: 'select_account' });
+    // Force the Google account chooser EVERY time. Without this, Google
+    // silently auto-picks the device's default account if there's only one
+    // signed in, OR re-uses the previous OAuth grant — so the user never
+    // sees a "Choose an account" UI.
+    //   prompt=select_account → always show chooser
+    //   include_granted_scopes=true → don't re-ask for permissions already granted
+    provider.setCustomParameters({
+      prompt: 'select_account',
+      include_granted_scopes: 'true',
+    });
+    // Also explicitly request the basic email/profile scopes so the OAuth URL
+    // is unambiguous (some browsers strip default scopes during redirect).
+    provider.addScope('email');
+    provider.addScope('profile');
 
     setError(null);
+    console.info('[Auth] Starting Google sign-in (prompt=select_account)');
 
     // STRATEGY:
     //   Popup-first on every platform (incl. iOS standalone — iOS 16.4+
@@ -162,6 +173,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     //   which covers older iOS and stricter browsers.
     try {
       await signInWithPopup(auth, provider);
+      console.info('[Auth] Popup sign-in completed');
       return;
     } catch (err: any) {
       const code = err?.code as string | undefined;
