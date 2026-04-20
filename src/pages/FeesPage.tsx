@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { db } from "../lib/firebase";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { scopedQuery } from "../lib/scopedQuery";
+import { where, onSnapshot } from "firebase/firestore";
 import { useAuth } from "../lib/AuthContext";
 import { CreditCard, CheckCircle2, Clock, AlertCircle, Loader2, IndianRupee } from "lucide-react";
 
@@ -14,9 +14,7 @@ const FeesPage = () => {
     setLoading(true);
 
     const schoolId = studentData.schoolId;
-    const q = schoolId
-      ? query(collection(db, "fees"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id))
-      : query(collection(db, "fees"), where("studentId", "==", studentData.id));
+    const q = scopedQuery("fees", schoolId, where("studentId", "==", studentData.id));
 
     const unsub = onSnapshot(q, (snap) => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -26,6 +24,11 @@ const FeesPage = () => {
         return bTime - aTime;
       });
       setFees(data);
+      setLoading(false);
+    }, (err) => {
+      // Surface the failure so the user isn't stuck on a spinner forever.
+      console.error("[Fees] listener error:", err);
+      setFees([]);
       setLoading(false);
     });
 

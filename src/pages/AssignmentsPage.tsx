@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { User, Clock, CheckCircle2, Loader2, Upload, FileCheck, X, FileText, Book, FlaskConical, Calculator, BarChart3, Target, Trophy, Send, Lightbulb, Sparkles, ChevronDown } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { db, storage } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, Unsubscribe } from "firebase/firestore";
+import { collection, where, onSnapshot, addDoc, serverTimestamp, Unsubscribe } from "firebase/firestore";
+import { scopedQuery } from "@/lib/scopedQuery";
 import { subscribeEnrollments } from "@/lib/enrollmentQuery";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { toast } from "sonner";
@@ -57,14 +58,15 @@ const AssignmentsPage = () => {
             setLoading(false);
             return;
         }
-        const assignmentsRef = collection(db, "assignments");
         // CRITICAL: filter by schoolId server-side — without it, a colliding
         // classId across schools would surface another school's assignments.
-        const q = schoolId
-          ? query(assignmentsRef, where("schoolId", "==", schoolId), where("classId", "in", classIds))
-          : query(assignmentsRef, where("classId", "in", classIds));
+        const q = scopedQuery("assignments", schoolId, where("classId", "in", classIds));
         unsubAssignments = onSnapshot(q, (snap) => {
             setAssignments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            setLoading(false);
+        }, (err) => {
+            console.error("[Assignments] assignments listener error:", err);
+            setAssignments([]);
             setLoading(false);
         });
     };
@@ -77,11 +79,12 @@ const AssignmentsPage = () => {
     });
 
     // Submissions — scoped query
-    const subQ = schoolId
-      ? query(collection(db, "submissions"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id))
-      : query(collection(db, "submissions"), where("studentId", "==", studentData.id));
+    const subQ = scopedQuery("submissions", schoolId, where("studentId", "==", studentData.id));
     const unsubSub = onSnapshot(subQ, (snapshot) => {
       setSubmissions(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (err) => {
+      console.error("[Assignments] submissions listener error:", err);
+      setSubmissions([]);
     });
     return () => { unsubEnroll(); if (unsubAssignments) unsubAssignments(); unsubSub(); };
   }, [studentData?.id, studentData?.schoolId]);
@@ -134,10 +137,58 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
 
   const handleOfficialSubmission = async () => {
     if (!uploadFile || !selectedTask) return toast.error("Please attach your homework artifact first!");
-    
+
+    // Storage rules require a schoolId segment — writing without one results
+    // in a silent "permission-denied" from Firebase that looks like a generic
+    // upload failure to the user.
+    if (!studentData?.schoolId) {
+      toast.error("Your school context is missing. Please sign in again.");
+      return;
+    }
+
+    // Match Cloud Storage rule: files must be one of these types and under
+    // 50 MB. Failing fast here avoids a confusing Firebase "permission-denied"
+    // after a slow upload attempt.
+    const allowedTypes = new Set([
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "text/plain",
+    ]);
+    if (!allowedTypes.has(uploadFile.type)) {
+      toast.error("Unsupported file type. Use PDF, image, Word, or text file.");
+      return;
+    }
+    if (uploadFile.size > 50 * 1024 * 1024) {
+      toast.error("File too large. Max size is 50 MB.");
+      return;
+    }
+
     setSubmittingFile(true);
     try {
-        const sRef = ref(storage, `submissions/${studentData.id}_${selectedTask.id}_${uploadFile.name}`);
+        // Sanitise the filename before embedding in a Storage path. Raw user
+        // filenames can contain "/" or ".." segments that confuse path logic
+        // downstream and, with permissive rules, enable traversal.
+        //
+        // Use \p{L}\p{N} (Unicode letters/numbers) instead of \w so that
+        // Hindi / Tamil / other non-ASCII filenames survive the sanitisation
+        // — this app ships to schools across India.
+        const safeName = uploadFile.name
+          .replace(/[^\p{L}\p{N}.\-_]/gu, "_")
+          .replace(/_{2,}/g, "_")
+          .slice(0, 120);
+        // IMPORTANT: Storage rule matches `/submissions/{schoolId}/{allPaths=**}`.
+        // The previous flat path `submissions/{filename}` did not include a
+        // schoolId segment, so every upload since the 2026-04-18 rules deploy
+        // has been silently rejected as permission-denied. This proper path
+        // restores the write.
+        const sRef = ref(
+          storage,
+          `submissions/${studentData.schoolId}/${studentData.id}/${selectedTask.id}/${safeName}`,
+        );
         const snap = await uploadBytes(sRef, uploadFile);
         const url = await getDownloadURL(snap.ref);
 
@@ -147,19 +198,29 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
             studentId: studentData.id,
             studentEmail: studentData.email?.toLowerCase() || "",
             studentName: studentData.name,
+            // Required by tenant-isolation rule — guaranteed non-empty because
+            // handleOfficialSubmission() bails out early without schoolId.
+            schoolId: studentData.schoolId,
             fileUrl: url,
             fileName: uploadFile.name,
             studentNote: studentNote,
             timestamp: serverTimestamp(),
             status: "Submitted"
         });
-        
-        toast.success("Assignment officially submitted to institutional repository!");
+
+        toast.success("Assignment submitted.");
         setIsSubmitOpen(false);
         setUploadFile(null);
         setStudentNote("");
-    } catch (e) {
-        toast.error("Cloud handover failed. Check connection.");
+    } catch (e: any) {
+        console.error("[Assignments] submission failed:", e?.code, e?.message || e);
+        // Distinguish permission-denied (actionable via re-login) from a real
+        // network/storage issue (actionable via retry). Never surface raw
+        // Firebase error codes to the parent — they look like a crash report.
+        const msg = e?.code === "permission-denied" || e?.code === "storage/unauthorized"
+          ? "Upload was blocked. Please sign in again and retry."
+          : "Upload failed. Check your connection and try again.";
+        toast.error(msg);
     } finally {
         setSubmittingFile(false);
     }

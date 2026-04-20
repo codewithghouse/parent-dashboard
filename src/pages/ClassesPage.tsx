@@ -87,7 +87,11 @@ const ClassesPage = () => {
           try {
             const snap = await fbGetDoc(fbDoc(db, "teachers", en.teacherId));
             if (snap.exists()) teacherName = snap.data().name || teacherName;
-          } catch { /* keep what we have */ }
+          } catch (err) {
+            // Keep existing teacherName on failure, but log so we can catch
+            // systematic permission errors across multiple class cards.
+            console.error("[Classes] teacher doc fetch error:", err);
+          }
         }
         const initials = (teacherName || "")
           .split(" ").map((n: string) => n[0]).join("").toUpperCase().substring(0, 2) || "—";

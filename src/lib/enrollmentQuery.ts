@@ -14,15 +14,13 @@
  * Returns a single unsubscribe function that tears both listeners down.
  */
 import {
-  collection,
-  query,
   where,
   onSnapshot,
   QuerySnapshot,
   DocumentData,
   Unsubscribe,
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { scopedQuery } from "./scopedQuery";
 
 interface StudentLike {
   id?: string;
@@ -57,13 +55,7 @@ export function subscribeEnrollments(
   };
 
   // Query A — by canonical studentId (modern enrollments use student doc ID here)
-  const qById = schoolId
-    ? query(
-        collection(db, "enrollments"),
-        where("schoolId", "==", schoolId),
-        where("studentId", "==", student.id),
-      )
-    : query(collection(db, "enrollments"), where("studentId", "==", student.id));
+  const qById = scopedQuery("enrollments", schoolId, where("studentId", "==", student.id));
   const u1 = onSnapshot(
     qById,
     (s) => { snap1 = s; emit(); },
@@ -75,13 +67,7 @@ export function subscribeEnrollments(
   // studentId to the doc ID at all, so this catches them).
   let u2: Unsubscribe = () => {};
   if (email) {
-    const qByEmail = schoolId
-      ? query(
-          collection(db, "enrollments"),
-          where("schoolId", "==", schoolId),
-          where("studentEmail", "==", email),
-        )
-      : query(collection(db, "enrollments"), where("studentEmail", "==", email));
+    const qByEmail = scopedQuery("enrollments", schoolId, where("studentEmail", "==", email));
     u2 = onSnapshot(
       qByEmail,
       (s) => { snap2 = s; emit(); },

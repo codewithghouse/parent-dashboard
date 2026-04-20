@@ -105,6 +105,10 @@ const MyChildPage = () => {
     // Live-subscribe to the student's master record
     const unsubStudent = onSnapshot(doc(db, "students", sid), (d) => {
       if (d.exists()) setMasterProfile(d.data());
+    }, (err) => {
+      // Permission-denied or network failure — don't leave masterProfile stale
+      // forever; fall back to the cached studentData from AuthContext.
+      console.error("[MyChild] student doc listener error:", err);
     });
 
     const run = async () => {

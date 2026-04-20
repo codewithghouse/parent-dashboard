@@ -84,7 +84,12 @@ const TimetablePage = () => {
           }));
           setTimetable(slots);
         }
-      } catch { /* silently fail */ } finally {
+      } catch (err) {
+        // Surface the error in the console so a support engineer can see why
+        // the timetable is empty; the UI still falls through to the "No
+        // timetable yet" empty state either way.
+        console.error("[Timetable] fetch error:", err);
+      } finally {
         setLoading(false);
       }
     };

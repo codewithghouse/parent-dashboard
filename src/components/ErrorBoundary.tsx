@@ -27,8 +27,22 @@ export class ErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    // In production you'd send this to Sentry / Firebase Crashlytics
+    // TELEMETRY GAP — production errors only surface to the browser console
+    // today. 400 schools × thousands of parents means we are blind to crashes
+    // until a user emails support. Wire Sentry / Firebase Crashlytics here
+    // before the next major rollout; capturing the error + componentStack +
+    // the current user's schoolId (without PII) is enough to diagnose most
+    // regressions. Avoid capturing raw studentData — it's PII.
     console.error("[ErrorBoundary]", error, info.componentStack);
+    // Best-effort: forward to a global hook if the host app wired one up.
+    // This lets us inject Sentry from App.tsx without editing this file
+    // whenever we change telemetry backends.
+    try {
+      const sink = (window as unknown as { __reportUncaught?: (e: Error, ci: React.ErrorInfo) => void }).__reportUncaught;
+      if (typeof sink === "function") sink(error, info);
+    } catch {
+      // A broken reporter must never take down the fallback UI.
+    }
   }
 
   private handleRetry = () => {

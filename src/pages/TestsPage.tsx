@@ -4,9 +4,9 @@ import {
   FlaskConical, Calculator, Book, History, GraduationCap
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
-import { db } from "@/lib/firebase";
 import { useSchoolSettings } from "@/hooks/useSchoolSettings";
-import { collection, query, where, onSnapshot, limit } from "firebase/firestore";
+import { where, onSnapshot, limit } from "firebase/firestore";
+import { scopedQuery } from "@/lib/scopedQuery";
 import { subscribeEnrollments } from "@/lib/enrollmentQuery";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -41,9 +41,7 @@ const TestsPage = () => {
       const allTests: any[] = [];
       let resolved = 0;
       chunks.forEach(chunk => {
-        const q = schoolId
-          ? query(collection(db, "tests"), where("schoolId", "==", schoolId), where("classId", "in", chunk))
-          : query(collection(db, "tests"), where("classId", "in", chunk));
+        const q = scopedQuery("tests", schoolId, where("classId", "in", chunk));
         const unsub = onSnapshot(q, (snap) => {
           snap.docs.forEach(d => {
             const idx = allTests.findIndex(t => t.id === d.id);
@@ -71,9 +69,7 @@ const TestsPage = () => {
     });
 
     // test_scores — single scoped query
-    const scoresQ = schoolId
-      ? query(collection(db, "test_scores"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id), limit(20))
-      : query(collection(db, "test_scores"), where("studentId", "==", studentData.id), limit(20));
+    const scoresQ = scopedQuery("test_scores", schoolId, where("studentId", "==", studentData.id), limit(20));
 
     const unsubScores = onSnapshot(scoresQ, (snap) => {
       const scores = snap.docs

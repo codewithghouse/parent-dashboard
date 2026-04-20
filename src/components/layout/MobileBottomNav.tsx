@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useLocation, Link } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
-import { db } from "@/lib/firebase";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { scopedQuery } from "@/lib/scopedQuery";
+import { onSnapshot, where } from "firebase/firestore";
 
 interface MobileBottomNavProps {
   onMenuClick?: () => void;
@@ -68,9 +68,7 @@ export const MobileBottomNav = (_props: MobileBottomNavProps) => {
   useEffect(() => {
     if (!studentData?.id) return;
     const schoolId = studentData.schoolId;
-    const q = schoolId
-      ? query(collection(db, "risks"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id))
-      : query(collection(db, "risks"), where("studentId", "==", studentData.id));
+    const q = scopedQuery("risks", schoolId, where("studentId", "==", studentData.id));
     const u = onSnapshot(q, snap => {
       setAlertsCount(snap.size);
     }, () => setAlertsCount(0));

@@ -4,8 +4,8 @@ import {
   FileCheck, Clock, ArrowRightCircle, Sparkles, GraduationCap, ShieldCheck, CheckCircle2
 } from "lucide-react";
 import { useAuth } from "../lib/AuthContext";
-import { db } from "../lib/firebase";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { scopedQuery } from "../lib/scopedQuery";
+import { where, onSnapshot } from "firebase/firestore";
 import { toast } from "sonner";
 import * as XLSX from 'xlsx';
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -24,9 +24,7 @@ const ReportsPage = () => {
     const schoolId = studentData.schoolId;
 
     // Single scoped query — "all" grade-level reports + personal reports
-    const reportsQ = schoolId
-      ? query(collection(db, "reports"), where("schoolId", "==", schoolId), where("studentId", "in", [studentData.id, "all"]))
-      : query(collection(db, "reports"), where("studentId", "in", [studentData.id, "all"]));
+    const reportsQ = scopedQuery("reports", schoolId, where("studentId", "in", [studentData.id, "all"]));
 
     const unsub = onSnapshot(reportsQ, (snap) => {
       const filtered = snap.docs

@@ -4,6 +4,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { db } from "@/lib/firebase";
+import { openSafeExternalUrl } from "@/lib/safeExternalUrl";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -97,8 +98,9 @@ const SyllabusPage = () => {
   }, [docs, searchQuery]);
 
   const handleView = (url: string) => {
-    if (!url) return;
-    window.open(url, "_blank", "noopener,noreferrer");
+    if (!openSafeExternalUrl(url)) {
+      console.warn("[Syllabus] Refused to open non-https/blob URL");
+    }
   };
 
   /* ═══════════════════════════════════════════════════════════════

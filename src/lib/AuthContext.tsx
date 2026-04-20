@@ -10,7 +10,7 @@ import {
 } from 'firebase/auth';
 import { auth, db } from './firebase';
 import { collection, query, where, getDocs, updateDoc, doc, onSnapshot, getDoc } from 'firebase/firestore';
-import { syncClaimsAndRefreshToken } from './syncClaims';
+import { syncClaimsAndRefreshToken, SyncClaimsTransientError } from './syncClaims';
 import { isIOSStandalone } from './platform';
 
 interface AuthContextType {
@@ -40,7 +40,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .then((result) => {
         if (result?.user) {
           // onAuthStateChanged will fire next; nothing to do here.
-          console.info('[Auth] Redirect sign-in resolved for', result.user.email);
+          // Do NOT log the email — this runs in production consoles too.
+          console.info('[Auth] Redirect sign-in resolved');
         }
       })
       .catch((err) => {
@@ -85,19 +86,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // across schools (Admin SDK bypasses rules) and returns the chosen
           // schoolId. We then filter our client-side query by that schoolId so
           // Firestore rules accept it.
-          const synced = await syncClaimsAndRefreshToken(currentUser);
+          //
+          // `syncClaimsAndRefreshToken` retries internally on transient network
+          // / function errors and throws `SyncClaimsTransientError` only after
+          // all retries fail. A successful call that returns `{ schoolId: null }`
+          // means the user genuinely isn't enrolled — that's a different state
+          // and must NOT be treated the same as a transient failure, because
+          // forcing a signout on a 300ms network blip would be painful on 400
+          // schools × thousands of parents.
+          let synced: Awaited<ReturnType<typeof syncClaimsAndRefreshToken>> = null;
+          try {
+            synced = await syncClaimsAndRefreshToken(currentUser);
+          } catch (err) {
+            if (err instanceof SyncClaimsTransientError) {
+              // Keep the user signed in — they can retry by refreshing — but
+              // surface the failure so they aren't stuck on a silent spinner.
+              console.error("[Auth] Claim sync failed after retries:", err.cause || err);
+              setError("We couldn't verify your account right now. Please check your connection and try again.");
+              setLoading(false);
+              return;
+            }
+            throw err;
+          }
           const claimSchoolId = synced?.schoolId || null;
 
-          // Whitelist Check for Students/Parents — must filter by schoolId
-          // so the list query passes the `inSameSchool()` rule.
+          // HARD GATE: call succeeded but user has no schoolId → genuinely not
+          // enrolled (or not yet onboarded by their school). Signing out here is
+          // the right move because any subsequent query would hit the new
+          // claims-based Firestore rules and silently fail.
+          if (!claimSchoolId) {
+            await signOut(auth);
+            setUser(null);
+            setStudentData(null);
+            setError("Your account isn't linked to a school yet. Please contact your school administration.");
+            setLoading(false);
+            return;
+          }
+
+          // Whitelist Check for Students/Parents — filter by schoolId so the
+          // list query passes the `inSameSchool()` rule.
           const lowerEmail = currentUser.email.toLowerCase();
-          const q = claimSchoolId
-            ? query(
-                collection(db, "students"),
-                where("schoolId", "==", claimSchoolId),
-                where("email", "==", lowerEmail),
-              )
-            : query(collection(db, "students"), where("email", "==", lowerEmail));
+          const q = query(
+            collection(db, "students"),
+            where("schoolId", "==", claimSchoolId),
+            where("email", "==", lowerEmail),
+          );
           const querySnapshot = await getDocs(q);
 
           if (!querySnapshot.empty) {
@@ -236,7 +269,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    localStorage.removeItem("parent_ai_persistent_cache_v3");
+    // Clear EVERY per-user key so the next user on a shared device does not
+    // inherit dismissed alerts, AI caches, or any other scoped state. We err
+    // on the side of nuking well-known prefixes rather than relying on an
+    // exhaustive list — new caches added later would otherwise leak silently.
+    try {
+      const prefixes = [
+        "parent_ai_",
+        "dismissed_alerts_",
+        "weekly_report_",
+        "parent_cache_",
+      ];
+      const toRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && prefixes.some((p) => key.startsWith(p))) toRemove.push(key);
+      }
+      toRemove.forEach((k) => localStorage.removeItem(k));
+    } catch {
+      // localStorage may be unavailable in private-mode / storage-quota cases.
+      // Not fatal — proceed with sign-out.
+    }
     await signOut(auth);
   };
 

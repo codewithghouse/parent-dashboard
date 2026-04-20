@@ -211,6 +211,13 @@ const DashboardPage = () => {
         ? query(collection(db, collName), where("schoolId", "==", schoolId), where(field, "==", value))
         : query(collection(db, collName), where(field, "==", value));
 
+    // Shared error handler — all listeners below route here so a rule rejection
+    // or network blip can't leave the UI stuck in an indeterminate state.
+    const onListenerError = (label: string) => (err: Error) => {
+      console.error(`[Dashboard] ${label} listener error:`, err);
+      setDataLoading(false);
+    };
+
     // 1. Attendance — single listener (was 2)
     const u1 = onSnapshot(sq("attendance"), snap => {
       const records = snap.docs.map(d => d.data());
@@ -222,7 +229,7 @@ const DashboardPage = () => {
       const present = records.filter((r: any) => r.status === "present" || r.status === "late").length;
       const pct = Math.round((present / records.length) * 100);
       setLiveStats(prev => ({ ...prev, attendance: pct, hasAttendanceData: true }));
-    });
+    }, onListenerError("attendance"));
 
     // 2. Enrollments → assignments + tests (single listener, was 2 + unbounded classIds)
     let enSnap: any = null;
@@ -350,8 +357,8 @@ const DashboardPage = () => {
         hasScoreData: true,
       }));
     };
-    const u3 = onSnapshot(sq("results"), s => { rSnap = s; processResults(); });
-    const u4 = onSnapshot(sq("gradebook_scores"), s => { gSnap = s; processResults(); });
+    const u3 = onSnapshot(sq("results"), s => { rSnap = s; processResults(); }, onListenerError("results"));
+    const u4 = onSnapshot(sq("gradebook_scores"), s => { gSnap = s; processResults(); }, onListenerError("gradebook_scores"));
 
     // 4. Risks — single listener (was 2)
     const u5 = onSnapshot(sq("risks"), snap => {
@@ -359,7 +366,7 @@ const DashboardPage = () => {
         .map(d => ({ id: d.id, ...d.data() as any }))
         .sort((a, b) => (b.timestamp?.toDate()?.getTime() || 0) - (a.timestamp?.toDate()?.getTime() || 0));
       setRecentAlerts(unique.slice(0, 3).map(d => ({ id: d.id, title: d.issue, time: d.timestamp?.toDate() || new Date(), urgent: d.severity === "Critical" })));
-    });
+    }, onListenerError("risks"));
 
     return () => [u1, u2, u3, u4, u5].forEach(u => u());
   }, [studentData?.id, studentData?.schoolId]);

@@ -5,8 +5,9 @@ import {
   Phone, MoreVertical, Clock, Sparkles, Bell,
 } from "lucide-react";
 import { db } from "../lib/firebase";
+import { scopedQuery } from "../lib/scopedQuery";
 import {
-  collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs,
+  collection, where, onSnapshot, addDoc, serverTimestamp, getDocs,
   updateDoc, doc
 } from "firebase/firestore";
 import { useAuth } from "../lib/AuthContext";
@@ -42,15 +43,17 @@ const TeacherNotesPage = () => {
     const schoolId = studentData.schoolId;
 
     // Single scoped query — prevents cross-school data access
-    const q = schoolId
-      ? query(collection(db, "parent_notes"), where("schoolId", "==", schoolId), where("studentId", "==", sId))
-      : query(collection(db, "parent_notes"), where("studentId", "==", sId));
+    const q = scopedQuery("parent_notes", schoolId, where("studentId", "==", sId));
 
     const u1 = onSnapshot(q, snap => {
       const data = snap.docs
         .map((d: any) => ({ id: d.id, ...d.data() }))
         .sort((a: any, b: any) => (a.createdAt?.toMillis?.() || 0) - (b.createdAt?.toMillis?.() || 0));
       setAllNotes(data);
+      setLoading(false);
+    }, (err) => {
+      console.error("[TeacherNotes] listener error:", err);
+      setAllNotes([]);
       setLoading(false);
     });
     return () => u1();
@@ -59,17 +62,24 @@ const TeacherNotesPage = () => {
   // Fetch available teachers for "New Message"
   useEffect(() => {
     if (!studentData?.classId) return;
+    const schoolId = studentData.schoolId;
     const fetchTeachers = async () => {
       try {
-        const snap = await getDocs(query(collection(db, "teaching_assignments"), where("classId", "==", studentData.classId)));
+        const taQ = scopedQuery("teaching_assignments", schoolId, where("classId", "==", studentData.classId));
+        const snap = await getDocs(taQ);
         const ids  = snap.docs.map(d => d.data().teacherId).filter(Boolean);
         if (!ids.length) return;
-        const tSnap = await getDocs(query(collection(db, "teachers"), where("__name__", "in", ids.slice(0, 10))));
+        const tQ = scopedQuery("teachers", schoolId, where("__name__", "in", ids.slice(0, 10)));
+        const tSnap = await getDocs(tQ);
         setAvailableTeachers(tSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      } catch { /* silent */ }
+      } catch (err) {
+        // Don't silently hide a permission-denied — support needs the signal
+        // to debug "New Message" button showing an empty teachers list.
+        console.error("[TeacherNotes] available-teachers fetch error:", err);
+      }
     };
     fetchTeachers();
-  }, [studentData?.classId]);
+  }, [studentData?.classId, studentData?.schoolId]);
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [allNotes, selectedTeacher]);
 
@@ -159,9 +169,11 @@ const TeacherNotesPage = () => {
       });
     } catch (err: any) {
       console.error("[TeacherNotes] send failed:", err?.code, err?.message || err);
+      // Preserve the drafted content so the parent can retry without re-typing,
+      // and translate Firebase error codes into actionable, non-jargon copy.
       toast.error(err?.code === "permission-denied"
-        ? "Send blocked by server rules — contact admin."
-        : `Failed to send: ${err?.message || "unknown error"}`);
+        ? "This message couldn't be sent. Please contact your school if this continues."
+        : "Couldn't send the message. Please check your connection and try again.");
       setMessageContent(content);
     }
   };

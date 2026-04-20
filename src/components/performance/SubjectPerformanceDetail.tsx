@@ -2,6 +2,7 @@ import {
   ArrowLeft, BookOpen, PlayCircle, Star, User,
   Calculator, FlaskConical, Globe, Monitor, Palette, Languages, FileText
 } from "lucide-react";
+import { openSafeExternalUrl } from "@/lib/safeExternalUrl";
 
 interface Topic { name: string; score: number; }
 interface TestScore { name: string; date: string; score: string; status: "success" | "warning" | "error"; }
@@ -141,7 +142,7 @@ export const SubjectPerformanceDetail = ({ subject, teacher, grade, average, top
               return (
                 <div
                   key={i}
-                  onClick={() => res.url && res.url !== "#" && window.open(res.url, "_blank")}
+                  onClick={() => res.url && res.url !== "#" && openSafeExternalUrl(res.url)}
                   className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 cursor-pointer transition-all group"
                 >
                   <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center flex-shrink-0`}>

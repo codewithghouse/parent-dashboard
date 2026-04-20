@@ -5,8 +5,9 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { ParentAIController } from "../ai/controller/ai-controller";
 import { db } from "../lib/firebase";
 import {
-  collection, query, where, onSnapshot, addDoc, serverTimestamp,
+  collection, where, onSnapshot, addDoc, serverTimestamp,
 } from "firebase/firestore";
+import { scopedQuery } from "../lib/scopedQuery";
 import { toast } from "sonner";
 import * as pdfjsLib from "pdfjs-dist";
 
@@ -147,13 +148,11 @@ const AIPracticePage = () => {
   // ── Firebase listeners ──────────────────────────────────────────────────
   useEffect(() => {
     if (!studentId) return;
+    const schoolId = studentData?.schoolId;
 
     // Attempts (for calendar + history)
     // No orderBy — avoids composite index requirement. Sort client-side.
-    const qAttempts = query(
-      collection(db, "practice_attempts"),
-      where("studentId", "==", studentId),
-    );
+    const qAttempts = scopedQuery("practice_attempts", schoolId, where("studentId", "==", studentId));
     const unsub1 = onSnapshot(qAttempts, snap => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() as any }));
       // Sort client-side (newest first)
@@ -173,10 +172,7 @@ const AIPracticePage = () => {
 
     // Documents (uploaded syllabi)
     // No orderBy — avoids composite index requirement. Sort client-side.
-    const qDocs = query(
-      collection(db, "practice_documents"),
-      where("studentId", "==", studentId),
-    );
+    const qDocs = scopedQuery("practice_documents", schoolId, where("studentId", "==", studentId));
     const unsub2 = onSnapshot(qDocs, snap => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() as any }));
       docs.sort((a, b) => (b.uploadedAt?.toMillis?.() || 0) - (a.uploadedAt?.toMillis?.() || 0));
@@ -186,7 +182,7 @@ const AIPracticePage = () => {
     });
 
     return () => { unsub1(); unsub2(); };
-  }, [studentId]);
+  }, [studentId, studentData?.schoolId]);
 
   // Timer
   useEffect(() => {
@@ -218,6 +214,13 @@ const AIPracticePage = () => {
   const handleFileUpload = async (f: File) => {
     if (f.type !== "application/pdf") { toast.error("Only PDF files are supported."); return; }
     if (f.size > 20 * 1024 * 1024) { toast.error("File must be under 20 MB."); return; }
+    // Without a resolved schoolId the addDoc below would be rejected by the
+    // tenant-isolation rule AFTER a slow PDF extraction. Bail out early with
+    // an honest, actionable message.
+    if (!studentData?.schoolId) {
+      toast.error("Your school context is missing. Please sign in again.");
+      return;
+    }
     setFile(f);
     setExtracting(true);
     try {
@@ -236,6 +239,7 @@ const AIPracticePage = () => {
       // Save document to Firebase
       await addDoc(collection(db, "practice_documents"), {
         studentId, fileName: f.name, fileSize: f.size,
+        schoolId: studentData.schoolId,
         extractedText: text.slice(0, 50000), // limit storage
         extractedTopics: topics,
         pageCount: pages,
@@ -243,9 +247,12 @@ const AIPracticePage = () => {
       });
 
       setView("configure");
-    } catch (e) {
-      console.error(e);
-      toast.error("Could not read PDF. Try a different file.");
+    } catch (e: any) {
+      console.error("[AIPractice] PDF upload failed:", e?.code, e?.message || e);
+      const msg = e?.code === "permission-denied"
+        ? "Upload was blocked. Please sign in again and retry."
+        : "Couldn't read that PDF. Please try a different file.";
+      toast.error(msg);
     }
     setExtracting(false);
   };
@@ -298,23 +305,38 @@ const AIPracticePage = () => {
       });
       const evalData = res.data || { score: 0, total: questions.length, percentage: 0, grade: "-", evaluations: [], weakTopics: [], encouragement: "" };
 
-      // Save attempt to Firebase
-      await addDoc(collection(db, "practice_attempts"), {
-        studentId, studentName,
-        examTitle, topic, difficulty, questionType,
-        questionCount: questions.length,
-        questions, answers,
-        score: evalData.score, total: evalData.total,
-        percentage: evalData.percentage, grade: evalData.grade,
-        evaluations: evalData.evaluations || [],
-        weakTopics: evalData.weakTopics || [],
-        timeTaken: timeLimit > 0 ? (timeLimit * 60 - timerSec) : 0,
-        submittedAt: serverTimestamp(),
-      });
+      // Save attempt to Firebase — only if we have a schoolId. Without it the
+      // write is silently rejected by the tenant-isolation rule; the student
+      // sees their score on screen but nothing is persisted.
+      if (studentData?.schoolId) {
+        await addDoc(collection(db, "practice_attempts"), {
+          studentId, studentName,
+          schoolId: studentData.schoolId,
+          examTitle, topic, difficulty, questionType,
+          questionCount: questions.length,
+          questions, answers,
+          score: evalData.score, total: evalData.total,
+          percentage: evalData.percentage, grade: evalData.grade,
+          evaluations: evalData.evaluations || [],
+          weakTopics: evalData.weakTopics || [],
+          timeTaken: timeLimit > 0 ? (timeLimit * 60 - timerSec) : 0,
+          submittedAt: serverTimestamp(),
+        });
+      } else {
+        console.warn("[AIPractice] attempt NOT saved — missing schoolId. Result shown locally only.");
+        toast.error("Couldn't save your attempt. Please sign in again.");
+      }
 
       setResult(evalData);
-    } catch {
-      setResult({ score: 0, total: questions.length, percentage: 0, grade: "-", evaluations: [], weakTopics: [], encouragement: "Evaluation failed. Your attempt was saved." });
+    } catch (err: any) {
+      console.error("[AIPractice] submit exam failed:", err?.code, err?.message || err);
+      // Previous copy lied — said "Your attempt was saved" after an exception
+      // that could have been the save itself failing. Be honest.
+      setResult({
+        score: 0, total: questions.length, percentage: 0, grade: "-",
+        evaluations: [], weakTopics: [],
+        encouragement: "We couldn't evaluate your attempt just now. Please retry.",
+      });
     }
     setEvaluating(false);
   };

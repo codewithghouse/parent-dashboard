@@ -3,8 +3,8 @@ import { CheckCircle, XCircle, Clock, ChevronLeft, ChevronRight, Loader2, Calend
 import { useAuth } from "@/lib/AuthContext";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useSchoolSettings } from "@/hooks/useSchoolSettings";
-import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { scopedQuery } from "@/lib/scopedQuery";
+import { where, onSnapshot } from "firebase/firestore";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 type DayStatus = "present" | "absent" | "late" | "weekend" | "forgotten" | "empty";
@@ -61,9 +61,7 @@ const AttendancePage = () => {
       : `${now.getFullYear() - 1}-06-01`;
 
     // Single query scoped to this school + current academic year — prevents cross-school reads
-    const q = schoolId
-      ? query(collection(db, "attendance"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id), where("date", ">=", yearStart))
-      : query(collection(db, "attendance"), where("studentId", "==", studentData.id), where("date", ">=", yearStart));
+    const q = scopedQuery("attendance", schoolId, where("studentId", "==", studentData.id), where("date", ">=", yearStart));
     const u1 = onSnapshot(q, s => processLogs(s));
     return () => { u1(); };
   }, [studentData?.id, studentData?.schoolId]);

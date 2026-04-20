@@ -9,9 +9,10 @@ import { useAuth } from "@/lib/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { db } from "@/lib/firebase";
+import { scopedQuery } from "@/lib/scopedQuery";
 import { subscribeEnrollments } from "@/lib/enrollmentQuery";
 import {
-  collection, query, where, onSnapshot,
+  where, onSnapshot,
   doc, updateDoc
 } from "firebase/firestore";
 import { toast } from "sonner";
@@ -67,15 +68,23 @@ const AlertsPage = () => {
 
     const done = () => { loaded++; if (loaded >= total) setLoading(false); };
 
-    // Single scoped query helper — one listener per collection, filtered by schoolId when available
+    // Single scoped query helper — one listener per collection, filtered by schoolId when available.
+    // `done()` runs on both success and error so the spinner is never stuck when one
+    // source returns permission-denied (rule rejection does not progress the counter otherwise).
     const scopedSnap = (collName: string, setter: (docs: any[]) => void) => {
-      const q = schoolId
-        ? query(collection(db, collName), where("schoolId", "==", schoolId), where("studentId", "==", sid))
-        : query(collection(db, collName), where("studentId", "==", sid));
-      const u = onSnapshot(q, snap => {
-        setter(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        done();
-      });
+      const q = scopedQuery(collName, schoolId, where("studentId", "==", sid));
+      const u = onSnapshot(
+        q,
+        snap => {
+          setter(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+          done();
+        },
+        (err) => {
+          console.error(`[Alerts] ${collName} listener error:`, err);
+          setter([]);
+          done();
+        },
+      );
       unsubs.push(u);
     };
 
@@ -98,15 +107,16 @@ const AlertsPage = () => {
       [...ts, ...gb].forEach(d => { if (!all.has(d.id)) all.set(d.id, d); });
       setScores(Array.from(all.values()));
     };
-    const tsQ = schoolId
-      ? query(collection(db, "test_scores"), where("schoolId", "==", schoolId), where("studentId", "==", sid))
-      : query(collection(db, "test_scores"), where("studentId", "==", sid));
-    const gbQ = schoolId
-      ? query(collection(db, "gradebook_scores"), where("schoolId", "==", schoolId), where("studentId", "==", sid))
-      : query(collection(db, "gradebook_scores"), where("studentId", "==", sid));
+    const tsQ = scopedQuery("test_scores", schoolId, where("studentId", "==", sid));
+    const gbQ = scopedQuery("gradebook_scores", schoolId, where("studentId", "==", sid));
     unsubs.push(
-      onSnapshot(tsQ, s => { tsSnap = s; processScores(); done(); }),
-      onSnapshot(gbQ, s => { gbSnap = s; processScores(); })
+      onSnapshot(tsQ, s => { tsSnap = s; processScores(); done(); }, (err) => {
+        console.error("[Alerts] test_scores listener error:", err);
+        done();
+      }),
+      onSnapshot(gbQ, s => { gbSnap = s; processScores(); }, (err) => {
+        console.error("[Alerts] gradebook_scores listener error:", err);
+      })
     );
 
     // 4. parent_notes
@@ -133,12 +143,12 @@ const AlertsPage = () => {
 
       const allAssignments: Map<string, any> = new Map();
       chunks.forEach(chunk => {
-        const q = schoolId
-          ? query(collection(db, "assignments"), where("schoolId", "==", schoolId), where("classId", "in", chunk))
-          : query(collection(db, "assignments"), where("classId", "in", chunk));
+        const q = scopedQuery("assignments", schoolId, where("classId", "in", chunk));
         const u = onSnapshot(q, snap => {
           snap.docs.forEach(d => allAssignments.set(d.id, { id: d.id, ...d.data() }));
           setAssignments(Array.from(allAssignments.values()));
+        }, (err) => {
+          console.error("[Alerts] assignments chunk listener error:", err);
         });
         assignUnsubs.push(u);
       });

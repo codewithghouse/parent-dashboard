@@ -145,6 +145,11 @@ const ConceptStrengthsPage = () => {
     let snap1Cache: any = null, snap2Cache: any = null;
     let assignUnsub: (() => void) | null = null;
 
+    const onListenerError = (label: string) => (err: Error) => {
+      console.error(`[ConceptStrengths] ${label} listener error:`, err);
+      setLoading(false);
+    };
+
     const subscribeAssignments = (classIds: string[]) => {
       if (assignUnsub) { assignUnsub(); assignUnsub = null; }
       if (classIds.length === 0) { setLoading(false); return; }
@@ -154,7 +159,8 @@ const ConceptStrengthsPage = () => {
           where("schoolId", "==", schoolId),
           where("classId", "in", classIds.slice(0, 10)),
         ),
-        (snap) => { setAssignments(snap.docs.map(d => ({ id: d.id, ...d.data() } as any))); setLoading(false); }
+        (snap) => { setAssignments(snap.docs.map(d => ({ id: d.id, ...d.data() } as any))); setLoading(false); },
+        onListenerError("assignments"),
       );
     };
 
@@ -172,8 +178,8 @@ const ConceptStrengthsPage = () => {
       subscribeAssignments(classIds);
     };
 
-    const u1 = onSnapshot(query(collection(db, "enrollments"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id)), s => { snap1Cache = s; mergeEnrollments(); });
-    const u2 = studentEmail ? onSnapshot(query(collection(db, "enrollments"), where("schoolId", "==", schoolId), where("studentEmail", "==", studentEmail)), s => { snap2Cache = s; mergeEnrollments(); }) : () => {};
+    const u1 = onSnapshot(query(collection(db, "enrollments"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id)), s => { snap1Cache = s; mergeEnrollments(); }, onListenerError("enrollments (by id)"));
+    const u2 = studentEmail ? onSnapshot(query(collection(db, "enrollments"), where("schoolId", "==", schoolId), where("studentEmail", "==", studentEmail)), s => { snap2Cache = s; mergeEnrollments(); }, onListenerError("enrollments (by email)")) : () => {};
 
     let s1: any = null, s2: any = null, g1: any = null, g2: any = null;
     const processScores = () => {
@@ -185,15 +191,15 @@ const ConceptStrengthsPage = () => {
       setAllScores(Array.from(new Map([...combined, ...gb].map(d => [d.id, d])).values()));
     };
 
-    const u3 = onSnapshot(query(collection(db, "test_scores"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id)), snap => { s1 = snap; processScores(); });
-    const u4 = studentEmail ? onSnapshot(query(collection(db, "test_scores"), where("schoolId", "==", schoolId), where("studentEmail", "==", studentEmail)), snap => { s2 = snap; processScores(); }) : () => {};
-    const u5 = onSnapshot(query(collection(db, "gradebook_scores"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id)), snap => { g1 = snap; processScores(); });
-    const u6 = studentEmail ? onSnapshot(query(collection(db, "gradebook_scores"), where("schoolId", "==", schoolId), where("studentEmail", "==", studentEmail)), snap => { g2 = snap; processScores(); }) : () => {};
+    const u3 = onSnapshot(query(collection(db, "test_scores"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id)), snap => { s1 = snap; processScores(); }, onListenerError("test_scores (by id)"));
+    const u4 = studentEmail ? onSnapshot(query(collection(db, "test_scores"), where("schoolId", "==", schoolId), where("studentEmail", "==", studentEmail)), snap => { s2 = snap; processScores(); }, onListenerError("test_scores (by email)")) : () => {};
+    const u5 = onSnapshot(query(collection(db, "gradebook_scores"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id)), snap => { g1 = snap; processScores(); }, onListenerError("gradebook_scores (by id)"));
+    const u6 = studentEmail ? onSnapshot(query(collection(db, "gradebook_scores"), where("schoolId", "==", schoolId), where("studentEmail", "==", studentEmail)), snap => { g2 = snap; processScores(); }, onListenerError("gradebook_scores (by email)")) : () => {};
 
     let a1: any = null, a2: any = null;
     const processAtt = () => setAttendance(Array.from(new Map([...(a1?.docs || []), ...(a2?.docs || [])].map(d => [d.id, { id: d.id, ...d.data() as any }])).values()));
-    const u7 = onSnapshot(query(collection(db, "attendance"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id)), snap => { a1 = snap; processAtt(); });
-    const u8 = studentEmail ? onSnapshot(query(collection(db, "attendance"), where("schoolId", "==", schoolId), where("studentEmail", "==", studentEmail)), snap => { a2 = snap; processAtt(); }) : () => {};
+    const u7 = onSnapshot(query(collection(db, "attendance"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id)), snap => { a1 = snap; processAtt(); }, onListenerError("attendance (by id)"));
+    const u8 = studentEmail ? onSnapshot(query(collection(db, "attendance"), where("schoolId", "==", schoolId), where("studentEmail", "==", studentEmail)), snap => { a2 = snap; processAtt(); }, onListenerError("attendance (by email)")) : () => {};
 
     return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); if (assignUnsub) assignUnsub(); };
   }, [studentData?.id, studentData?.schoolId]);

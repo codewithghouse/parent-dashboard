@@ -5,8 +5,8 @@ import {
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useAuth } from "@/lib/AuthContext";
-import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, limit } from "firebase/firestore";
+import { scopedQuery } from "@/lib/scopedQuery";
+import { where, onSnapshot, limit } from "firebase/firestore";
 import { subscribeEnrollments } from "@/lib/enrollmentQuery";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -30,14 +30,16 @@ export default function BehaviourPage() {
     });
 
     // 2. Behavioural notes — single scoped query
-    const notesQ = schoolId
-      ? query(collection(db, "parent_notes"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id), limit(40))
-      : query(collection(db, "parent_notes"), where("studentId", "==", studentData.id), limit(40));
+    const notesQ = scopedQuery("parent_notes", schoolId, where("studentId", "==", studentData.id), limit(40));
     const unsubNotes = onSnapshot(notesQ, (snap) => {
       const notes = snap.docs
         .map(d => ({ id: d.id, ...d.data() as any }))
         .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
       setTeacherNotes(notes);
+      setLoading(false);
+    }, (err) => {
+      console.error("[Behaviour] notes listener error:", err);
+      setTeacherNotes([]);
       setLoading(false);
     });
 
@@ -79,10 +81,19 @@ export default function BehaviourPage() {
      return 'Recent';
   };
 
-  const calculatedRating = teacherNotes.length === 0 ? 5.0 : 
-    Math.min(5.0, Math.max(1.0, 5.0 - (improvementNotes.length * 0.3) + (positiveNotes.length * 0.1)));
+  // Do NOT default the rating to 5.0 when there are zero notes — a brand-new
+  // student would then render "Excellent" on day one, which misrepresents the
+  // system to parents. When we have no signal, expose that explicitly as null
+  // so the UI can render an empty state instead of a healthy-looking score.
+  const hasBehaviourSignal = teacherNotes.length > 0 || manualRating !== null;
+  const calculatedRating = teacherNotes.length === 0
+    ? null
+    : Math.min(5.0, Math.max(1.0, 5.0 - (improvementNotes.length * 0.3) + (positiveNotes.length * 0.1)));
 
-  const rating = manualRating !== null ? manualRating.toFixed(1) : calculatedRating.toFixed(1);
+  const ratingNum: number | null = manualRating !== null
+    ? manualRating
+    : calculatedRating;
+  const rating = ratingNum !== null ? ratingNum.toFixed(1) : "—";
 
   // Generate dynamic chart data from joining date to now
   const getTrendData = () => {
@@ -129,16 +140,20 @@ export default function BehaviourPage() {
     });
 
     return Object.values(months).map((data: any) => {
-       const isCurrentMonth = data.m === now.toLocaleString('default', { month: 'short' }) && 
+       const isCurrentMonth = data.m === now.toLocaleString('default', { month: 'short' }) &&
                              data.date?.getFullYear() === now.getFullYear();
-       
-       const calculatedScore = data.count === 0 ? 5.0 : 
-          Math.min(5.0, Math.max(1.0, 5.0 - (data.improv * 0.3) + (data.pos * 0.1)));
+
+       // Don't synthesise a flat 5.0 for empty months — recharts will drop nulls
+       // from the line instead of painting a misleading "excellent" streak for
+       // brand-new students.
+       const calculatedScore: number | null = data.count === 0
+         ? null
+         : Math.min(5.0, Math.max(1.0, 5.0 - (data.improv * 0.3) + (data.pos * 0.1)));
 
        return {
           m: data.m,
           key: data.key,
-          score: isCurrentMonth && manualRating !== null ? manualRating : calculatedScore
+          score: isCurrentMonth && manualRating !== null ? manualRating : calculatedScore,
        };
     });
   };
@@ -179,19 +194,25 @@ export default function BehaviourPage() {
     const SH = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.08), 0 10px 26px rgba(0,85,255,0.10)";
     const SH_LG = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.11), 0 18px 44px rgba(0,85,255,0.13)";
 
-    const rateNum = parseFloat(rating);
+    // Use the typed rating number (null when no data) rather than parseFloat
+    // of the display string — that path turned "—" into NaN and silently
+    // painted every sub-metric with junk values.
+    const rateNum = ratingNum ?? 0;
+    const incidents = improvementNotes.length;
 
-    // Derive sub-metrics from available data
-    const conductGrade =
+    // Derive sub-metrics from available data. When there's no behaviour
+    // signal at all, surface "—" instead of fabricating grades / percentages.
+    const conductGrade = !hasBehaviourSignal ? "—" :
       rateNum >= 4.8 ? "A+" :
       rateNum >= 4.5 ? "A"  :
       rateNum >= 4.0 ? "B+" :
       rateNum >= 3.5 ? "B"  :
       rateNum >= 3.0 ? "C"  : "D";
-    const incidents = improvementNotes.length;
-    const punctualityPct = Math.max(0, Math.round(100 - incidents * 8));
-    const respectScore = rateNum.toFixed(1);
-    const participationScore = (Math.max(1, Math.min(5, rateNum - (incidents ? 0.2 : 0) + (positiveNotes.length ? 0.1 : 0)))).toFixed(1);
+    const punctualityPct = !hasBehaviourSignal ? null : Math.max(0, Math.round(100 - incidents * 8));
+    const respectScore = !hasBehaviourSignal ? "—" : rateNum.toFixed(1);
+    const participationScore = !hasBehaviourSignal
+      ? "—"
+      : (Math.max(1, Math.min(5, rateNum - (incidents ? 0.2 : 0) + (positiveNotes.length ? 0.1 : 0)))).toFixed(1);
 
     // Trend delta arrow direction
     const lastTwo = trendData.slice(-2);

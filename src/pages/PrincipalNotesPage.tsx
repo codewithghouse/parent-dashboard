@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Loader2, Send, CheckCheck, School, Mail, MessageSquare, Smile, Shield, ChevronLeft } from "lucide-react";
 import { db } from "../lib/firebase";
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, updateDoc, doc } from "firebase/firestore";
+import { scopedQuery } from "../lib/scopedQuery";
+import { collection, where, onSnapshot, addDoc, serverTimestamp, updateDoc, doc } from "firebase/firestore";
 import { useAuth } from "../lib/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useNavigate } from "react-router-dom";
@@ -20,9 +21,7 @@ const PrincipalNotesPage = () => {
     if (!studentData?.id) return;
     setLoading(true);
     const schoolId = studentData.schoolId;
-    const notesQ = schoolId
-      ? query(collection(db, "principal_to_parent_notes"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id))
-      : query(collection(db, "principal_to_parent_notes"), where("studentId", "==", studentData.id));
+    const notesQ = scopedQuery("principal_to_parent_notes", schoolId, where("studentId", "==", studentData.id));
     const unsub = onSnapshot(notesQ,
       async snap => {
         const data = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
@@ -52,15 +51,28 @@ const PrincipalNotesPage = () => {
     if (!messageContent.trim()) return;
     const content = messageContent.trim();
     if (!studentData?.schoolId) {
-      toast.error("Cannot send: missing school context. Please re-login.");
+      toast.error("Your school context is missing. Please sign in again.");
+      return;
+    }
+    if (!studentData.id) {
+      toast.error("We couldn't identify your student record. Please sign in again.");
+      return;
+    }
+    // Without a prior principal message in this thread we have no principalId
+    // to address. The server rule accepts the write but the note becomes
+    // unaddressable (principal's inbox query filters by principalId). Surface
+    // this explicitly instead of creating orphaned records.
+    const principalId = allMessages[0]?.principalId;
+    if (!principalId) {
+      toast.error("No principal is assigned to your school yet. Please check back later.");
       return;
     }
     setMessageContent("");
     try {
       await addDoc(collection(db, "principal_to_parent_notes"), {
-        principalId:   allMessages[0]?.principalId   || "",
+        principalId,
         principalName: allMessages[0]?.principalName || "Principal",
-        studentId:     studentData.id   || "",
+        studentId:     studentData.id,
         studentName:   studentData.name || "",
         parentName:    `Parent of ${studentData.name || "Student"}`,
         className:     studentData.className || "",
@@ -73,9 +85,12 @@ const PrincipalNotesPage = () => {
       });
     } catch (err: any) {
       console.error("[PrincipalNotes] send failed:", err?.code, err?.message || err);
+      // Keep the message content so the parent can retry. Never leak Firebase
+      // internals (rule names, deploy hints) to the UI — that jargon helps
+      // nobody and looks like a crash report to non-technical users.
       toast.error(err?.code === "permission-denied"
-        ? "Send blocked by server rules — deploy updated firestore.rules."
-        : `Failed to send: ${err?.message || "unknown error"}`);
+        ? "This message couldn't be sent. Please contact your school if this continues."
+        : "Couldn't send the message. Please check your connection and try again.");
       setMessageContent(content);
     }
   };
