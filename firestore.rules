@@ -482,9 +482,21 @@ service cloud.firestore {
     match /principal_to_parent_notes/{id} {
       allow get:  if signedIn() && inSameSchool();
       allow list: if signedIn();  // TEMPORARY PHASE-1: relaxed while client queries migrate. Re-tighten to inSameSchool() once all pages filter by schoolId.
-      allow create:    if signedIn() && hasSchoolId() && writingToOwnSchool() && hasAdminRole();
-      allow update:    if signedIn() && inSameSchool() && schoolIdImmutable() && hasAdminRole();
-      allow delete:    if signedIn() && inSameSchool() && hasAdminRole();
+      // Create: admin (principal/owner) can write any direction.
+      // Parent/student replies are allowed only when from == "parent".
+      allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && (
+                      hasAdminRole()
+                      || (claimRole() in ['parent', 'student']
+                          && request.resource.data.from == 'parent')
+                    );
+      // Update: admin can edit anything; parent/student may only flip the
+      // `read` flag on incoming principal messages (no other field changes).
+      allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && (
+                      hasAdminRole()
+                      || (claimRole() in ['parent', 'student']
+                          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']))
+                    );
+      allow delete: if signedIn() && inSameSchool() && hasAdminRole();
     }
     match /principal_to_teacher_notes/{id} {
       allow get:  if signedIn() && inSameSchool();

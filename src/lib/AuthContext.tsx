@@ -147,28 +147,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
+    // Force account chooser even when one Google account is already signed in
+    // on the device — otherwise iOS auto-picks an account that may not be
+    // whitelisted in our Firestore students collection.
+    provider.setCustomParameters({ prompt: 'select_account' });
+
+    setError(null);
+
+    // STRATEGY:
+    //   Popup-first on every platform (incl. iOS standalone — iOS 16.4+
+    //   supports popups inside installed PWAs and avoids the ITP/redirect
+    //   pitfalls that broke signInWithRedirect).
+    //   Fall back to redirect ONLY if the popup is blocked / unsupported,
+    //   which covers older iOS and stricter browsers.
     try {
-      setError(null);
-      // iOS standalone PWA blocks popups → must use redirect flow.
-      // Everywhere else we keep the popup so the user stays in-context.
-      if (isIOSStandalone()) {
-        await signInWithRedirect(auth, provider);
-        return; // page navigates away; resolution happens in getRedirectResult
-      }
       await signInWithPopup(auth, provider);
+      return;
     } catch (err: any) {
-      // Popup blocked / closed by user is non-fatal; let caller decide messaging.
-      // For other browsers that block popups we fall back to redirect.
-      if (err?.code === 'auth/popup-blocked' || err?.code === 'auth/operation-not-supported-in-this-environment') {
+      const code = err?.code as string | undefined;
+      console.warn('[Auth] popup sign-in failed, code=', code, 'msg=', err?.message);
+
+      // User explicitly cancelled — don't escalate, stay silent.
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        return;
+      }
+
+      // Popup couldn't even be opened (blocked, or the runtime doesn't
+      // support popups). Fall back to redirect (which is the only option
+      // on Android Chrome PWA + older iOS).
+      const popupUnsupported =
+        code === 'auth/popup-blocked' ||
+        code === 'auth/operation-not-supported-in-this-environment' ||
+        // iOS Safari sometimes throws this when the popup is killed mid-flow
+        code === 'auth/web-storage-unsupported' ||
+        // On iOS standalone, certain iOS versions throw this when the popup
+        // child window can't communicate back to the opener.
+        (isIOSStandalone() && code === 'auth/internal-error');
+
+      if (popupUnsupported) {
         try {
           await signInWithRedirect(auth, provider);
           return;
         } catch (redirectErr: any) {
-          setError(redirectErr.message);
+          console.error('[Auth] redirect fallback also failed:', redirectErr?.code, redirectErr?.message);
+          setError(`Sign-in failed (${redirectErr?.code || 'unknown'}). Please try again.`);
           throw redirectErr;
         }
       }
-      setError(err.message);
+
+      // Specific error codes → friendly messages
+      if (code === 'auth/unauthorized-domain') {
+        setError('This domain is not authorized in Firebase Console → Authentication → Settings → Authorized domains.');
+      } else if (code === 'auth/network-request-failed') {
+        setError('Network error. Check your connection and try again.');
+      } else {
+        setError(err?.message || `Sign-in failed (${code || 'unknown error'}).`);
+      }
       throw err;
     }
   };

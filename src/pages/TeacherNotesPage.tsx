@@ -132,20 +132,38 @@ const TeacherNotesPage = () => {
   const handleSend = async () => {
     if (!selectedTeacher || !messageContent.trim()) return;
     const content = messageContent.trim();
+    if (!studentData?.schoolId) {
+      toast.error("Cannot send: missing school context. Please re-login.");
+      return;
+    }
     setMessageContent("");
     try {
       await addDoc(collection(db, "parent_notes"), {
-        teacherId:   selectedTeacher.teacherId,
-        teacherName: selectedTeacher.teacherName,
-        studentId:   studentData?.id   || "",
-        studentEmail: studentData?.email?.toLowerCase() || "",
-        studentName: studentData?.name || "",
-        parentName:  `Parent of ${studentData?.name || "Student"}`,
-        subject:     selectedTeacher.subject || "",
-        content, from: "parent", status: "Sent",
-        createdAt: serverTimestamp(),
+        teacherId:    selectedTeacher.teacherId,
+        teacherName:  selectedTeacher.teacherName,
+        studentId:    studentData.id   || "",
+        studentEmail: studentData.email?.toLowerCase() || "",
+        studentName:  studentData.name || "",
+        parentName:   `Parent of ${studentData.name || "Student"}`,
+        subject:      selectedTeacher.subject || "",
+        // schoolId is REQUIRED by the parent_notes Firestore rule
+        // (hasSchoolId() && writingToOwnSchool()). Without it, addDoc
+        // is rejected as "Missing or insufficient permissions".
+        schoolId:     studentData.schoolId,
+        branchId:     studentData.branchId || "",
+        content,
+        from:         "parent",
+        status:       "Sent",
+        read:         false,
+        createdAt:    serverTimestamp(),
       });
-    } catch { toast.error("Failed to send."); setMessageContent(content); }
+    } catch (err: any) {
+      console.error("[TeacherNotes] send failed:", err?.code, err?.message || err);
+      toast.error(err?.code === "permission-denied"
+        ? "Send blocked by server rules — contact admin."
+        : `Failed to send: ${err?.message || "unknown error"}`);
+      setMessageContent(content);
+    }
   };
 
   const handleSubmitReview = async () => {

@@ -51,22 +51,33 @@ const PrincipalNotesPage = () => {
   const handleSend = async () => {
     if (!messageContent.trim()) return;
     const content = messageContent.trim();
+    if (!studentData?.schoolId) {
+      toast.error("Cannot send: missing school context. Please re-login.");
+      return;
+    }
     setMessageContent("");
     try {
       await addDoc(collection(db, "principal_to_parent_notes"), {
         principalId:   allMessages[0]?.principalId   || "",
         principalName: allMessages[0]?.principalName || "Principal",
-        studentId:     studentData?.id   || "",
-        studentName:   studentData?.name || "",
-        parentName:    `Parent of ${studentData?.name || "Student"}`,
-        className:     studentData?.className || "",
-        message: content, from: "parent",
+        studentId:     studentData.id   || "",
+        studentName:   studentData.name || "",
+        parentName:    `Parent of ${studentData.name || "Student"}`,
+        className:     studentData.className || "",
+        message: content,
+        from: "parent",
         timestamp: serverTimestamp(),
-        schoolId: studentData?.schoolId || "",
-        branchId: studentData?.branchId || "",
+        schoolId: studentData.schoolId,
+        branchId: studentData.branchId || "",
         read: false,
       });
-    } catch { toast.error("Failed to send."); setMessageContent(content); }
+    } catch (err: any) {
+      console.error("[PrincipalNotes] send failed:", err?.code, err?.message || err);
+      toast.error(err?.code === "permission-denied"
+        ? "Send blocked by server rules — deploy updated firestore.rules."
+        : `Failed to send: ${err?.message || "unknown error"}`);
+      setMessageContent(content);
+    }
   };
 
   const fmtTime = (ts: any) =>
