@@ -112,9 +112,8 @@ export function SplashScreen() {
 
 const splashStyles = `
 @font-face {
-  font-family: 'Mokoto Glitch 2';
-  src: url('/fonts/mokoto-glitch-2.woff2') format('woff2'),
-       url('/fonts/mokoto-glitch-2.ttf') format('truetype');
+  font-family: 'Mokoto';
+  src: url('/fonts/mokoto.regular.ttf') format('truetype');
   font-weight: 400;
   font-style: normal;
   font-display: block;
@@ -131,7 +130,7 @@ const splashStyles = `
   overflow: hidden;
   opacity: 1;
   transition: opacity ${FADE_OUT_MS}ms cubic-bezier(0.4, 0, 0.2, 1);
-  font-family: 'Mokoto Glitch 2', 'Audiowide', 'Arial Black', sans-serif;
+  font-family: 'Mokoto', 'Audiowide', 'Arial Black', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
