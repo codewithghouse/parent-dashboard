@@ -142,14 +142,14 @@ const splashStyles = `
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 140px;
-  height: 140px;
+  width: 68px;
+  height: 68px;
   transform: translate(-50%, -50%);
   animation: eduSplashMoveLeft 0.75s cubic-bezier(0.65, 0, 0.35, 1) 2.4s forwards;
   will-change: transform;
 }
 @keyframes eduSplashMoveLeft {
-  to { transform: translate(calc(-50% - 135px), -50%); }
+  to { transform: translate(calc(-50% - 82px), -50%); }
 }
 
 .edu-splash__svg { width: 100%; height: 100%; display: block; }
@@ -185,11 +185,11 @@ const splashStyles = `
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-60px, -50%);
-  font-size: 42px;
+  transform: translate(-44px, -50%);
+  font-size: 30px;
   font-weight: 400;
   color: #1d1d6e;
-  letter-spacing: 3px;
+  letter-spacing: 2px;
   display: flex;
   white-space: nowrap;
   line-height: 1;
@@ -212,20 +212,8 @@ const splashStyles = `
   to { opacity: 1; transform: translateY(0); }
 }
 
-@media (min-width: 380px) {
-  .edu-splash__logo { width: 160px; height: 160px; }
-  @keyframes eduSplashMoveLeft {
-    to { transform: translate(calc(-50% - 150px), -50%); }
-  }
-  .edu-splash__wordmark {
-    font-size: 48px;
-    letter-spacing: 3.5px;
-    transform: translate(-70px, -50%);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .edu-splash__logo { animation: none; transform: translate(calc(-50% - 135px), -50%); }
+  .edu-splash__logo { animation: none; transform: translate(calc(-50% - 82px), -50%); }
   .edu-splash__bg { opacity: 1; transform: none; animation: none; }
   .edu-splash__bar { opacity: 1; transform: none; animation: none; }
   .edu-splash__wordmark span {
