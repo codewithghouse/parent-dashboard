@@ -1056,505 +1056,685 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
     );
   }
 
-  // ── Render (Desktop) ──────────────────────────────────────────────────────
+  // ── Render (Desktop) — Bright Blue Apple UI ──────────────────────────────
+  const B1 = "#0055FF", B2 = "#1166FF", B3 = "#2277FF";
+  const BG = "#EEF4FF", BG2 = "#E0ECFF";
+  const GREEN = "#00C853", GREEN2 = "#00A040";
+  const ORANGE = "#FF8800";
+  const RED = "#FF3355";
+  const TEAL = "#00C4B4";
+  const PINK = "#FF3BA8";
+  const T1 = "#001040", T2 = "#002080", T3 = "#5070B0", T4 = "#99AACC";
+  const BLUE_BDR = "rgba(0,85,255,0.12)";
+  const SH = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.09), 0 10px 28px rgba(0,85,255,0.11)";
+  const SH_LG = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 18px 44px rgba(0,85,255,0.14)";
+  const SH_BTN = "0 6px 22px rgba(0,85,255,0.42), 0 2px 6px rgba(0,85,255,0.22)";
+
+  const tabStylesD: Record<FeatureTab, { gradient: string; shadow: string; icon: any; label: string; dot: string }> = {
+    "strengths":  { gradient: `linear-gradient(135deg, ${GREEN}, #22EE66)`, shadow: "0 3px 12px rgba(0,200,83,0.30)", icon: CheckCircle2, label: "Strengths",    dot: GREEN },
+    "study-plan": { gradient: `linear-gradient(135deg, ${B1}, ${B2})`,       shadow: SH_BTN,                            icon: CalendarDays, label: "Study Plan",   dot: B1 },
+    "explainer":  { gradient: `linear-gradient(135deg, ${TEAL}, #22DDCC)`,   shadow: "0 3px 12px rgba(0,196,180,0.30)", icon: BookOpenText, label: "Explainer",    dot: TEAL },
+    "practice":   { gradient: `linear-gradient(135deg, ${ORANGE}, #FFAA22)`, shadow: "0 3px 12px rgba(255,136,0,0.30)", icon: FlaskConical, label: "Practice",     dot: ORANGE },
+    "doubt":      { gradient: `linear-gradient(135deg, ${PINK}, #FF77CC)`,   shadow: "0 3px 12px rgba(255,59,168,0.30)", icon: HelpCircle,  label: "Doubt Solver", dot: PINK },
+  };
+
   return (
-    <div className="animate-in fade-in duration-500 pb-28">
+    <div className="animate-in fade-in duration-500 -m-4 sm:-m-6 md:-m-8 min-h-[calc(100vh-64px)]"
+      style={{ fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif", background: BG }}>
+      <div className="w-full px-6 pt-8 pb-12">
 
-      {/* ── Page Header ── */}
-      <div className="mb-6">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.25em] mb-1">Parent Dashboard</p>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Concept Strengths</h1>
-        <p className="text-sm text-slate-500 mt-1">AI-powered learning tools for <span className="font-bold text-slate-800">{studentName}</span></p>
-      </div>
-
-      {/* ── Feature Tabs ── */}
-      <div className="flex gap-2 overflow-x-auto pb-1 mb-6 scrollbar-hide">
-        {FEATURE_TABS.map(tab => {
-          const Icon = tab.icon;
-          const isActive = activeFeature === tab.key;
-          return (
-            <button
-              key={tab.key}
-              onClick={() => setActiveFeature(tab.key)}
-              className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all ${
-                isActive
-                  ? `bg-gradient-to-r ${tab.color} text-white shadow-md`
-                  : "bg-white border border-slate-100 text-slate-500 hover:border-slate-200"
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {tab.label}
-            </button>
-          );
-        })}
-        {analyzing && (
-          <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 bg-indigo-50 rounded-2xl border border-indigo-100">
-            <Loader2 className="w-3.5 h-3.5 text-indigo-500 animate-spin" />
-            <span className="text-xs font-bold text-indigo-600">AI syncing...</span>
-          </div>
-        )}
-      </div>
-
-      {/* ══════════════════════════════════════════════════════════════════════
-          TAB 1: STRENGTHS (existing)
-      ══════════════════════════════════════════════════════════════════════ */}
-      {activeFeature === "strengths" && (
-        <>
-          {/* Subject filter tabs */}
-          <div className="flex flex-wrap gap-2 mb-6">
-            {enrollments.map((en) => {
-              const name = en.subject || en.className || "General";
-              const isActive = activeSubject === name;
-              return (
-                <button key={en.id} onClick={() => setActiveSubject(name)}
-                  className={`px-4 py-2 rounded-full text-xs font-bold border transition-all ${
-                    isActive ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
-                  }`}>
-                  {name}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* 3-column mastery grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6">
-            {[
-              { label: "Strong", icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-50", bar: "bg-emerald-500", items: currentData.strong },
-              { label: "Developing", icon: CircleDashed, color: "text-amber-500", bg: "bg-amber-50", bar: "bg-amber-400", items: currentData.developing },
-              { label: "Needs Work", icon: AlertCircle, color: "text-rose-500", bg: "bg-rose-50", bar: "bg-rose-500", items: currentData.attention },
-            ].map(({ label, icon: Icon, color, bg, bar, items }) => (
-              <div key={label} className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
-                <div className="flex items-center gap-2 mb-4">
-                  <Icon className={`w-5 h-5 ${color}`} />
-                  <h3 className="text-sm font-bold text-slate-800">{label}</h3>
-                  <span className={`ml-auto text-xs font-black px-2 py-0.5 rounded-full ${bg} ${color}`}>{items.length}</span>
-                </div>
-                <div className="space-y-3">
-                  {items.length === 0 ? (
-                    <p className="text-xs text-slate-300 py-6 text-center">No data yet</p>
-                  ) : items.map((c, i) => (
-                    <div key={i} className="bg-slate-50 rounded-xl p-3.5">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs font-semibold text-slate-700 truncate pr-2">{c.title}</p>
-                        <span className={`text-xs font-bold ${color}`}>{c.pct}%</span>
-                      </div>
-                      <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                        <div className={`h-full ${bar} rounded-full`} style={{ width: `${c.pct}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                  {label === "Needs Work" && recommendedFocus && (
-                    <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 mt-2">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Lightbulb className="w-4 h-4 text-amber-500" />
-                        <p className="text-xs font-bold text-slate-700">Recommended Focus</p>
-                      </div>
-                      <p className="text-xs text-slate-500 leading-relaxed">{recommendedFocus}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Trend chart */}
-          <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-800 mb-5">Concept Mastery Progress</h3>
-            {chartData.length === 0 ? (
-              <div className="h-48 flex items-center justify-center text-slate-300 text-xs">No score data yet</div>
-            ) : (
-              <div className="h-72 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData} margin={{ top: 10, right: 20, left: -10, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} domain={[50, 100]} />
-                    <Tooltip contentStyle={{ borderRadius: "12px", border: "1px solid #f1f5f9", fontSize: 12 }} formatter={(v: any, n: string) => [`${v}%`, n]} />
-                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, paddingTop: 16 }} />
-                    {subjectList.slice(0, 5).map((sub, i) => (
-                      <Line key={i} type="monotone" dataKey={sub} stroke={lineColors[i % lineColors.length]} strokeWidth={2}
-                        dot={{ r: 4, fill: lineColors[i % lineColors.length], strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 6, strokeWidth: 0 }} connectNulls />
-                    ))}
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </div>
-        </>
-      )}
-
-      {/* ══════════════════════════════════════════════════════════════════════
-          TAB 2: AI STUDY PLAN MAKER
-      ══════════════════════════════════════════════════════════════════════ */}
-      {activeFeature === "study-plan" && (
-        <div className="space-y-5">
-
-          {/* Generate card */}
-          <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-8 h-8 rounded-xl bg-indigo-100 flex items-center justify-center">
-                <CalendarDays className="w-4 h-4 text-indigo-600" />
-              </div>
-              <h2 className="text-sm font-bold text-slate-800">AI Study Plan Maker</h2>
+        {/* ── Toolbar ── */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.12em] mb-1 flex items-center gap-[7px]" style={{ color: T4 }}>
+              <span className="w-[6px] h-[6px] rounded-full" style={{ background: GREEN, boxShadow: "0 0 0 3px rgba(0,200,83,0.2)" }} />
+              Parent Dashboard · Concept Strengths
             </div>
-            <p className="text-xs text-slate-400 mb-4 ml-10">Based on {studentName}'s weak topics — personalised schedule for today & tomorrow.</p>
+            <h1 className="text-[32px] font-bold leading-none" style={{ color: T1, letterSpacing: "-0.8px" }}>Concept Strengths</h1>
+            <div className="text-[13px] font-normal mt-[6px]" style={{ color: T3 }}>
+              AI-powered learning tools for <strong style={{ color: B1, fontWeight: 700 }}>{studentName}</strong>
+            </div>
+          </div>
+          <div className="flex items-center gap-[10px]">
+            {analyzing && (
+              <div className="flex items-center gap-2 px-4 py-[8px] rounded-full" style={{ background: "rgba(0,85,255,0.08)", border: `0.5px solid ${BLUE_BDR}` }}>
+                <Loader2 className="w-[14px] h-[14px] animate-spin" style={{ color: B1 }} />
+                <span className="text-[11px] font-bold" style={{ color: B1 }}>AI syncing…</span>
+              </div>
+            )}
+            <div className="w-10 h-10 rounded-full flex items-center justify-center text-[14px] font-bold text-white"
+              style={{ background: `linear-gradient(140deg, ${B1}, ${B2})`, boxShadow: "0 3px 12px rgba(0,85,255,0.36), 0 0 0 2px rgba(255,255,255,0.8)" }}>
+              {studentName?.[0]?.toUpperCase() || "S"}
+            </div>
+          </div>
+        </div>
 
-            {weakTopics.length > 0 && (
-              <div className="mb-4 flex flex-wrap gap-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider w-full mb-1">Weak topics detected:</span>
-                {weakTopics.slice(0, 5).map((t, i) => (
-                  <span key={i} className="text-[11px] font-semibold px-2.5 py-1 bg-rose-50 text-rose-600 rounded-full border border-rose-100">{t}</span>
-                ))}
+        {/* ── Feature Tabs (horizontal pills) ── */}
+        <div className="flex gap-2 flex-wrap mb-6">
+          {FEATURE_TABS.map(tab => {
+            const ts = tabStylesD[tab.key];
+            const Icon = ts.icon;
+            const isActive = activeFeature === tab.key;
+            return (
+              <button key={tab.key} onClick={() => setActiveFeature(tab.key)}
+                className="flex items-center gap-2 px-5 py-[10px] rounded-[16px] text-[13px] font-bold transition-transform hover:scale-[1.02]"
+                style={isActive ? {
+                  background: ts.gradient, color: "#fff",
+                  boxShadow: ts.shadow,
+                  letterSpacing: "-0.1px",
+                } : {
+                  background: "#fff", color: T3,
+                  border: `0.5px solid ${BLUE_BDR}`,
+                  boxShadow: SH,
+                  letterSpacing: "-0.1px",
+                }}>
+                <Icon className="w-4 h-4" strokeWidth={isActive ? 2.5 : 2.2} />
+                {ts.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            TAB 1: STRENGTHS
+        ══════════════════════════════════════════════════════════════════════ */}
+        {activeFeature === "strengths" && (
+          <>
+            {/* Subject Pills */}
+            {enrollments.length > 0 && (
+              <div className="flex gap-2 flex-wrap mb-5">
+                {enrollments.map(en => {
+                  const name = en.subject || en.className || "General";
+                  const isActive = activeSubject === name;
+                  return (
+                    <button key={en.id || name} onClick={() => setActiveSubject(name)}
+                      className="px-4 py-[8px] rounded-[14px] text-[12px] font-bold transition-transform hover:scale-[1.02]"
+                      style={isActive ? {
+                        background: `linear-gradient(135deg, ${B1}, ${B2})`, color: "#fff",
+                        boxShadow: SH_BTN,
+                      } : {
+                        background: "#fff", color: T3,
+                        border: `0.5px solid ${BLUE_BDR}`,
+                        boxShadow: SH,
+                      }}>
+                      {name}
+                    </button>
+                  );
+                })}
               </div>
             )}
 
-            <button
-              onClick={handleGeneratePlan}
-              disabled={generatingPlan}
-              className="w-full h-11 rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-500 text-white text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60 active:scale-95 transition-all"
-            >
-              {generatingPlan ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-              {generatingPlan ? "Generating Plan..." : "Generate Today's Plan"}
-            </button>
-          </div>
-
-          {/* Plan result */}
-          {studyPlan && (
-            <>
-              {[{ key: "today", label: "Today", color: "from-indigo-500 to-violet-500" }, { key: "tomorrow", label: "Tomorrow", color: "from-sky-500 to-cyan-500" }].map(({ key, label, color }) => (
-                <div key={key} className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
-                  <div className={`bg-gradient-to-r ${color} px-5 py-3 flex items-center gap-2`}>
-                    <CalendarDays className="w-4 h-4 text-white" />
-                    <h3 className="text-sm font-bold text-white">{label}'s Schedule</h3>
+            {/* 3-col Mastery Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+              {[
+                { label: "Strong", icon: CheckCircle2, color: GREEN, color2: GREEN2, glow: "rgba(0,200,83,0.05)", iconBg: "rgba(0,200,83,0.10)", iconBdr: "rgba(0,200,83,0.22)", bar: `linear-gradient(90deg, ${GREEN}, #66EE88)`, items: currentData.strong },
+                { label: "Developing", icon: CircleDashed, color: ORANGE, color2: "#884400", glow: "rgba(255,136,0,0.05)", iconBg: "rgba(255,136,0,0.10)", iconBdr: "rgba(255,136,0,0.22)", bar: `linear-gradient(90deg, ${ORANGE}, #FFCC44)`, items: currentData.developing },
+                { label: "Needs Work", icon: AlertCircle, color: RED, color2: RED, glow: "rgba(255,51,85,0.05)", iconBg: "rgba(255,51,85,0.10)", iconBdr: "rgba(255,51,85,0.22)", bar: `linear-gradient(90deg, ${RED}, #FF88AA)`, items: currentData.attention },
+              ].map(({ label, icon: Icon, color, color2, glow, iconBg, iconBdr, bar, items }) => (
+                <div key={label} className="bg-white rounded-[22px] px-6 py-5 relative overflow-hidden"
+                  style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                  <div className="absolute -top-[40px] -right-[15px] w-[140px] h-[140px] rounded-full pointer-events-none"
+                    style={{ background: `radial-gradient(circle, ${glow} 0%, transparent 70%)` }} />
+                  <div className="flex items-center justify-between mb-5 relative z-10">
+                    <div className="flex items-center gap-2">
+                      <div className="w-9 h-9 rounded-[12px] flex items-center justify-center"
+                        style={{ background: iconBg, border: `0.5px solid ${iconBdr}` }}>
+                        <Icon className="w-[16px] h-[16px]" style={{ color }} strokeWidth={2.5} />
+                      </div>
+                      <span className="text-[16px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>{label}</span>
+                    </div>
+                    <div className="w-8 h-8 rounded-[10px] flex items-center justify-center text-[14px] font-bold text-white"
+                      style={{ background: `linear-gradient(135deg, ${color2}, ${color})`, boxShadow: `0 2px 8px ${iconBg}` }}>
+                      {items.length}
+                    </div>
                   </div>
-                  <div className="divide-y divide-slate-50">
-                    {(studyPlan[key] || []).map((slot: any, i: number) => {
-                      const S = SLOTS[i % SLOTS.length];
-                      return (
-                        <div key={i} className="p-4 flex gap-4 items-start">
-                          <div className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${S.dot}`} style={{ marginTop: 6 }} />
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{slot.slot || S.label}</span>
-                              <span className="text-[10px] font-semibold text-slate-300">{slot.time || S.time}</span>
-                              <span className="ml-auto text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full">{slot.duration}</span>
-                            </div>
-                            <p className="text-sm font-bold text-slate-800 mt-1">{slot.topic}</p>
-                            <p className="text-xs text-slate-500 mt-0.5">{slot.activity}</p>
-                            {slot.reason && <p className="text-[10px] text-slate-400 mt-1 italic">{slot.reason}</p>}
-                          </div>
+                  <div className="space-y-3 relative z-10">
+                    {items.length === 0 ? (
+                      <p className="text-[12px] py-5 text-center" style={{ color: T4 }}>No data yet</p>
+                    ) : items.slice(0, 5).map((c, i) => (
+                      <div key={i}>
+                        <div className="flex items-center justify-between mb-[6px]">
+                          <span className="text-[12px] font-bold truncate pr-2" style={{ color: T2 }}>{c.title}</span>
+                          <span className="text-[13px] font-bold" style={{ color: color2 }}>{c.pct}%</span>
                         </div>
-                      );
-                    })}
+                        <div className="h-[7px] rounded-[4px] overflow-hidden" style={{ background: BG2 }}>
+                          <div className="h-full rounded-[4px]" style={{ width: `${c.pct}%`, background: bar, transition: "width 1s cubic-bezier(0.4,0,0.2,1)" }} />
+                        </div>
+                      </div>
+                    ))}
+                    {label === "Needs Work" && recommendedFocus && (
+                      <div className="mt-4 px-4 py-3 rounded-[14px] flex items-start gap-2"
+                        style={{ background: "rgba(255,136,0,0.07)", border: "0.5px solid rgba(255,136,0,0.20)" }}>
+                        <div className="w-[22px] h-[22px] rounded-[7px] flex items-center justify-center shrink-0 mt-[1px]"
+                          style={{ background: "rgba(255,136,0,0.15)", border: "0.5px solid rgba(255,136,0,0.25)" }}>
+                          <Lightbulb className="w-[12px] h-[12px]" style={{ color: ORANGE }} strokeWidth={2.5} />
+                        </div>
+                        <div>
+                          <div className="text-[12px] font-bold mb-[3px]" style={{ color: ORANGE, letterSpacing: "-0.1px" }}>Recommended Focus</div>
+                          <div className="text-[11px] leading-[1.55]" style={{ color: "#884400" }}>{recommendedFocus}</div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
-            </>
-          )}
-        </div>
-      )}
+            </div>
 
-      {/* ══════════════════════════════════════════════════════════════════════
-          TAB 3: CONCEPT EXPLAINER
-      ══════════════════════════════════════════════════════════════════════ */}
-      {activeFeature === "explainer" && (
-        <div className="space-y-5">
-          <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-8 h-8 rounded-xl bg-sky-100 flex items-center justify-center">
-                <BookOpenText className="w-4 h-4 text-sky-600" />
+            {/* Trend Chart */}
+            <div className="bg-white rounded-[22px] px-6 py-6"
+              style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+              <div className="flex items-center justify-between mb-5">
+                <div className="text-[17px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Concept Mastery Progress</div>
+                <div className="text-[11px] font-medium" style={{ color: T4 }}>{chartData.length} months</div>
               </div>
-              <h2 className="text-sm font-bold text-slate-800">24/7 Concept Explainer</h2>
-            </div>
-            <p className="text-xs text-slate-400 mb-4 ml-10">Type any concept — AI explains it in simple language with a real-world example.</p>
-
-            <div className="flex gap-2 mb-4">
-              <input
-                value={explainTopic}
-                onChange={e => setExplainTopic(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleExplain()}
-                placeholder="e.g. Photosynthesis, Fractions, Newton's Laws..."
-                className="flex-1 h-11 rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-300"
-              />
-              <button
-                onClick={() => handleExplain()}
-                disabled={generatingExplanation || !explainTopic.trim()}
-                className="w-11 h-11 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-500 flex items-center justify-center text-white disabled:opacity-50 active:scale-95 transition-all"
-              >
-                {generatingExplanation ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              </button>
-            </div>
-
-            {/* Quick picks from weak topics */}
-            {weakTopics.length > 0 && (
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Quick picks — your weak topics:</p>
-                <div className="flex flex-wrap gap-2">
-                  {weakTopics.slice(0, 6).map((t, i) => (
-                    <button key={i} onClick={() => handleExplain(t)}
-                      className="text-[11px] font-bold px-3 py-1.5 bg-sky-50 text-sky-700 rounded-full border border-sky-100 hover:bg-sky-100 transition-all active:scale-95">
-                      {t}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Explanation result */}
-          {generatingExplanation && (
-            <div className="flex items-center gap-3 p-5 bg-sky-50 rounded-2xl border border-sky-100">
-              <Loader2 className="w-5 h-5 text-sky-500 animate-spin flex-shrink-0" />
-              <p className="text-sm text-sky-700 font-medium">Explaining "{explainTopic}"...</p>
-            </div>
-          )}
-
-          {explanation && !generatingExplanation && (
-            <div className="space-y-4">
-              {/* Simple explanation */}
-              <div className="rounded-2xl overflow-hidden shadow-sm" style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)" }}>
-                <div className="p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-2xl">{explanation.emoji || "💡"}</span>
-                    <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Simple Explanation</span>
-                  </div>
-                  <p className="text-sm text-slate-200 leading-relaxed">{explanation.simple_explanation}</p>
-                </div>
-              </div>
-
-              {/* Real-world example */}
-              <div className="bg-sky-50 border border-sky-100 rounded-2xl p-5">
-                <div className="flex items-center gap-2 mb-2">
-                  <Zap className="w-4 h-4 text-sky-600" />
-                  <span className="text-xs font-bold text-sky-700 uppercase tracking-wider">Real-World Example</span>
-                </div>
-                <p className="text-sm text-slate-700 leading-relaxed">{explanation.real_world_example}</p>
-              </div>
-
-              {/* Remember points */}
-              <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
-                <div className="flex items-center gap-2 mb-3">
-                  <ClipboardList className="w-4 h-4 text-violet-600" />
-                  <span className="text-xs font-bold text-violet-700 uppercase tracking-wider">Remember These 3 Points</span>
-                </div>
-                <div className="space-y-2">
-                  {(explanation.remember_points || []).map((point: string, i: number) => (
-                    <div key={i} className="flex gap-3 items-start">
-                      <div className="w-5 h-5 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <span className="text-[9px] font-black text-violet-700">{i + 1}</span>
-                      </div>
-                      <p className="text-xs text-slate-600 leading-relaxed">{point}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ══════════════════════════════════════════════════════════════════════
-          TAB 4: PRACTICE PROBLEM GENERATOR
-      ══════════════════════════════════════════════════════════════════════ */}
-      {activeFeature === "practice" && (
-        <div className="space-y-5">
-          <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center">
-                <FlaskConical className="w-4 h-4 text-amber-600" />
-              </div>
-              <h2 className="text-sm font-bold text-slate-800">Practice Problem Generator</h2>
-            </div>
-            <p className="text-xs text-slate-400 mb-4 ml-10">AI generates 5 dynamic questions on any topic — with answers you can reveal one at a time.</p>
-
-            <div className="flex gap-2 mb-4">
-              <input
-                value={practiceTopic}
-                onChange={e => setPracticeTopic(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleGenerateQuestions()}
-                placeholder={`Topic (e.g. ${activeSubject || "Fractions"})`}
-                className="flex-1 h-11 rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-300"
-              />
-              <button
-                onClick={handleGenerateQuestions}
-                disabled={generatingQuestions}
-                className="h-11 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 flex items-center justify-center gap-2 text-white text-sm font-bold disabled:opacity-50 active:scale-95 transition-all"
-              >
-                {generatingQuestions ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                {generatingQuestions ? "Generating..." : "Generate"}
-              </button>
-            </div>
-          </div>
-
-          {/* Questions */}
-          {generatingQuestions && (
-            <div className="flex items-center gap-3 p-5 bg-amber-50 rounded-2xl border border-amber-100">
-              <Loader2 className="w-5 h-5 text-amber-500 animate-spin flex-shrink-0" />
-              <p className="text-sm text-amber-700 font-medium">Generating 5 questions...</p>
-            </div>
-          )}
-
-          {questions.length > 0 && !generatingQuestions && (
-            <div className="space-y-4">
-              {questions.map((q, qi) => {
-                const selected = selectedAnswers[qi];
-                const revealed = revealedAnswers.has(qi);
-                const isCorrect = selected === q.correct;
-                return (
-                  <div key={qi} className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
-                    <div className="flex items-start gap-3 mb-4">
-                      <span className="w-7 h-7 rounded-full bg-amber-100 text-amber-700 text-xs font-black flex items-center justify-center flex-shrink-0">{qi + 1}</span>
-                      <p className="text-sm font-semibold text-slate-800 leading-relaxed">{q.question}</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
-                      {(q.options || []).map((opt: string, oi: number) => {
-                        const optKey = opt.charAt(0);
-                        const isSelected = selected === optKey;
-                        const isCorrectOpt = q.correct === optKey;
-                        let optStyle = "border-slate-100 bg-slate-50 text-slate-700";
-                        if (selected) {
-                          if (isCorrectOpt) optStyle = "border-emerald-300 bg-emerald-50 text-emerald-700";
-                          else if (isSelected) optStyle = "border-rose-300 bg-rose-50 text-rose-700";
-                        }
+              {chartData.length === 0 ? (
+                <div className="h-56 flex items-center justify-center text-[13px]" style={{ color: T4 }}>No score data yet</div>
+              ) : (
+                <div className="h-80 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData} margin={{ top: 10, right: 20, left: -10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="0" vertical={false} stroke="rgba(0,85,255,0.07)" />
+                      <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: T4, fontSize: 11 }} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fill: T4, fontSize: 11 }} domain={[0, 100]} />
+                      <Tooltip contentStyle={{ borderRadius: "12px", border: `0.5px solid ${BLUE_BDR}`, fontSize: 12, fontFamily: "DM Sans", boxShadow: "0 4px 20px rgba(0,85,255,0.12)" }} formatter={(v: any, n: string) => [`${v}%`, n]} />
+                      <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, paddingTop: 16, color: T3 }} />
+                      {subjectList.slice(0, 5).map((sub, i) => {
+                        const colors = [B1, GREEN, ORANGE, PINK, TEAL];
                         return (
-                          <button key={oi} onClick={() => !selected && setSelectedAnswers(prev => ({ ...prev, [qi]: optKey }))}
-                            className={`text-left px-3 py-2.5 rounded-xl border text-xs font-semibold transition-all ${optStyle} ${!selected ? "hover:border-slate-200 active:scale-95" : ""}`}>
-                            {opt}
-                          </button>
+                          <Line key={i} type="monotone" dataKey={sub} stroke={colors[i % colors.length]} strokeWidth={2.5}
+                            dot={{ r: 4, fill: colors[i % colors.length], strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 6, strokeWidth: 0 }} connectNulls />
                         );
                       })}
-                    </div>
-
-                    {selected && (
-                      <div className={`rounded-xl p-3 ${isCorrect ? "bg-emerald-50 border border-emerald-100" : "bg-rose-50 border border-rose-100"}`}>
-                        <p className={`text-xs font-bold ${isCorrect ? "text-emerald-700" : "text-rose-700"}`}>
-                          {isCorrect ? "✓ Correct!" : `✗ Incorrect — correct answer is ${q.correct}`}
-                        </p>
-                      </div>
-                    )}
-
-                    {!selected && (
-                      <button onClick={() => {
-                        setRevealedAnswers(prev => new Set([...prev, qi]));
-                        setSelectedAnswers(prev => ({ ...prev, [qi]: q.correct }));
-                      }} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 transition-all mt-1">
-                        <Eye className="w-3.5 h-3.5" />
-                        Reveal answer
-                      </button>
-                    )}
-
-                    {(selected || revealed) && q.explanation && (
-                      <p className="text-xs text-slate-500 italic mt-2 leading-relaxed">{q.explanation}</p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ══════════════════════════════════════════════════════════════════════
-          TAB 5: AI DOUBT SOLVER
-      ══════════════════════════════════════════════════════════════════════ */}
-      {activeFeature === "doubt" && (
-        <div className="space-y-5">
-          <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-8 h-8 rounded-xl bg-rose-100 flex items-center justify-center">
-                <HelpCircle className="w-4 h-4 text-rose-600" />
-              </div>
-              <h2 className="text-sm font-bold text-slate-800">AI Doubt Solver</h2>
-            </div>
-            <p className="text-xs text-slate-400 mb-4 ml-10">Type your doubt OR upload a photo. AI guides step by step — teaches, doesn't just answer.</p>
-
-            {/* Image preview */}
-            {doubtImagePreview && (
-              <div className="mb-4 relative">
-                <img src={doubtImagePreview} alt="Doubt" className="w-full max-h-48 object-contain rounded-xl border border-slate-100 bg-slate-50" />
-                <button onClick={() => { setDoubtImagePreview(null); setDoubtImageB64(null); }}
-                  className="absolute top-2 right-2 w-7 h-7 bg-white rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:text-rose-500 text-xs font-bold shadow-sm">✕</button>
-              </div>
-            )}
-
-            {/* Text input */}
-            {!doubtImagePreview && (
-              <textarea
-                value={doubtText}
-                onChange={e => setDoubtText(e.target.value)}
-                placeholder="Type your doubt here... e.g. 'I don't understand how to solve simultaneous equations'"
-                rows={3}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-300 resize-none mb-3"
-              />
-            )}
-
-            <div className="flex gap-2">
-              <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageUpload} className="hidden" />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 h-11 px-4 rounded-xl border border-slate-200 text-slate-500 text-xs font-bold hover:border-slate-300 transition-all active:scale-95"
-              >
-                <Camera className="w-4 h-4" />
-                Upload Photo
-              </button>
-              <button
-                onClick={handleDoubtSubmit}
-                disabled={generatingDoubt || (!doubtText.trim() && !doubtImageB64)}
-                className="flex-1 h-11 rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 text-white text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 transition-all"
-              >
-                {generatingDoubt ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                {generatingDoubt ? "Thinking..." : "Get Step-by-Step Help"}
-              </button>
-            </div>
-          </div>
-
-          {/* Hints result */}
-          {generatingDoubt && (
-            <div className="flex items-center gap-3 p-5 bg-rose-50 rounded-2xl border border-rose-100">
-              <Loader2 className="w-5 h-5 text-rose-500 animate-spin flex-shrink-0" />
-              <p className="text-sm text-rose-700 font-medium">Preparing your hints...</p>
-            </div>
-          )}
-
-          {doubtHints.length > 0 && !generatingDoubt && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 px-1">
-                <Sparkles className="w-4 h-4 text-rose-500" />
-                <p className="text-xs font-bold text-slate-600">Hints revealed: {Math.min(hintIndex + 1, doubtHints.length)} / {doubtHints.length}</p>
-              </div>
-
-              {doubtHints.slice(0, hintIndex + 1).map((hint, i) => (
-                <div key={i} className={`rounded-2xl p-4 border ${i === hintIndex ? "bg-rose-50 border-rose-100" : "bg-slate-50 border-slate-100"}`}>
-                  <div className="flex items-start gap-3">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-black ${i === hintIndex ? "bg-rose-500 text-white" : "bg-slate-200 text-slate-500"}`}>
-                      {i + 1}
-                    </div>
-                    <p className="text-sm text-slate-700 leading-relaxed">{hint}</p>
-                  </div>
-                </div>
-              ))}
-
-              {hintIndex < doubtHints.length - 1 ? (
-                <button
-                  onClick={() => setHintIndex(prev => prev + 1)}
-                  className="w-full h-11 rounded-2xl border-2 border-dashed border-rose-200 text-rose-500 text-sm font-bold flex items-center justify-center gap-2 hover:border-rose-300 hover:bg-rose-50 transition-all active:scale-95"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                  Next Hint
-                </button>
-              ) : (
-                <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-4 text-center">
-                  <p className="text-sm font-bold text-emerald-700">All hints revealed! Did that help?</p>
-                  <button onClick={() => { setDoubtHints([]); setHintIndex(0); setDoubtText(""); setDoubtImagePreview(null); setDoubtImageB64(null); }}
-                    className="mt-2 text-xs text-emerald-600 font-semibold underline">Ask another doubt</button>
+                    </LineChart>
+                  </ResponsiveContainer>
                 </div>
               )}
             </div>
-          )}
-        </div>
-      )}
+          </>
+        )}
 
+        {/* ══════════════════════════════════════════════════════════════════════
+            TAB 2: AI STUDY PLAN MAKER
+        ══════════════════════════════════════════════════════════════════════ */}
+        {activeFeature === "study-plan" && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+            {/* Generate card — col-1 */}
+            <div className="bg-white rounded-[22px] p-6 relative overflow-hidden"
+              style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+              <div className="absolute -top-[30px] -right-5 w-[140px] h-[140px] rounded-full pointer-events-none"
+                style={{ background: "radial-gradient(circle, rgba(0,85,255,0.05) 0%, transparent 70%)" }} />
+              <div className="flex items-center gap-3 mb-3 relative z-10">
+                <div className="w-[48px] h-[48px] rounded-[15px] flex items-center justify-center shrink-0"
+                  style={{ background: `linear-gradient(135deg, ${B1}, ${B3})`, boxShadow: "0 3px 12px rgba(0,85,255,0.28)" }}>
+                  <CalendarDays className="w-6 h-6 text-white" strokeWidth={2.2} />
+                </div>
+                <div>
+                  <div className="text-[17px] font-bold mb-[2px]" style={{ color: T1, letterSpacing: "-0.3px" }}>AI Study Plan Maker</div>
+                  <div className="text-[11px] font-normal leading-[1.5]" style={{ color: T3 }}>Based on {studentName}'s weak topics</div>
+                </div>
+              </div>
+
+              {weakTopics.length > 0 && (
+                <>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.10em] mb-2 mt-4 relative z-10" style={{ color: T4 }}>Weak Topics Detected</div>
+                  <div className="flex flex-wrap gap-[7px] mb-4 relative z-10">
+                    {weakTopics.slice(0, 5).map((t, i) => (
+                      <div key={i} className="px-[13px] py-[5px] rounded-full text-[11px] font-bold"
+                        style={{
+                          background: i === 0 ? "rgba(255,51,85,0.10)" : "rgba(255,136,0,0.10)",
+                          color: i === 0 ? RED : "#884400",
+                          border: `0.5px solid ${i === 0 ? "rgba(255,51,85,0.22)" : "rgba(255,136,0,0.22)"}`
+                        }}>
+                        {t}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              <button onClick={handleGeneratePlan} disabled={generatingPlan}
+                className="w-full h-12 rounded-[15px] flex items-center justify-center gap-2 text-[14px] font-bold text-white disabled:opacity-60 transition-transform hover:scale-[1.02] relative overflow-hidden"
+                style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: SH_BTN, letterSpacing: "-0.1px" }}>
+                <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.14) 0%, transparent 52%)" }} />
+                {generatingPlan ? <Loader2 className="relative z-10 w-4 h-4 animate-spin" />
+                  : studyPlan ? <RefreshCw className="relative z-10 w-4 h-4" strokeWidth={2.2} />
+                  : <Sparkles className="relative z-10 w-4 h-4" strokeWidth={2.2} />}
+                <span className="relative z-10">{generatingPlan ? "Generating…" : studyPlan ? "Regenerate Plan" : "Generate Today's Plan"}</span>
+              </button>
+            </div>
+
+            {/* Plan result — spans 2 cols */}
+            {studyPlan ? (
+              <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[
+                  { key: "today", label: "Today", grad: `linear-gradient(135deg, ${B1}, ${B3})`, sh: SH_BTN },
+                  { key: "tomorrow", label: "Tomorrow", grad: `linear-gradient(135deg, ${TEAL}, #22DDCC)`, sh: "0 3px 12px rgba(0,196,180,0.30)" },
+                ].map(({ key, label, grad, sh }) => (
+                  <div key={key} className="bg-white rounded-[22px] overflow-hidden"
+                    style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                    <div className="px-5 py-4 flex items-center gap-2" style={{ background: grad, boxShadow: sh }}>
+                      <CalendarDays className="w-4 h-4 text-white" strokeWidth={2.5} />
+                      <h3 className="text-[14px] font-bold text-white" style={{ letterSpacing: "-0.2px" }}>{label}'s Schedule</h3>
+                    </div>
+                    <div className="p-4 space-y-2">
+                      {(studyPlan[key] || []).map((slot: any, i: number) => {
+                        const isFirst = i === 0;
+                        const isLast = i === (studyPlan[key].length - 1);
+                        const priority = isFirst ? "High" : isLast ? "Low" : "Med";
+                        const pColor = priority === "High" ? RED : priority === "Med" ? ORANGE : GREEN;
+                        const pBg = priority === "High" ? "rgba(255,51,85,0.07)" : priority === "Med" ? "rgba(255,136,0,0.07)" : "rgba(0,200,83,0.08)";
+                        const pBdr = priority === "High" ? "rgba(255,51,85,0.16)" : priority === "Med" ? "rgba(255,136,0,0.16)" : "rgba(0,200,83,0.22)";
+                        return (
+                          <div key={i} className="flex items-start gap-3 px-4 py-3 rounded-[14px]"
+                            style={{ background: pBg, border: `0.5px solid ${pBdr}` }}>
+                            <div className="w-9 h-9 rounded-[11px] flex items-center justify-center shrink-0"
+                              style={{ background: "rgba(255,255,255,0.7)", border: `0.5px solid ${pBdr}` }}>
+                              <Clock className="w-[15px] h-[15px]" style={{ color: pColor }} strokeWidth={2.3} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap mb-[2px]">
+                                <span className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: T4 }}>{slot.slot}</span>
+                                <span className="text-[10px]" style={{ color: T4 }}>{slot.time}</span>
+                                <span className="ml-auto text-[10px] font-bold px-[8px] py-[2px] rounded-full"
+                                  style={{ background: "rgba(0,85,255,0.06)", color: T3, border: `0.5px solid ${BLUE_BDR}` }}>
+                                  {slot.duration}
+                                </span>
+                              </div>
+                              <p className="text-[13px] font-bold mt-1" style={{ color: T1, letterSpacing: "-0.15px" }}>{slot.topic}</p>
+                              <p className="text-[11px] mt-[2px]" style={{ color: T3 }}>{slot.activity}</p>
+                              {slot.reason && <p className="text-[10px] italic mt-[4px]" style={{ color: T4 }}>{slot.reason}</p>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="lg:col-span-2 bg-white rounded-[22px] p-10 flex flex-col items-center justify-center text-center relative overflow-hidden"
+                style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                <div className="absolute -top-[50px] -right-[30px] w-[180px] h-[180px] rounded-full pointer-events-none"
+                  style={{ background: "radial-gradient(circle, rgba(0,85,255,0.05) 0%, transparent 70%)" }} />
+                <div className="w-[72px] h-[72px] rounded-[22px] flex items-center justify-center mb-4 relative z-10"
+                  style={{ background: `linear-gradient(135deg, ${B1}, ${B3})`, boxShadow: SH_BTN }}>
+                  <CalendarDays className="w-[32px] h-[32px] text-white" strokeWidth={2.2} />
+                </div>
+                <div className="text-[19px] font-bold mb-1 relative z-10" style={{ color: T1, letterSpacing: "-0.4px" }}>Ready to Plan?</div>
+                <div className="text-[13px] font-normal leading-[1.55] max-w-[360px] relative z-10" style={{ color: T3 }}>
+                  Click "Generate Today's Plan" to get a personalised study schedule for today &amp; tomorrow based on your weak topics.
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            TAB 3: CONCEPT EXPLAINER
+        ══════════════════════════════════════════════════════════════════════ */}
+        {activeFeature === "explainer" && (
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+
+            {/* Input — col-2 */}
+            <div className="lg:col-span-2 bg-white rounded-[22px] p-6 relative overflow-hidden"
+              style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+              <div className="absolute -top-[30px] -right-5 w-[140px] h-[140px] rounded-full pointer-events-none"
+                style={{ background: "radial-gradient(circle, rgba(0,196,180,0.05) 0%, transparent 70%)" }} />
+              <div className="flex items-center gap-3 mb-3 relative z-10">
+                <div className="w-[48px] h-[48px] rounded-[15px] flex items-center justify-center shrink-0"
+                  style={{ background: `linear-gradient(135deg, ${TEAL}, #22DDCC)`, boxShadow: "0 3px 12px rgba(0,196,180,0.28)" }}>
+                  <BookOpenText className="w-6 h-6 text-white" strokeWidth={2.2} />
+                </div>
+                <div>
+                  <div className="text-[17px] font-bold mb-[2px]" style={{ color: T1, letterSpacing: "-0.3px" }}>Concept Explainer</div>
+                  <div className="text-[11px] font-normal leading-[1.5]" style={{ color: T3 }}>AI explains any topic simply</div>
+                </div>
+              </div>
+
+              <div className="relative mb-4 mt-4 z-10">
+                <input type="text" value={explainTopic} onChange={e => setExplainTopic(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && handleExplain()}
+                  placeholder="e.g. Photosynthesis, Newton's Law…"
+                  className="w-full py-3 pl-4 pr-[52px] rounded-[14px] text-[13px] outline-none"
+                  style={{ background: BG, border: `0.5px solid ${BLUE_BDR}`, color: T1, fontFamily: "DM Sans, sans-serif", letterSpacing: "-0.1px" }} />
+                <button onClick={() => handleExplain()} disabled={generatingExplanation}
+                  className="absolute right-[6px] top-1/2 -translate-y-1/2 w-9 h-9 rounded-[11px] flex items-center justify-center disabled:opacity-50 transition-transform hover:scale-105"
+                  style={{ background: `linear-gradient(135deg, ${TEAL}, #22DDCC)`, boxShadow: "0 2px 8px rgba(0,196,180,0.32)" }}>
+                  {generatingExplanation ? <Loader2 className="w-4 h-4 text-white animate-spin" /> : <Send className="w-[15px] h-[15px] text-white" strokeWidth={2.5} />}
+                </button>
+              </div>
+
+              {weakTopics.length > 0 && (
+                <div className="relative z-10">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.10em] mb-2" style={{ color: T4 }}>Quick Picks — Weak Topics</div>
+                  <div className="flex flex-wrap gap-[7px]">
+                    {weakTopics.slice(0, 6).map((t, i) => (
+                      <button key={i} onClick={() => handleExplain(t)}
+                        className="px-[13px] py-[6px] rounded-full text-[11px] font-bold transition-transform hover:scale-105"
+                        style={{
+                          background: i % 3 === 0 ? "rgba(255,51,85,0.10)" : i % 3 === 1 ? "rgba(255,136,0,0.10)" : "rgba(0,196,180,0.10)",
+                          color: i % 3 === 0 ? RED : i % 3 === 1 ? "#884400" : TEAL,
+                          border: `0.5px solid ${i % 3 === 0 ? "rgba(255,51,85,0.22)" : i % 3 === 1 ? "rgba(255,136,0,0.22)" : "rgba(0,196,180,0.22)"}`
+                        }}>
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Result — col-3 */}
+            <div className="lg:col-span-3">
+              {generatingExplanation ? (
+                <div className="bg-white rounded-[22px] py-16 flex flex-col items-center"
+                  style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                  <Loader2 className="w-10 h-10 animate-spin" style={{ color: TEAL }} />
+                  <p className="text-[13px] font-medium mt-3" style={{ color: T3 }}>Explaining "{explainTopic}"…</p>
+                </div>
+              ) : explanation ? (
+                <div className="space-y-4">
+                  {/* Simple explanation — dark blue */}
+                  <div className="rounded-[22px] p-6 relative overflow-hidden"
+                    style={{
+                      background: "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)",
+                      boxShadow: "0 8px 28px rgba(0,51,204,0.32), 0 0 0 0.5px rgba(255,255,255,0.14)",
+                    }}>
+                    <div className="absolute -top-7 -right-5 w-[140px] h-[140px] rounded-full pointer-events-none"
+                      style={{ background: "radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 65%)" }} />
+                    <div className="absolute inset-0 pointer-events-none" style={{
+                      backgroundImage: "linear-gradient(rgba(255,255,255,0.014) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.014) 1px, transparent 1px)",
+                      backgroundSize: "24px 24px"
+                    }} />
+                    <div className="flex items-center gap-2 mb-3 relative z-10">
+                      <span className="text-[24px]">{explanation.emoji || "💡"}</span>
+                      <div className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "rgba(255,255,255,0.55)" }}>AI Explanation Ready</div>
+                    </div>
+                    <p className="text-[15px] leading-[1.7] font-normal relative z-10" style={{ color: "rgba(255,255,255,0.92)", letterSpacing: "-0.1px" }}>
+                      {explanation.simple_explanation}
+                    </p>
+                  </div>
+
+                  {/* Real-world Example */}
+                  {explanation.real_world_example && (
+                    <div className="bg-white rounded-[22px] p-5"
+                      style={{ boxShadow: SH, border: "0.5px solid rgba(0,196,180,0.18)" }}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-9 h-9 rounded-[12px] flex items-center justify-center"
+                          style={{ background: "rgba(0,196,180,0.10)", border: "0.5px solid rgba(0,196,180,0.22)" }}>
+                          <Zap className="w-[15px] h-[15px]" style={{ color: TEAL }} strokeWidth={2.5} />
+                        </div>
+                        <span className="text-[13px] font-bold uppercase tracking-[0.10em]" style={{ color: TEAL }}>Real-World Example</span>
+                      </div>
+                      <p className="text-[14px] leading-[1.6]" style={{ color: T2 }}>{explanation.real_world_example}</p>
+                    </div>
+                  )}
+
+                  {/* Remember points */}
+                  {explanation.remember_points?.length > 0 && (
+                    <div className="bg-white rounded-[22px] p-5"
+                      style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-9 h-9 rounded-[12px] flex items-center justify-center"
+                          style={{ background: "rgba(107,33,232,0.10)", border: "0.5px solid rgba(107,33,232,0.22)" }}>
+                          <ClipboardList className="w-[15px] h-[15px]" style={{ color: "#6B21E8" }} strokeWidth={2.5} />
+                        </div>
+                        <span className="text-[13px] font-bold uppercase tracking-[0.10em]" style={{ color: "#6B21E8" }}>Remember These Points</span>
+                      </div>
+                      <div className="space-y-3">
+                        {explanation.remember_points.map((point: string, i: number) => (
+                          <div key={i} className="flex gap-3 items-start">
+                            <div className="w-[22px] h-[22px] rounded-full flex items-center justify-center shrink-0 mt-[2px]"
+                              style={{ background: "rgba(107,33,232,0.10)", border: "0.5px solid rgba(107,33,232,0.22)" }}>
+                              <span className="text-[10px] font-bold" style={{ color: "#6B21E8" }}>{i + 1}</span>
+                            </div>
+                            <p className="text-[13px] leading-[1.55]" style={{ color: T2 }}>{point}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-white rounded-[22px] p-10 flex flex-col items-center justify-center text-center h-full relative overflow-hidden"
+                  style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                  <div className="absolute -top-[50px] -right-[30px] w-[180px] h-[180px] rounded-full pointer-events-none"
+                    style={{ background: "radial-gradient(circle, rgba(0,196,180,0.05) 0%, transparent 70%)" }} />
+                  <div className="w-[72px] h-[72px] rounded-[22px] flex items-center justify-center mb-4 relative z-10"
+                    style={{ background: `linear-gradient(135deg, ${TEAL}, #22DDCC)`, boxShadow: "0 6px 22px rgba(0,196,180,0.42)" }}>
+                    <BookOpenText className="w-[32px] h-[32px] text-white" strokeWidth={2.2} />
+                  </div>
+                  <div className="text-[19px] font-bold mb-1 relative z-10" style={{ color: T1, letterSpacing: "-0.4px" }}>Type Any Concept</div>
+                  <div className="text-[13px] font-normal leading-[1.55] max-w-[360px] relative z-10" style={{ color: T3 }}>
+                    Enter a topic on the left and AI will explain it in simple language with a real-world example.
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            TAB 4: PRACTICE PROBLEM GENERATOR
+        ══════════════════════════════════════════════════════════════════════ */}
+        {activeFeature === "practice" && (
+          <>
+            {/* Input bar */}
+            <div className="bg-white rounded-[22px] p-6 mb-5 relative overflow-hidden"
+              style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+              <div className="absolute -top-[30px] -right-5 w-[180px] h-[180px] rounded-full pointer-events-none"
+                style={{ background: "radial-gradient(circle, rgba(255,136,0,0.05) 0%, transparent 70%)" }} />
+              <div className="flex items-center gap-4 flex-wrap relative z-10">
+                <div className="w-[52px] h-[52px] rounded-[16px] flex items-center justify-center shrink-0"
+                  style={{ background: `linear-gradient(135deg, ${ORANGE}, #FFAA22)`, boxShadow: "0 3px 12px rgba(255,136,0,0.28)" }}>
+                  <FlaskConical className="w-[26px] h-[26px] text-white" strokeWidth={2.2} />
+                </div>
+                <div className="flex-1 min-w-[220px]">
+                  <div className="text-[17px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Practice Problem Generator</div>
+                  <div className="text-[12px] font-normal" style={{ color: T3 }}>5 AI questions on any topic — reveal answers one by one</div>
+                </div>
+                <input type="text" value={practiceTopic} onChange={e => setPracticeTopic(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && handleGenerateQuestions()}
+                  placeholder={`Topic (e.g. ${activeSubject || "Fractions"})`}
+                  className="flex-1 min-w-[220px] h-12 px-4 rounded-[14px] text-[13px] outline-none"
+                  style={{ background: BG, border: `0.5px solid ${BLUE_BDR}`, color: T1, fontFamily: "DM Sans, sans-serif" }} />
+                <button onClick={handleGenerateQuestions} disabled={generatingQuestions}
+                  className="h-12 px-6 rounded-[14px] text-[13px] font-bold text-white flex items-center gap-2 disabled:opacity-60 transition-transform hover:scale-[1.02]"
+                  style={{ background: `linear-gradient(135deg, ${ORANGE}, #FFAA22)`, boxShadow: "0 3px 12px rgba(255,136,0,0.32)" }}>
+                  {generatingQuestions ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" strokeWidth={2.3} />}
+                  {generatingQuestions ? "Generating…" : "Generate"}
+                </button>
+              </div>
+            </div>
+
+            {/* Questions grid (2 col on lg) */}
+            {questions.length > 0 && !generatingQuestions ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {questions.map((q: any, qi: number) => {
+                  const selected = selectedAnswers[qi];
+                  const revealed = revealedAnswers.has(qi);
+                  return (
+                    <div key={qi} className="bg-white rounded-[20px] p-5"
+                      style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                      <div className="flex items-start gap-3 mb-4">
+                        <div className="w-8 h-8 rounded-[10px] flex items-center justify-center text-[13px] font-bold text-white shrink-0"
+                          style={{ background: `linear-gradient(135deg, ${ORANGE}, #FFAA22)`, boxShadow: "0 2px 6px rgba(255,136,0,0.28)" }}>
+                          {qi + 1}
+                        </div>
+                        <p className="text-[14px] font-semibold leading-[1.5]" style={{ color: T1 }}>{q.question}</p>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        {q.options?.map((opt: string, oi: number) => {
+                          const letter = opt.charAt(0);
+                          const isSelected = selected === letter;
+                          const isCorrect = revealed && letter === q.correct;
+                          const isWrong = revealed && isSelected && letter !== q.correct;
+                          return (
+                            <button key={oi} onClick={() => setSelectedAnswers({ ...selectedAnswers, [qi]: letter })} disabled={revealed}
+                              className="text-left px-4 py-[11px] rounded-[12px] text-[12px] font-medium transition-colors"
+                              style={{
+                                background: isCorrect ? "rgba(0,200,83,0.12)" : isWrong ? "rgba(255,51,85,0.12)" : isSelected ? "rgba(255,136,0,0.10)" : BG,
+                                color: isCorrect ? GREEN2 : isWrong ? RED : T2,
+                                border: `0.5px solid ${isCorrect ? "rgba(0,200,83,0.25)" : isWrong ? "rgba(255,51,85,0.25)" : isSelected ? "rgba(255,136,0,0.25)" : BLUE_BDR}`,
+                              }}>
+                              {opt}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {!revealed && selected && (
+                        <button onClick={() => setRevealedAnswers(new Set([...revealedAnswers, qi]))}
+                          className="mt-3 w-full py-[11px] rounded-[12px] text-[12px] font-bold flex items-center justify-center gap-2"
+                          style={{ background: BG, color: T2, border: `0.5px solid ${BLUE_BDR}` }}>
+                          <Eye className="w-[14px] h-[14px]" /> Reveal Answer
+                        </button>
+                      )}
+                      {revealed && q.explanation && (
+                        <div className="mt-3 px-4 py-3 rounded-[12px]"
+                          style={{ background: "rgba(0,196,180,0.06)", border: "0.5px solid rgba(0,196,180,0.18)" }}>
+                          <div className="text-[10px] font-bold uppercase tracking-[0.09em] mb-1" style={{ color: TEAL }}>Explanation</div>
+                          <p className="text-[12px] leading-[1.55]" style={{ color: T2 }}>{q.explanation}</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : generatingQuestions ? (
+              <div className="bg-white rounded-[22px] py-16 flex flex-col items-center"
+                style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                <Loader2 className="w-10 h-10 animate-spin" style={{ color: ORANGE }} />
+                <p className="text-[13px] font-medium mt-3" style={{ color: T3 }}>Generating 5 questions…</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-[22px] p-12 flex flex-col items-center justify-center text-center relative overflow-hidden"
+                style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                <div className="absolute -top-[50px] -right-[30px] w-[200px] h-[200px] rounded-full pointer-events-none"
+                  style={{ background: "radial-gradient(circle, rgba(255,136,0,0.05) 0%, transparent 70%)" }} />
+                <div className="w-[80px] h-[80px] rounded-[24px] flex items-center justify-center mb-4 relative z-10"
+                  style={{ background: `linear-gradient(135deg, ${ORANGE}, #FFAA22)`, boxShadow: "0 6px 22px rgba(255,136,0,0.42)" }}>
+                  <FlaskConical className="w-[36px] h-[36px] text-white" strokeWidth={2.2} />
+                </div>
+                <div className="text-[22px] font-bold mb-1 relative z-10" style={{ color: T1, letterSpacing: "-0.5px" }}>Ready to Practice?</div>
+                <div className="text-[14px] font-normal leading-[1.55] max-w-[420px] relative z-10" style={{ color: T3 }}>
+                  Enter a topic above and generate AI-powered practice problems. Each question comes with a detailed explanation.
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            TAB 5: AI DOUBT SOLVER
+        ══════════════════════════════════════════════════════════════════════ */}
+        {activeFeature === "doubt" && (
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+
+            {/* Input — col-2 */}
+            <div className="lg:col-span-2 bg-white rounded-[22px] p-6 relative overflow-hidden"
+              style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+              <div className="absolute -top-[30px] -right-5 w-[140px] h-[140px] rounded-full pointer-events-none"
+                style={{ background: "radial-gradient(circle, rgba(255,59,168,0.05) 0%, transparent 70%)" }} />
+              <div className="flex items-center gap-3 mb-3 relative z-10">
+                <div className="w-[48px] h-[48px] rounded-[15px] flex items-center justify-center shrink-0"
+                  style={{ background: `linear-gradient(135deg, ${PINK}, #FF77CC)`, boxShadow: "0 3px 12px rgba(255,59,168,0.28)" }}>
+                  <HelpCircle className="w-6 h-6 text-white" strokeWidth={2.2} />
+                </div>
+                <div>
+                  <div className="text-[17px] font-bold mb-[2px]" style={{ color: T1, letterSpacing: "-0.3px" }}>AI Doubt Solver</div>
+                  <div className="text-[11px] font-normal leading-[1.5]" style={{ color: T3 }}>Get step-by-step guidance — not answers</div>
+                </div>
+              </div>
+
+              {doubtImagePreview && (
+                <div className="mb-3 relative rounded-[14px] overflow-hidden z-10" style={{ border: `0.5px solid ${BLUE_BDR}` }}>
+                  <img src={doubtImagePreview} alt="Doubt" className="w-full h-auto max-h-64 object-cover" />
+                  <button onClick={() => { setDoubtImagePreview(null); setDoubtImageB64(null); }}
+                    className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 text-white text-sm font-bold">×</button>
+                </div>
+              )}
+
+              <textarea value={doubtText} onChange={e => setDoubtText(e.target.value)}
+                placeholder="Type your doubt… e.g. 'I don't understand simultaneous equations'"
+                className="w-full py-3 px-4 rounded-[14px] text-[13px] outline-none resize-none min-h-[120px] leading-[1.6] relative z-10"
+                style={{ background: BG, border: `0.5px solid ${BLUE_BDR}`, color: T1, fontFamily: "DM Sans, sans-serif", letterSpacing: "-0.1px" }} />
+
+              <div className="flex gap-2 mt-4 relative z-10">
+                <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageUpload} className="hidden" />
+                <button onClick={() => fileInputRef.current?.click()}
+                  className="flex-1 h-12 rounded-[14px] text-[13px] font-bold flex items-center justify-center gap-2 transition-transform hover:scale-[1.02]"
+                  style={{ background: BG, color: T2, border: `0.5px solid ${BLUE_BDR}`, boxShadow: SH }}>
+                  <Camera className="w-4 h-4" strokeWidth={2} />
+                  Upload Photo
+                </button>
+                <button onClick={handleDoubtSubmit} disabled={generatingDoubt || (!doubtText.trim() && !doubtImageB64)}
+                  className="flex-[1.3] h-12 rounded-[14px] text-[13px] font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50 transition-transform hover:scale-[1.02]"
+                  style={{ background: `linear-gradient(135deg, ${PINK}, #FF77CC)`, boxShadow: "0 4px 14px rgba(255,59,168,0.30)" }}>
+                  {generatingDoubt ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" strokeWidth={2.3} />}
+                  Get Help
+                </button>
+              </div>
+            </div>
+
+            {/* Hints — col-3 */}
+            <div className="lg:col-span-3">
+              {generatingDoubt ? (
+                <div className="bg-white rounded-[22px] py-16 flex flex-col items-center"
+                  style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                  <Loader2 className="w-10 h-10 animate-spin" style={{ color: PINK }} />
+                  <p className="text-[13px] font-medium mt-3" style={{ color: T3 }}>Preparing your hints…</p>
+                </div>
+              ) : doubtHints.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="bg-white rounded-[18px] px-5 py-3 flex items-center justify-between"
+                    style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4" style={{ color: PINK }} strokeWidth={2.3} />
+                      <span className="text-[12px] font-bold" style={{ color: T2 }}>Hints revealed: {Math.min(hintIndex + 1, doubtHints.length)} / {doubtHints.length}</span>
+                    </div>
+                    <button onClick={() => { setDoubtHints([]); setHintIndex(0); setDoubtText(""); setDoubtImagePreview(null); setDoubtImageB64(null); }}
+                      className="text-[11px] font-bold" style={{ color: PINK }}>Ask another</button>
+                  </div>
+                  {doubtHints.slice(0, hintIndex + 1).map((hint, i) => (
+                    <div key={i} className="bg-white rounded-[18px] p-5 flex items-start gap-3"
+                      style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                      <div className="w-9 h-9 rounded-[11px] flex items-center justify-center shrink-0 text-[14px] font-bold text-white"
+                        style={{ background: `linear-gradient(135deg, ${PINK}, #FF77CC)`, boxShadow: "0 2px 8px rgba(255,59,168,0.28)" }}>
+                        {i + 1}
+                      </div>
+                      <p className="text-[14px] leading-[1.6]" style={{ color: T2 }}>{hint}</p>
+                    </div>
+                  ))}
+                  {hintIndex < doubtHints.length - 1 && (
+                    <button onClick={() => setHintIndex(hintIndex + 1)}
+                      className="w-full h-12 rounded-[14px] border-2 border-dashed text-[13px] font-bold flex items-center justify-center gap-2 transition-transform hover:scale-[1.01]"
+                      style={{ borderColor: "rgba(255,59,168,0.30)", color: PINK, background: "rgba(255,59,168,0.04)" }}>
+                      <ChevronRight className="w-4 h-4" />
+                      Next Hint ({hintIndex + 2}/{doubtHints.length})
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-white rounded-[22px] p-10 flex flex-col items-center justify-center text-center h-full relative overflow-hidden"
+                  style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                  <div className="absolute -top-[50px] -right-[30px] w-[180px] h-[180px] rounded-full pointer-events-none"
+                    style={{ background: "radial-gradient(circle, rgba(255,59,168,0.05) 0%, transparent 70%)" }} />
+                  <div className="w-[72px] h-[72px] rounded-[22px] flex items-center justify-center mb-4 relative z-10"
+                    style={{ background: `linear-gradient(135deg, ${PINK}, #FF77CC)`, boxShadow: "0 6px 22px rgba(255,59,168,0.42)" }}>
+                    <HelpCircle className="w-[32px] h-[32px] text-white" strokeWidth={2.2} />
+                  </div>
+                  <div className="text-[19px] font-bold mb-1 relative z-10" style={{ color: T1, letterSpacing: "-0.4px" }}>Stuck on Something?</div>
+                  <div className="text-[13px] font-normal leading-[1.55] max-w-[360px] relative z-10" style={{ color: T3 }}>
+                    Type your doubt or upload a photo. AI uses the Socratic method — guiding with progressive hints, never giving the direct answer.
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+      </div>
     </div>
   );
 };

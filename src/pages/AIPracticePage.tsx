@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { Loader2, Upload, Plus, Sparkles, Bell, FileText, Image as ImageIcon, MessageSquare, HardDrive, ChevronLeft, BarChart3 } from "lucide-react";
+import { Loader2, Upload, Plus, Sparkles, Bell, FileText, Image as ImageIcon, MessageSquare, HardDrive, ChevronLeft, BarChart3, Clock, CheckCircle2, XCircle, Lightbulb, RefreshCw, Award } from "lucide-react";
 import { useAuth } from "../lib/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ParentAIController } from "../ai/controller/ai-controller";
@@ -810,336 +810,626 @@ const AIPracticePage = () => {
     );
   }
 
+  // ── DESKTOP — Bright Blue Apple UI ───────────────────────────────────────
+  const B1 = "#0055FF", B2 = "#1166FF", B3 = "#2277FF", B4 = "#4499FF";
+  const BG_D = "#EEF4FF", BG2_D = "#E0ECFF";
+  const T1 = "#001040", T2 = "#002080", T3 = "#5070B0", T4 = "#99AACC";
+  const GREEN_D = "#00C853", RED_D = "#FF3355", ORANGE_D = "#FF8800", GOLD_D = "#FFCC22", PINK_D = "#FF3BA8", VIOLET_D = "#6B21E8";
+  const BLUE_BDR_D = "rgba(0,85,255,0.12)";
+  const SH_D = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.09), 0 10px 28px rgba(0,85,255,0.11)";
+  const SH_LG_D = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 18px 44px rgba(0,85,255,0.14)";
+  const SH_BTN_D = "0 6px 22px rgba(0,85,255,0.42), 0 2px 6px rgba(0,85,255,0.22)";
+
+  const avgScoreD = attempts.length > 0
+    ? Math.round(attempts.reduce((s, a) => s + (a.percentage || 0), 0) / attempts.length)
+    : 0;
+
+  const DesktopShell = ({ children }: { children: any }) => (
+    <div className="animate-in fade-in duration-500 -m-4 sm:-m-6 md:-m-8 min-h-[calc(100vh-64px)]"
+      style={{ fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif", background: BG_D }}>
+      <div className="w-full px-6 pt-8 pb-12">{children}</div>
+    </div>
+  );
+
   // ── HOME VIEW (Desktop) ──────────────────────────────────────────────────
   if (view === "home") return (
-    <div style={{ minHeight: "100vh", background: C.bg }}>
-      {/* Hero */}
-      <div style={{ background: "linear-gradient(145deg, #1e1b4b 0%, #312e81 50%, #4c1d95 100%)", padding: "28px 20px 24px", borderRadius: "0 0 28px 28px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-          <div style={{ padding: "5px 12px", borderRadius: 20, background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.18)", fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.8)", display: "flex", alignItems: "center", gap: 5 }}>
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="1.5" strokeLinecap="round"><path d="M5 1L6.5 4H9L7 6L7.8 9L5 7.5L2.2 9L3 6L1 4H3.5Z" /></svg>
-            AI POWERED
+    <DesktopShell>
+      {/* ── Toolbar ── */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <div className="text-[10px] font-bold uppercase tracking-[0.12em] mb-1 flex items-center gap-[7px]" style={{ color: T4 }}>
+            <span className="w-[6px] h-[6px] rounded-full" style={{ background: GREEN_D, boxShadow: "0 0 0 3px rgba(0,200,83,0.2)" }} />
+            Parent Dashboard · AI Practice
           </div>
-          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontWeight: 500 }}>USP Feature</span>
+          <h1 className="text-[32px] font-bold leading-none" style={{ color: T1, letterSpacing: "-0.8px" }}>AI Practice Exams</h1>
+          <div className="text-[13px] font-normal mt-[6px]" style={{ color: T3 }}>Upload syllabus, take AI exams, learn from mistakes.</div>
         </div>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: "#fff", lineHeight: 1.15, marginBottom: 6 }}>
-          AI Practice<br />Exams
-        </h1>
-        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", lineHeight: 1.5 }}>
-          Upload syllabus, take AI exams, learn from mistakes.
-        </p>
-
-        {/* Stats row */}
-        <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
-          {[
-            { label: "Streak", val: `${streak}d`, icon: "🔥" },
-            { label: "Exams", val: `${attempts.length}`, icon: "📝" },
-            { label: "Best", val: bestScore > 0 ? `${bestScore}%` : "—", icon: "⭐" },
-          ].map(s => (
-            <div key={s.label} style={{ flex: 1, padding: "10px 8px", borderRadius: 14, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.1)", textAlign: "center" }}>
-              <p style={{ fontSize: 16, marginBottom: 2 }}>{s.icon}</p>
-              <p style={{ fontSize: 16, fontWeight: 700, color: "#fff", margin: 0 }}>{s.val}</p>
-              <p style={{ fontSize: 9, color: "rgba(255,255,255,0.45)", marginTop: 2, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.label}</p>
-            </div>
-          ))}
+        <div className="flex items-center gap-[10px]">
+          <div className="px-[14px] py-[8px] rounded-full text-[12px] font-bold flex items-center gap-[6px]" style={{ background: "rgba(0,85,255,0.08)", color: B1, border: `0.5px solid ${BLUE_BDR_D}` }}>
+            <Sparkles className="w-[12px] h-[12px]" strokeWidth={2.5} />
+            USP Feature
+          </div>
+          <div className="w-10 h-10 rounded-full flex items-center justify-center text-[14px] font-bold text-white"
+            style={{ background: `linear-gradient(140deg, ${B1}, ${B2})`, boxShadow: "0 3px 12px rgba(0,85,255,0.36), 0 0 0 2px rgba(255,255,255,0.8)" }}>
+            {studentName?.[0]?.toUpperCase() || "S"}
+          </div>
         </div>
       </div>
 
-      <div style={{ padding: "16px 16px 100px", display: "flex", flexDirection: "column", gap: 14 }}>
-
-        {/* ── GitHub-style Heatmap Calendar ──────────────────────────── */}
-        <div style={card}>
-          <div style={{ padding: "14px 16px", borderBottom: `1px solid ${C.s2}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      {/* ── Hero Row: Big blue hero (col-2) + Streak card (col-1) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+        {/* Hero (col-2) */}
+        <div className="lg:col-span-2 rounded-[26px] px-8 py-8 relative overflow-hidden"
+          style={{ background: "linear-gradient(140deg, #0033CC 0%, #0055FF 40%, #2277FF 70%, #55AAFF 100%)", boxShadow: SH_BTN_D }}>
+          <div className="absolute -top-11 -right-8 w-[280px] h-[280px] rounded-full pointer-events-none"
+            style={{ background: "radial-gradient(circle, rgba(255,255,255,0.16) 0%, transparent 65%)" }} />
+          <div className="absolute -bottom-9 -left-5 w-[200px] h-[200px] rounded-full pointer-events-none"
+            style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.10)" }} />
+          <div className="absolute inset-0 pointer-events-none" style={{
+            backgroundImage: "linear-gradient(rgba(255,255,255,0.016) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.016) 1px, transparent 1px)",
+            backgroundSize: "22px 22px"
+          }} />
+          <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
             <div>
-              <p style={{ fontSize: 14, fontWeight: 600, color: C.ink, margin: 0 }}>Practice Calendar</p>
-              <p style={{ fontSize: 11, color: C.ink3, marginTop: 2 }}>{practiceDates.size} days practiced this year</p>
+              <div className="inline-flex items-center gap-[5px] px-3 py-[5px] rounded-full mb-4 text-[10px] font-bold uppercase tracking-[0.12em]"
+                style={{ background: "rgba(255,255,255,0.18)", border: "0.5px solid rgba(255,255,255,0.28)", color: "rgba(255,255,255,0.80)", backdropFilter: "blur(8px)" }}>
+                <Sparkles className="w-[12px] h-[12px]" strokeWidth={2.5} />
+                AI Powered
+              </div>
+              <h2 className="text-[44px] font-bold text-white leading-[1.05] mb-3" style={{ letterSpacing: "-1px" }}>
+                Practice<br />Smart.
+              </h2>
+              <p className="text-[14px] leading-[1.6]" style={{ color: "rgba(255,255,255,0.7)" }}>
+                Upload your syllabus and let AI generate personalised exams. Grade yourself, learn from mistakes, build streaks.
+              </p>
+              <button onClick={() => setView("upload")}
+                className="mt-5 h-12 px-6 rounded-[14px] text-[14px] font-bold flex items-center gap-2 transition-transform hover:scale-[1.02]"
+                style={{ background: "#fff", color: B1, boxShadow: "0 4px 14px rgba(0,0,0,0.12)", letterSpacing: "-0.1px" }}>
+                <Plus className="w-4 h-4" strokeWidth={2.5} /> New Practice Exam
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { icon: "🔥", val: `${streak}d`, label: "Streak" },
+                { icon: <BarChart3 className="w-[20px] h-[20px]" style={{ color: "rgba(255,255,255,0.80)" }} strokeWidth={2.2} />, val: `${attempts.length}`, label: "Exams" },
+                { icon: "⭐", val: bestScore > 0 ? `${bestScore}%` : "—", label: "Best" },
+              ].map(({ icon, val, label }) => (
+                <div key={label} className="rounded-[18px] py-5 px-3 flex flex-col items-center gap-1"
+                  style={{ background: "rgba(255,255,255,0.14)", border: "0.5px solid rgba(255,255,255,0.22)", backdropFilter: "blur(8px)" }}>
+                  <div className="h-[26px] flex items-center justify-center text-[22px] leading-none mb-1">
+                    {typeof icon === "string" ? icon : icon}
+                  </div>
+                  <div className="text-[22px] font-bold text-white leading-none" style={{ letterSpacing: "-0.6px" }}>{val}</div>
+                  <div className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(255,255,255,0.50)" }}>{label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Streak / Progress (col-1) */}
+        <div className="bg-white rounded-[22px] p-6 relative overflow-hidden"
+          style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+          <div className="absolute -top-[30px] -right-[20px] w-[140px] h-[140px] rounded-full pointer-events-none"
+            style={{ background: "radial-gradient(circle, rgba(255,136,0,0.08) 0%, transparent 70%)" }} />
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-[15px] flex items-center justify-center text-[24px] shrink-0"
+                style={{ background: `linear-gradient(135deg, ${ORANGE_D}, ${GOLD_D})`, boxShadow: "0 3px 12px rgba(255,136,0,0.30)" }}>
+                🔥
+              </div>
+              <div>
+                <div className="text-[16px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>Practice Streak</div>
+                <div className="text-[11px] font-normal" style={{ color: T3 }}>
+                  {streak > 0 ? "Keep the fire going!" : "Start today!"}
+                </div>
+              </div>
+            </div>
+            <div className="text-[44px] font-bold" style={{ color: ORANGE_D, letterSpacing: "-1px" }}>{streak}<span className="text-[24px]" style={{ color: T4 }}>d</span></div>
+
+            <div className="mt-4 pt-4" style={{ borderTop: `0.5px solid ${BLUE_BDR_D}` }}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-bold uppercase tracking-[0.10em]" style={{ color: T4 }}>Avg Score</span>
+                <span className="text-[15px] font-bold" style={{ color: avgScoreD >= 80 ? GREEN_D : avgScoreD >= 50 ? ORANGE_D : avgScoreD > 0 ? RED_D : T4 }}>
+                  {avgScoreD > 0 ? `${avgScoreD}%` : "—"}
+                </span>
+              </div>
+              <div className="h-[7px] rounded-[4px] overflow-hidden" style={{ background: BG2_D }}>
+                <div className="h-full rounded-[4px]" style={{ width: `${avgScoreD}%`, background: `linear-gradient(90deg, ${B1}, ${B4})`, transition: "width 1s cubic-bezier(0.4,0,0.2,1)" }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Main Row: Calendar (col-2) + Recent Attempts (col-1) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+        {/* Calendar */}
+        <div className="lg:col-span-2 bg-white rounded-[22px] p-6"
+          style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <div className="text-[17px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Practice Calendar</div>
+              <div className="text-[11px] font-normal mt-[3px]" style={{ color: T3 }}>{practiceDates.size} days practiced this year</div>
             </div>
             {streak > 0 && (
-              <div style={{ padding: "4px 10px", borderRadius: 20, background: "#fef3c7", fontSize: 11, fontWeight: 600, color: "#92400e" }}>
+              <div className="px-[10px] py-[5px] rounded-full text-[11px] font-bold flex items-center gap-[5px]"
+                style={{ background: "rgba(255,136,0,0.10)", color: "#884400", border: "0.5px solid rgba(255,136,0,0.22)" }}>
                 🔥 {streak} day streak
               </div>
             )}
           </div>
-          <div style={{ padding: "12px 16px", overflowX: "auto" }}>
-            <div style={{ display: "flex", gap: 2, minWidth: 700 }}>
+          <div className="overflow-x-auto">
+            <div className="flex gap-[3px] min-w-[700px]">
               {weeks.map((week, wi) => (
-                <div key={wi} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <div key={wi} className="flex flex-col gap-[3px]">
                   {week.map((day, di) => {
                     const today = new Date();
                     const isToday = day.date.toDateString() === today.toDateString();
                     const isFuture = day.date > today;
                     return (
-                      <div
-                        key={di}
+                      <div key={di}
                         title={day.date.toLocaleDateString()}
                         style={{
-                          width: 12, height: 12, borderRadius: 3,
-                          background: isFuture ? "transparent"
-                            : day.level > 0 ? "#22c55e"
-                            : "#e2e8f0",
-                          border: isToday ? "2px solid #6741D9" : "none",
-                          opacity: isFuture ? 0.2 : 1,
-                        }}
-                      />
+                          width: 14, height: 14, borderRadius: 3,
+                          background: isFuture ? "transparent" : day.level > 0 ? B1 : BG2_D,
+                          boxShadow: isToday ? "0 0 0 2px rgba(0,85,255,0.30), 0 0 0 4px rgba(0,85,255,0.10)" : "none",
+                          opacity: isFuture ? 0.15 : 1,
+                        }} />
                     );
                   })}
                 </div>
               ))}
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, fontSize: 10, color: C.ink3 }}>
-              Less
-              <div style={{ width: 10, height: 10, borderRadius: 2, background: "#e2e8f0" }} />
-              <div style={{ width: 10, height: 10, borderRadius: 2, background: "#86efac" }} />
-              <div style={{ width: 10, height: 10, borderRadius: 2, background: "#22c55e" }} />
-              <div style={{ width: 10, height: 10, borderRadius: 2, background: "#15803d" }} />
-              More
+            <div className="flex items-center gap-2 mt-4 text-[11px] font-semibold" style={{ color: T4 }}>
+              <span>Less</span>
+              {[BG2_D, "rgba(0,85,255,0.15)", "rgba(0,85,255,0.30)", "rgba(0,85,255,0.55)", B1].map((c, i) => (
+                <div key={i} className="w-[12px] h-[12px] rounded-[3px]" style={{ background: c }} />
+              ))}
+              <span>More</span>
             </div>
           </div>
         </div>
 
-        {/* ── New Practice Exam Button ──────────────────────────────── */}
-        <button onClick={() => setView("upload")} style={btnPrimary}>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round">
-            <line x1="8" y1="3" x2="8" y2="13" /><line x1="3" y1="8" x2="13" y2="8" />
-          </svg>
-          New Practice Exam
-        </button>
-
-        {/* ── Previously Uploaded Documents ─────────────────────────── */}
-        {documents.length > 0 && (
-          <div style={card}>
-            <div style={{ padding: "12px 16px", borderBottom: `1px solid ${C.s2}` }}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: C.ink, margin: 0 }}>Your Documents</p>
-              <p style={{ fontSize: 11, color: C.ink3, marginTop: 2 }}>Tap to practice from a saved syllabus</p>
+        {/* Recent Attempts sidebar */}
+        <div className="bg-white rounded-[22px] p-5"
+          style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+          <div className="text-[16px] font-bold mb-4" style={{ color: T1, letterSpacing: "-0.3px" }}>Recent Exams</div>
+          {attempts.length === 0 ? (
+            <div className="py-8 text-center text-[12px]" style={{ color: T4 }}>
+              No exams yet. Start your first one.
             </div>
-            {documents.map((doc, i) => (
-              <div key={doc.id} onClick={() => useDocument(doc)} style={{
-                display: "flex", alignItems: "center", gap: 10, padding: "12px 16px",
-                borderBottom: i < documents.length - 1 ? `1px solid ${C.s2}` : "none",
-                cursor: "pointer",
-              }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: C.plBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke={C.pur} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="2" width="10" height="12" rx="1.5" /><line x1="5.5" y1="6" x2="10.5" y2="6" /><line x1="5.5" y1="8.5" x2="9" y2="8.5" />
-                  </svg>
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 13, fontWeight: 500, color: C.ink, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{doc.fileName}</p>
-                  <p style={{ fontSize: 10, color: C.ink3, marginTop: 2 }}>{doc.pageCount || 0} pages · {doc.extractedTopics?.length || 0} topics</p>
-                </div>
-                <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke={C.ink3} strokeWidth="1.5" strokeLinecap="round"><polyline points="5,3 9,6.5 5,10" /></svg>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* ── Recent Attempts ──────────────────────────────────────── */}
-        {attempts.length > 0 && (
-          <div style={card}>
-            <div style={{ padding: "12px 16px", borderBottom: `1px solid ${C.s2}` }}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: C.ink, margin: 0 }}>Recent Attempts</p>
+          ) : (
+            <div className="space-y-[10px]">
+              {attempts.slice(0, 5).map(a => {
+                const pct = a.percentage || 0;
+                const passed = pct >= 80;
+                const review = pct >= 50 && pct < 80;
+                const iconBg = passed ? "rgba(0,200,83,0.10)" : review ? "rgba(255,136,0,0.10)" : "rgba(255,51,85,0.10)";
+                const iconBdr = passed ? "rgba(0,200,83,0.22)" : review ? "rgba(255,136,0,0.22)" : "rgba(255,51,85,0.22)";
+                const iconColor = passed ? GREEN_D : review ? ORANGE_D : RED_D;
+                return (
+                  <div key={a.id} className="rounded-[14px] px-3 py-3 flex items-center gap-3"
+                    style={{ background: BG_D, border: `0.5px solid ${BLUE_BDR_D}` }}>
+                    <div className="w-10 h-10 rounded-[11px] flex items-center justify-center shrink-0"
+                      style={{ background: iconBg, border: `0.5px solid ${iconBdr}` }}>
+                      <BarChart3 className="w-[16px] h-[16px]" style={{ color: iconColor }} strokeWidth={2.3} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[12px] font-bold truncate" style={{ color: T1, letterSpacing: "-0.1px" }}>{a.examTitle || a.topic || "Practice"}</div>
+                      <div className="text-[10px] mt-[2px]" style={{ color: T3 }}>
+                        {a.submittedAt?.toDate?.().toLocaleDateString(undefined, { month: "short", day: "numeric" }) || "—"} · {a.total || a.questionCount || 0}Q
+                      </div>
+                    </div>
+                    <div className="text-[15px] font-bold shrink-0" style={{ color: iconColor, letterSpacing: "-0.3px" }}>{pct}%</div>
+                  </div>
+                );
+              })}
             </div>
-            {attempts.slice(0, 5).map((a, i) => {
-              const scoreColor = (a.percentage || 0) >= 80 ? C.grn : (a.percentage || 0) >= 50 ? C.amb : C.red;
-              return (
-                <div key={a.id} style={{
-                  display: "flex", alignItems: "center", gap: 10, padding: "12px 16px",
-                  borderBottom: i < Math.min(attempts.length, 5) - 1 ? `1px solid ${C.s2}` : "none",
-                }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: `${scoreColor}18`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: scoreColor }}>
-                    {a.grade || "-"}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 13, fontWeight: 500, color: C.ink, margin: 0 }}>{a.examTitle || a.topic || "Practice"}</p>
-                    <p style={{ fontSize: 10, color: C.ink3, marginTop: 2 }}>
-                      {a.score}/{a.total} · {a.difficulty} · {a.submittedAt?.toDate?.().toLocaleDateString() || ""}
-                    </p>
-                  </div>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: scoreColor }}>{a.percentage || 0}%</span>
-                </div>
-              );
-            })}
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* ── Documents + Summary Row ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Documents */}
+        <div className="lg:col-span-2 bg-white rounded-[22px] p-6"
+          style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <div className="text-[17px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Your Documents</div>
+              <div className="text-[11px] font-normal mt-[3px]" style={{ color: T3 }}>Tap to practice from a saved syllabus</div>
+            </div>
+            <button onClick={() => setView("upload")}
+              className="px-4 py-[8px] rounded-[12px] text-[12px] font-bold text-white flex items-center gap-[5px] transition-transform hover:scale-[1.02]"
+              style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: SH_BTN_D }}>
+              <Upload className="w-[12px] h-[12px]" strokeWidth={2.5} /> Upload New
+            </button>
+          </div>
+          {documents.length === 0 ? (
+            <div className="py-10 text-center">
+              <div className="w-[64px] h-[64px] rounded-[20px] mx-auto mb-3 flex items-center justify-center"
+                style={{ background: "rgba(0,85,255,0.06)", border: `0.5px solid ${BLUE_BDR_D}` }}>
+                <FileText className="w-[28px] h-[28px]" style={{ color: B1 }} strokeWidth={1.8} />
+              </div>
+              <div className="text-[14px] font-bold mb-1" style={{ color: T1 }}>No documents yet</div>
+              <div className="text-[12px]" style={{ color: T3 }}>Upload your first syllabus to generate AI practice exams.</div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {documents.slice(0, 6).map(doc => (
+                <div key={doc.id} onClick={() => useDocument(doc)}
+                  className="rounded-[14px] px-4 py-3 flex items-center gap-3 cursor-pointer transition-transform hover:-translate-y-[1px]"
+                  style={{ background: BG_D, border: `0.5px solid ${BLUE_BDR_D}` }}>
+                  <div className="w-11 h-11 rounded-[12px] flex items-center justify-center shrink-0"
+                    style={{ background: "rgba(0,85,255,0.10)", border: "0.5px solid rgba(0,85,255,0.20)" }}>
+                    <FileText className="w-5 h-5" style={{ color: B1 }} strokeWidth={2} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-bold truncate" style={{ color: T1, letterSpacing: "-0.2px" }}>{doc.fileName}</div>
+                    <div className="text-[11px] mt-[2px]" style={{ color: T3 }}>{doc.pageCount || 0} pages · {doc.extractedTopics?.length || 0} topics</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Summary Dark Card */}
+        <div className="rounded-[22px] px-6 py-6 relative overflow-hidden"
+          style={{
+            background: "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)",
+            boxShadow: "0 8px 30px rgba(0,51,204,0.34), 0 0 0 0.5px rgba(255,255,255,0.14)",
+          }}>
+          <div className="absolute -top-10 -right-7 w-[200px] h-[200px] rounded-full pointer-events-none"
+            style={{ background: "radial-gradient(circle, rgba(255,255,255,0.14) 0%, transparent 65%)" }} />
+          <div className="absolute inset-0 pointer-events-none" style={{
+            backgroundImage: "linear-gradient(rgba(255,255,255,0.014) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.014) 1px, transparent 1px)",
+            backgroundSize: "24px 24px"
+          }} />
+          <div className="text-[10px] font-bold uppercase tracking-[0.12em] mb-2 relative z-10" style={{ color: "rgba(255,255,255,0.50)" }}>Exam History</div>
+          <div className="text-[19px] font-bold mb-5 relative z-10 text-white" style={{ letterSpacing: "-0.3px" }}>Your Totals</div>
+          <div className="grid grid-cols-3 rounded-[16px] overflow-hidden relative z-10" style={{ gap: "1px", background: "rgba(255,255,255,0.12)" }}>
+            <div className="py-4 px-3 text-center" style={{ background: "rgba(255,255,255,0.08)" }}>
+              <div className="text-[24px] font-bold text-white leading-none mb-1" style={{ letterSpacing: "-0.6px" }}>{attempts.length}</div>
+              <div className="text-[9px] font-bold uppercase tracking-[0.09em]" style={{ color: "rgba(255,255,255,0.42)" }}>Total</div>
+            </div>
+            <div className="py-4 px-3 text-center" style={{ background: "rgba(255,255,255,0.08)" }}>
+              <div className="text-[24px] font-bold text-white leading-none mb-1" style={{ letterSpacing: "-0.6px" }}>{avgScoreD > 0 ? `${avgScoreD}%` : "—"}</div>
+              <div className="text-[9px] font-bold uppercase tracking-[0.09em]" style={{ color: "rgba(255,255,255,0.42)" }}>Avg</div>
+            </div>
+            <div className="py-4 px-3 text-center" style={{ background: "rgba(255,255,255,0.08)" }}>
+              <div className="text-[24px] font-bold text-white leading-none mb-1" style={{ letterSpacing: "-0.6px" }}>{bestScore > 0 ? `${bestScore}%` : "—"}</div>
+              <div className="text-[9px] font-bold uppercase tracking-[0.09em]" style={{ color: "rgba(255,255,255,0.42)" }}>Best</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </DesktopShell>
   );
 
   // ── UPLOAD VIEW ───────────────────────────────────────────────────────────
   if (view === "upload") return (
-    <div style={{ minHeight: "100vh", background: C.bg, padding: "20px 16px 100px" }}>
-      <button onClick={() => setView("home")} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", marginBottom: 20, fontSize: 13, color: C.pur, fontWeight: 500 }}>
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke={C.pur} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><polyline points="8,2 3,6.5 8,11" /></svg>
-        Back
+    <DesktopShell>
+      {/* Back */}
+      <button onClick={() => setView("home")}
+        className="flex items-center gap-2 mb-6 px-4 py-[8px] rounded-[12px] cursor-pointer"
+        style={{ background: "#fff", border: `0.5px solid ${BLUE_BDR_D}`, boxShadow: SH_D, color: B1 }}>
+        <ChevronLeft className="w-4 h-4" strokeWidth={2.5} />
+        <span className="text-[13px] font-bold" style={{ letterSpacing: "-0.1px" }}>Back</span>
       </button>
 
-      <h2 style={{ fontSize: 22, fontWeight: 700, color: C.ink, marginBottom: 6 }}>Upload Syllabus</h2>
-      <p style={{ fontSize: 13, color: C.ink3, marginBottom: 20 }}>Upload a PDF of your chapter, notes, or syllabus.</p>
-
-      {/* Dropzone */}
-      <div
-        onDragOver={e => e.preventDefault()}
-        onDrop={handleDrop}
-        onClick={() => fileInputRef.current?.click()}
-        style={{
-          border: `2px dashed ${C.plBdr}`, borderRadius: 18, padding: "40px 20px",
-          background: C.plBg, display: "flex", flexDirection: "column",
-          alignItems: "center", gap: 10, cursor: "pointer", textAlign: "center",
-        }}
-      >
-        {extracting ? (
-          <Loader2 style={{ width: 32, height: 32, color: C.pur }} className="animate-spin" />
-        ) : (
-          <div style={{ width: 52, height: 52, borderRadius: 16, background: `${C.pur}22`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={C.pur} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="4" y="3" width="16" height="18" rx="2" /><line x1="8" y1="9" x2="16" y2="9" /><line x1="8" y1="12" x2="16" y2="12" /><line x1="8" y1="15" x2="12" y2="15" />
-            </svg>
-          </div>
-        )}
-        <p style={{ fontSize: 14, fontWeight: 600, color: C.pur }}>{extracting ? "Reading PDF..." : "Drop PDF here"}</p>
-        <p style={{ fontSize: 12, color: C.pur, opacity: 0.6 }}>or tap to browse · Max 20 MB</p>
-        <input ref={fileInputRef} type="file" accept="application/pdf" style={{ display: "none" }}
-          onChange={e => { if (e.target.files?.[0]) handleFileUpload(e.target.files[0]); }} />
+      <div className="mb-6">
+        <h1 className="text-[32px] font-bold leading-none" style={{ color: T1, letterSpacing: "-0.8px" }}>Upload Syllabus</h1>
+        <div className="text-[13px] font-normal mt-[6px]" style={{ color: T3 }}>Upload a PDF of your chapter, notes, or syllabus. AI will generate a practice exam.</div>
       </div>
 
-      {/* Previously uploaded */}
-      {documents.length > 0 && (
-        <div style={{ marginTop: 20 }}>
-          <p style={{ fontSize: 12, fontWeight: 600, color: C.ink3, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>Or use a saved document</p>
-          {documents.map(doc => (
-            <div key={doc.id} onClick={() => useDocument(doc)} style={{
-              display: "flex", alignItems: "center", gap: 10, padding: "12px 14px",
-              background: C.white, border: `1px solid ${C.bdr}`, borderRadius: 14,
-              cursor: "pointer", marginBottom: 8,
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-5">
+        {/* Drop Zone (col-3) */}
+        <div className="lg:col-span-3">
+          <div
+            onDragOver={e => e.preventDefault()}
+            onDrop={handleDrop}
+            onClick={() => !extracting && fileInputRef.current?.click()}
+            className="rounded-[22px] px-6 py-16 flex flex-col items-center gap-3 cursor-pointer transition-all"
+            style={{
+              border: `2px dashed ${(!!file || !!extractedText) ? "rgba(0,85,255,0.40)" : "rgba(0,85,255,0.25)"}`,
+              background: (!!file || !!extractedText) ? "rgba(0,85,255,0.04)" : "rgba(255,255,255,0.70)",
+              boxShadow: "0 0 0 6px rgba(0,85,255,0.04)",
             }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: C.plBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke={C.pur} strokeWidth="1.5" strokeLinecap="round"><rect x="3" y="2" width="10" height="12" rx="1.5" /><line x1="5.5" y1="6" x2="10.5" y2="6" /></svg>
+            {extracting ? (
+              <Loader2 className="w-[80px] h-[80px] animate-spin" style={{ color: B1 }} />
+            ) : (
+              <div className="w-[80px] h-[80px] rounded-[24px] flex items-center justify-center mb-2"
+                style={{
+                  background: (!!file || !!extractedText) ? `linear-gradient(135deg, ${B1}, ${B3})` : `linear-gradient(135deg, ${BG_D}, ${BG2_D})`,
+                  border: (!!file || !!extractedText) ? "none" : "0.5px solid rgba(0,85,255,0.18)",
+                  boxShadow: (!!file || !!extractedText) ? SH_BTN_D : SH_D,
+                }}>
+                <Upload className="w-[34px] h-[34px]" style={{ color: (!!file || !!extractedText) ? "#fff" : "rgba(0,85,255,0.55)" }} strokeWidth={2.2} />
               </div>
-              <div style={{ flex: 1 }}>
-                <p style={{ fontSize: 13, fontWeight: 500, color: C.ink, margin: 0 }}>{doc.fileName}</p>
-                <p style={{ fontSize: 10, color: C.ink3, marginTop: 2 }}>{doc.extractedTopics?.length || 0} topics extracted</p>
+            )}
+            <div className="text-[20px] font-bold text-center px-3" style={{ color: T1, letterSpacing: "-0.4px" }}>
+              {extracting ? "Reading PDF..." : file?.name || ((!!file || !!extractedText) ? "Syllabus Ready" : "Drop PDF Here")}
+            </div>
+            <div className="text-[13px] font-normal" style={{ color: T3 }}>or click to browse your files</div>
+            <div className="text-[11px] font-semibold" style={{ color: T4 }}>Max 20 MB · PDF only</div>
+            <input ref={fileInputRef} type="file" accept="application/pdf" style={{ display: "none" }}
+              onChange={e => { if (e.target.files?.[0]) handleFileUpload(e.target.files[0]); }} />
+          </div>
+
+          {/* CTA */}
+          <button
+            onClick={() => {
+              if ((!!file || !!extractedText) && extractedText) setView("configure");
+              else if (!extracting) fileInputRef.current?.click();
+            }}
+            disabled={extracting}
+            className="mt-4 w-full h-14 rounded-[18px] flex items-center justify-center gap-2 text-[15px] font-bold text-white disabled:opacity-60 transition-transform hover:scale-[1.01] relative overflow-hidden"
+            style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: SH_BTN_D, letterSpacing: "-0.1px" }}>
+            <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 52%)" }} />
+            {extracting ? (
+              <><Loader2 className="relative z-10 w-4 h-4 animate-spin" /><span className="relative z-10">Reading PDF…</span></>
+            ) : (
+              <><Upload className="relative z-10 w-4 h-4" strokeWidth={2.5} /><span className="relative z-10">Upload &amp; Generate Exam</span></>
+            )}
+          </button>
+        </div>
+
+        {/* Sidebar (col-2) */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* AI hint card */}
+          <div className="bg-white rounded-[22px] p-5 relative overflow-hidden"
+            style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+            <div className="absolute -top-[20px] -right-[20px] w-[120px] h-[120px] rounded-full pointer-events-none"
+              style={{ background: "radial-gradient(circle, rgba(0,85,255,0.06) 0%, transparent 70%)" }} />
+            <div className="flex items-center gap-3 mb-3 relative z-10">
+              <div className="w-11 h-11 rounded-[14px] flex items-center justify-center"
+                style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: "0 3px 10px rgba(0,85,255,0.28)" }}>
+                <Sparkles className="w-5 h-5 text-white" strokeWidth={2.3} />
+              </div>
+              <div className="text-[15px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>AI Generates 15-30 MCQs</div>
+            </div>
+            <div className="text-[12px] leading-[1.6] font-normal relative z-10" style={{ color: T3 }}>
+              Tailored to your syllabus with instant grading, explanations, and targeted feedback on weak areas.
+            </div>
+          </div>
+
+          {/* Supported formats */}
+          <div className="bg-white rounded-[22px] p-5"
+            style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+            <div className="text-[10px] font-bold uppercase tracking-[0.10em] mb-3" style={{ color: T4 }}>Supported Formats</div>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { label: "PDF", color: RED_D, bg: "rgba(255,51,85,0.10)", bdr: "rgba(255,51,85,0.22)" },
+                { label: "DOCX", color: B1, bg: "rgba(0,85,255,0.10)", bdr: "rgba(0,85,255,0.20)" },
+                { label: "JPG / PNG", color: "#007830", bg: "rgba(0,200,83,0.10)", bdr: "rgba(0,200,83,0.22)" },
+                { label: "TXT", color: T2, bg: "rgba(0,85,255,0.08)", bdr: "rgba(0,85,255,0.14)" },
+              ].map(({ label, color, bg, bdr }) => (
+                <div key={label} className="flex items-center gap-[5px] px-3 py-[6px] rounded-full text-[11px] font-bold"
+                  style={{ background: bg, color, border: `0.5px solid ${bdr}` }}>
+                  <FileText className="w-[11px] h-[11px]" strokeWidth={2.5} />
+                  {label}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Saved documents */}
+          {documents.length > 0 && (
+            <div className="bg-white rounded-[22px] p-5"
+              style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+              <div className="text-[15px] font-bold mb-3" style={{ color: T1, letterSpacing: "-0.3px" }}>Saved Documents</div>
+              <div className="space-y-2">
+                {documents.slice(0, 4).map(doc => (
+                  <div key={doc.id} onClick={() => useDocument(doc)}
+                    className="rounded-[13px] px-3 py-[10px] flex items-center gap-3 cursor-pointer transition-transform hover:-translate-y-[1px]"
+                    style={{ background: BG_D, border: `0.5px solid ${BLUE_BDR_D}` }}>
+                    <div className="w-9 h-9 rounded-[11px] flex items-center justify-center shrink-0"
+                      style={{ background: "rgba(0,85,255,0.10)", border: "0.5px solid rgba(0,85,255,0.20)" }}>
+                      <FileText className="w-[16px] h-[16px]" style={{ color: B1 }} strokeWidth={2} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[12px] font-bold truncate" style={{ color: T1 }}>{doc.fileName}</div>
+                      <div className="text-[10px] mt-[2px]" style={{ color: T3 }}>{doc.extractedTopics?.length || 0} topics</div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-          ))}
+          )}
         </div>
-      )}
-    </div>
+      </div>
+    </DesktopShell>
   );
 
   // ── CONFIGURE VIEW ────────────────────────────────────────────────────────
   if (view === "configure") return (
-    <div style={{ minHeight: "100vh", background: C.bg, padding: "20px 16px 100px" }}>
-      <button onClick={() => setView("upload")} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", marginBottom: 20, fontSize: 13, color: C.pur, fontWeight: 500 }}>
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke={C.pur} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><polyline points="8,2 3,6.5 8,11" /></svg>
-        Back
+    <DesktopShell>
+      <button onClick={() => setView("upload")}
+        className="flex items-center gap-2 mb-6 px-4 py-[8px] rounded-[12px] cursor-pointer"
+        style={{ background: "#fff", border: `0.5px solid ${BLUE_BDR_D}`, boxShadow: SH_D, color: B1 }}>
+        <ChevronLeft className="w-4 h-4" strokeWidth={2.5} />
+        <span className="text-[13px] font-bold" style={{ letterSpacing: "-0.1px" }}>Back</span>
       </button>
 
-      <h2 style={{ fontSize: 22, fontWeight: 700, color: C.ink, marginBottom: 6 }}>Configure Exam</h2>
-      <p style={{ fontSize: 13, color: C.ink3, marginBottom: 20 }}>
-        {file?.name || "Saved document"} · {pageCount} pages · {extractedTopics.length} topics found
-      </p>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-
-        {/* Topic */}
-        <div>
-          <p style={{ fontSize: 11, fontWeight: 600, color: C.ink3, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Topic</p>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {extractedTopics.map(t => (
-              <button key={t} onClick={() => setTopic(t)} style={{
-                padding: "8px 14px", borderRadius: 20,
-                background: topic === t ? C.pur : C.white,
-                color: topic === t ? "#fff" : C.ink2,
-                border: topic === t ? "none" : `1px solid ${C.bdr}`,
-                fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
-              }}>
-                {t}
-              </button>
-            ))}
-          </div>
+      <div className="mb-6">
+        <h1 className="text-[32px] font-bold leading-none" style={{ color: T1, letterSpacing: "-0.8px" }}>Configure Exam</h1>
+        <div className="text-[13px] font-normal mt-[6px]" style={{ color: T3 }}>
+          <strong style={{ color: B1 }}>{file?.name || "Saved document"}</strong> · {pageCount} pages · {extractedTopics.length} topics
         </div>
-
-        {/* Difficulty */}
-        <div>
-          <p style={{ fontSize: 11, fontWeight: 600, color: C.ink3, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Difficulty</p>
-          <div style={{ display: "flex", gap: 8 }}>
-            {DIFFICULTIES.map(d => (
-              <button key={d} onClick={() => setDifficulty(d)} style={{
-                flex: 1, padding: "10px 0", borderRadius: 12,
-                background: difficulty === d ? (d === "Easy" ? C.grn : d === "Medium" ? C.amb : C.red) : C.white,
-                color: difficulty === d ? "#fff" : C.ink2,
-                border: difficulty === d ? "none" : `1px solid ${C.bdr}`,
-                fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
-              }}>
-                {d}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Question Type */}
-        <div>
-          <p style={{ fontSize: 11, fontWeight: 600, color: C.ink3, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Question Type</p>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {Q_TYPES.map(q => (
-              <button key={q.id} onClick={() => setQuestionType(q.id)} style={{
-                padding: "8px 14px", borderRadius: 20,
-                background: questionType === q.id ? C.blue : C.white,
-                color: questionType === q.id ? "#fff" : C.ink2,
-                border: questionType === q.id ? "none" : `1px solid ${C.bdr}`,
-                fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
-              }}>
-                {q.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Question Count */}
-        <div>
-          <p style={{ fontSize: 11, fontWeight: 600, color: C.ink3, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Number of Questions</p>
-          <div style={{ display: "flex", gap: 8 }}>
-            {Q_COUNTS.map(n => (
-              <button key={n} onClick={() => setQuestionCount(n)} style={{
-                flex: 1, padding: "10px 0", borderRadius: 12,
-                background: questionCount === n ? C.ink : C.white,
-                color: questionCount === n ? "#fff" : C.ink2,
-                border: questionCount === n ? "none" : `1px solid ${C.bdr}`,
-                fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
-              }}>
-                {n}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Time Limit */}
-        <div>
-          <p style={{ fontSize: 11, fontWeight: 600, color: C.ink3, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Time Limit</p>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {TIME_LIMITS.map(t => (
-              <button key={t.val} onClick={() => setTimeLimit(t.val)} style={{
-                padding: "8px 14px", borderRadius: 20,
-                background: timeLimit === t.val ? C.tea : C.white,
-                color: timeLimit === t.val ? "#fff" : C.ink2,
-                border: timeLimit === t.val ? "none" : `1px solid ${C.bdr}`,
-                fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
-              }}>
-                {t.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Generate button */}
-        <button onClick={handleGenerateExam} disabled={generating} style={{ ...btnPrimary, opacity: generating ? 0.7 : 1 }}>
-          {generating ? <Loader2 style={{ width: 16, height: 16 }} className="animate-spin" /> : (
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"><path d="M8 2L9.8 6.5H14L10.7 9.2L11.8 14L8 11.5L4.2 14L5.3 9.2L2 6.5H6.2Z" /></svg>
-          )}
-          {generating ? "Generating..." : "Generate Exam"}
-        </button>
       </div>
-    </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Config Card (col-2) */}
+        <div className="lg:col-span-2 bg-white rounded-[22px] p-6 space-y-6"
+          style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+
+          {/* Topic */}
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.10em] mb-3" style={{ color: T4 }}>Topic</div>
+            <div className="flex flex-wrap gap-2">
+              {extractedTopics.map(t => {
+                const isActive = topic === t;
+                return (
+                  <button key={t} onClick={() => setTopic(t)}
+                    className="px-4 py-[8px] rounded-[12px] text-[12px] font-bold transition-transform hover:scale-[1.02]"
+                    style={isActive ? {
+                      background: `linear-gradient(135deg, ${B1}, ${B2})`, color: "#fff",
+                      boxShadow: SH_BTN_D,
+                    } : {
+                      background: BG_D, color: T3,
+                      border: `0.5px solid ${BLUE_BDR_D}`,
+                    }}>
+                    {t}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Difficulty */}
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.10em] mb-3" style={{ color: T4 }}>Difficulty</div>
+            <div className="grid grid-cols-3 gap-2">
+              {DIFFICULTIES.map(d => {
+                const isActive = difficulty === d;
+                const colorMap: Record<string, string> = { Easy: GREEN_D, Medium: ORANGE_D, Hard: RED_D };
+                const col = colorMap[d];
+                return (
+                  <button key={d} onClick={() => setDifficulty(d)}
+                    className="h-12 rounded-[14px] text-[14px] font-bold transition-transform hover:scale-[1.02]"
+                    style={isActive ? {
+                      background: `linear-gradient(135deg, ${col}, ${col}dd)`, color: "#fff",
+                      boxShadow: `0 3px 12px ${col}55`,
+                    } : {
+                      background: BG_D, color: T3,
+                      border: `0.5px solid ${BLUE_BDR_D}`,
+                    }}>
+                    {d}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Question Type */}
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.10em] mb-3" style={{ color: T4 }}>Question Type</div>
+            <div className="flex flex-wrap gap-2">
+              {Q_TYPES.map(q => {
+                const isActive = questionType === q.id;
+                return (
+                  <button key={q.id} onClick={() => setQuestionType(q.id)}
+                    className="px-5 py-[10px] rounded-[12px] text-[12px] font-bold transition-transform hover:scale-[1.02]"
+                    style={isActive ? {
+                      background: `linear-gradient(135deg, ${B1}, ${B2})`, color: "#fff",
+                      boxShadow: SH_BTN_D,
+                    } : {
+                      background: BG_D, color: T3,
+                      border: `0.5px solid ${BLUE_BDR_D}`,
+                    }}>
+                    {q.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Question Count */}
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.10em] mb-3" style={{ color: T4 }}>Number of Questions</div>
+            <div className="grid grid-cols-4 gap-2">
+              {Q_COUNTS.map(n => {
+                const isActive = questionCount === n;
+                return (
+                  <button key={n} onClick={() => setQuestionCount(n)}
+                    className="h-12 rounded-[14px] text-[15px] font-bold transition-transform hover:scale-[1.02]"
+                    style={isActive ? {
+                      background: "linear-gradient(135deg, #001040, #002080)", color: "#fff",
+                      boxShadow: "0 4px 14px rgba(0,16,64,0.32)",
+                    } : {
+                      background: BG_D, color: T3,
+                      border: `0.5px solid ${BLUE_BDR_D}`,
+                    }}>
+                    {n}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Time Limit */}
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.10em] mb-3" style={{ color: T4 }}>Time Limit</div>
+            <div className="flex flex-wrap gap-2">
+              {TIME_LIMITS.map(t => {
+                const isActive = timeLimit === t.val;
+                return (
+                  <button key={t.val} onClick={() => setTimeLimit(t.val)}
+                    className="px-4 py-[10px] rounded-[12px] text-[12px] font-bold flex items-center gap-[5px] transition-transform hover:scale-[1.02]"
+                    style={isActive ? {
+                      background: "linear-gradient(135deg, #00C4B4, #22DDCC)", color: "#fff",
+                      boxShadow: "0 3px 12px rgba(0,196,180,0.32)",
+                    } : {
+                      background: BG_D, color: T3,
+                      border: `0.5px solid ${BLUE_BDR_D}`,
+                    }}>
+                    <Clock className="w-[11px] h-[11px]" strokeWidth={2.5} />
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Summary + Generate (col-1) */}
+        <div className="space-y-4">
+          {/* Summary dark card */}
+          <div className="rounded-[22px] px-5 py-6 relative overflow-hidden"
+            style={{
+              background: "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)",
+              boxShadow: "0 8px 30px rgba(0,51,204,0.34), 0 0 0 0.5px rgba(255,255,255,0.14)",
+            }}>
+            <div className="absolute -top-[30px] -right-[20px] w-[160px] h-[160px] rounded-full pointer-events-none"
+              style={{ background: "radial-gradient(circle, rgba(255,255,255,0.14) 0%, transparent 65%)" }} />
+            <div className="relative z-10">
+              <div className="text-[10px] font-bold uppercase tracking-[0.12em] mb-3" style={{ color: "rgba(255,255,255,0.50)" }}>Exam Preview</div>
+              <div className="space-y-3">
+                {[
+                  { label: "Topic", val: topic || "—" },
+                  { label: "Difficulty", val: difficulty },
+                  { label: "Type", val: Q_TYPES.find(q => q.id === questionType)?.label || questionType },
+                  { label: "Questions", val: `${questionCount}` },
+                  { label: "Time", val: TIME_LIMITS.find(t => t.val === timeLimit)?.label || "—" },
+                ].map(({ label, val }) => (
+                  <div key={label} className="flex items-center justify-between" style={{ borderBottom: "0.5px solid rgba(255,255,255,0.10)", paddingBottom: 10 }}>
+                    <span className="text-[11px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(255,255,255,0.50)" }}>{label}</span>
+                    <span className="text-[13px] font-bold text-white truncate max-w-[160px]" style={{ letterSpacing: "-0.1px" }}>{val}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Generate button */}
+          <button onClick={handleGenerateExam} disabled={generating}
+            className="w-full h-14 rounded-[18px] flex items-center justify-center gap-2 text-[15px] font-bold text-white disabled:opacity-60 transition-transform hover:scale-[1.02] relative overflow-hidden"
+            style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: SH_BTN_D, letterSpacing: "-0.1px" }}>
+            <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 52%)" }} />
+            {generating ? <Loader2 className="relative z-10 w-5 h-5 animate-spin" /> : <Sparkles className="relative z-10 w-5 h-5" strokeWidth={2.3} />}
+            <span className="relative z-10">{generating ? "Generating…" : "Generate Exam"}</span>
+          </button>
+
+          <div className="bg-white rounded-[16px] p-4 text-[11px] leading-[1.55] font-normal flex items-start gap-2"
+            style={{ boxShadow: SH_D, border: "0.5px solid rgba(0,85,255,0.10)", color: T3 }}>
+            <Sparkles className="w-[12px] h-[12px] shrink-0 mt-[2px]" style={{ color: B1 }} strokeWidth={2.3} />
+            AI tailors the question difficulty and mixes topics based on what you configured.
+          </div>
+        </div>
+      </div>
+    </DesktopShell>
   );
 
   // ── EXAM VIEW ─────────────────────────────────────────────────────────────
@@ -1147,269 +1437,363 @@ const AIPracticePage = () => {
     const q = questions[currentQ];
     const timerStr = timeLimit > 0 ? `${Math.floor(timerSec / 60)}:${String(timerSec % 60).padStart(2, "0")}` : "";
     const answered = answers.filter(a => a !== "").length;
+    const timerLow = timerSec < 60;
 
     return (
-      <div style={{ minHeight: "100vh", background: C.bg }}>
-        {/* Exam header */}
-        <div style={{ background: C.ink, padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div>
-            <p style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.06em" }}>{examTitle}</p>
-            <p style={{ fontSize: 13, color: "#fff", fontWeight: 600, marginTop: 2 }}>
-              Q {currentQ + 1} of {questions.length}
-            </p>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {timerStr && (
-              <div style={{ padding: "6px 12px", borderRadius: 20, background: timerSec < 60 ? "rgba(220,38,38,0.3)" : "rgba(255,255,255,0.1)", fontSize: 13, fontWeight: 600, color: timerSec < 60 ? "#fca5a5" : "#fff" }}>
-                ⏱ {timerStr}
+      <DesktopShell>
+        {/* ── Exam Header Hero ── */}
+        <div className="rounded-[26px] px-8 py-6 mb-5 relative overflow-hidden"
+          style={{
+            background: timerLow && timerStr
+              ? "linear-gradient(140deg, #661122 0%, #991133 50%, #CC1144 100%)"
+              : "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)",
+            boxShadow: "0 8px 30px rgba(0,51,204,0.34), 0 0 0 0.5px rgba(255,255,255,0.14)",
+          }}>
+          <div className="absolute -top-[40px] -right-[30px] w-[260px] h-[260px] rounded-full pointer-events-none"
+            style={{ background: "radial-gradient(circle, rgba(255,255,255,0.14) 0%, transparent 65%)" }} />
+          <div className="relative z-10 flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-[0.12em] mb-2" style={{ color: "rgba(255,255,255,0.55)" }}>{examTitle}</div>
+              <div className="text-[28px] font-bold text-white leading-none" style={{ letterSpacing: "-0.6px" }}>
+                Question {currentQ + 1} <span style={{ color: "rgba(255,255,255,0.45)" }}>/ {questions.length}</span>
               </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {timerStr && (
+                <div className="px-4 py-3 rounded-[14px] flex items-center gap-2"
+                  style={{ background: "rgba(255,255,255,0.14)", border: "0.5px solid rgba(255,255,255,0.22)", backdropFilter: "blur(8px)" }}>
+                  <Clock className="w-[16px] h-[16px] text-white" strokeWidth={2.5} />
+                  <span className="text-[16px] font-bold text-white tabular-nums" style={{ letterSpacing: "-0.3px" }}>{timerStr}</span>
+                </div>
+              )}
+              <div className="px-4 py-3 rounded-[14px] text-[13px] font-bold text-white"
+                style={{ background: "rgba(255,255,255,0.14)", border: "0.5px solid rgba(255,255,255,0.22)", backdropFilter: "blur(8px)" }}>
+                {answered} <span style={{ color: "rgba(255,255,255,0.55)" }}>/ {questions.length}</span> answered
+              </div>
+            </div>
+          </div>
+          {/* Progress bar */}
+          <div className="mt-5 h-[6px] rounded-full relative z-10" style={{ background: "rgba(255,255,255,0.16)" }}>
+            <div className="h-full rounded-full" style={{ width: `${((currentQ + 1) / questions.length) * 100}%`, background: "#fff", boxShadow: "0 0 10px rgba(255,255,255,0.5)", transition: "width 0.3s" }} />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+          {/* Question Card (col-3) */}
+          <div className="lg:col-span-3 bg-white rounded-[22px] p-8"
+            style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+            {q && (
+              <>
+                <div className="flex items-center gap-2 mb-5">
+                  <div className="px-[10px] py-[5px] rounded-full text-[10px] font-bold uppercase tracking-[0.10em]"
+                    style={{ background: "rgba(0,85,255,0.10)", color: B1, border: `0.5px solid ${BLUE_BDR_D}` }}>
+                    {q.type.replace("_", " ")}
+                  </div>
+                  <div className="text-[11px] font-medium" style={{ color: T4 }}>{difficulty}</div>
+                </div>
+
+                <p className="text-[20px] font-semibold leading-[1.5] mb-6" style={{ color: T1, letterSpacing: "-0.3px" }}>
+                  {q.questionText}
+                </p>
+
+                {(q.type === "mcq" || q.type === "true_false") && q.options.length > 0 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {q.options.map((opt, oi) => {
+                      const selected = answers[currentQ] === opt;
+                      return (
+                        <button key={oi} onClick={() => {
+                          const newAns = [...answers]; newAns[currentQ] = opt; setAnswers(newAns);
+                        }}
+                          className="text-left px-5 py-4 rounded-[16px] flex items-center gap-3 transition-transform hover:-translate-y-[1px]"
+                          style={selected ? {
+                            background: `linear-gradient(135deg, ${B1}, ${B2})`,
+                            color: "#fff",
+                            border: "0.5px solid rgba(255,255,255,0.2)",
+                            boxShadow: SH_BTN_D,
+                          } : {
+                            background: BG_D,
+                            color: T2,
+                            border: `0.5px solid ${BLUE_BDR_D}`,
+                          }}>
+                          <span className="w-9 h-9 rounded-[11px] flex items-center justify-center text-[14px] font-bold shrink-0"
+                            style={{
+                              background: selected ? "rgba(255,255,255,0.22)" : "#fff",
+                              color: selected ? "#fff" : T3,
+                              border: selected ? "none" : `0.5px solid ${BLUE_BDR_D}`,
+                            }}>
+                            {String.fromCharCode(65 + oi)}
+                          </span>
+                          <span className="text-[14px] font-medium">{opt}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {(q.type === "fill_blank" || q.type === "short_answer") && (
+                  <textarea
+                    value={answers[currentQ] || ""}
+                    onChange={e => { const newAns = [...answers]; newAns[currentQ] = e.target.value; setAnswers(newAns); }}
+                    placeholder={q.type === "fill_blank" ? "Type your answer..." : "Write your answer (2-3 sentences)..."}
+                    rows={q.type === "short_answer" ? 5 : 3}
+                    className="w-full px-5 py-4 rounded-[16px] text-[14px] outline-none resize-none leading-[1.6]"
+                    style={{ background: BG_D, border: `0.5px solid ${BLUE_BDR_D}`, color: T1, fontFamily: "DM Sans, sans-serif" }}
+                  />
+                )}
+              </>
             )}
-            <div style={{ padding: "6px 12px", borderRadius: 20, background: "rgba(255,255,255,0.1)", fontSize: 11, color: "rgba(255,255,255,0.7)", fontWeight: 500 }}>
-              {answered}/{questions.length}
+
+            {/* Navigation */}
+            <div className="flex gap-3 mt-8">
+              {currentQ > 0 && (
+                <button onClick={() => setCurrentQ(currentQ - 1)}
+                  className="flex-1 h-12 rounded-[14px] flex items-center justify-center gap-2 text-[13px] font-bold transition-transform hover:scale-[1.01]"
+                  style={{ background: "#fff", color: T2, border: `0.5px solid ${BLUE_BDR_D}`, boxShadow: SH_D }}>
+                  <ChevronLeft className="w-4 h-4" strokeWidth={2.5} /> Previous
+                </button>
+              )}
+              {currentQ < questions.length - 1 ? (
+                <button onClick={() => setCurrentQ(currentQ + 1)}
+                  className="flex-1 h-12 rounded-[14px] flex items-center justify-center gap-2 text-[13px] font-bold text-white transition-transform hover:scale-[1.01]"
+                  style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: SH_BTN_D, letterSpacing: "-0.1px" }}>
+                  Next <ChevronLeft className="w-4 h-4 rotate-180" strokeWidth={2.5} />
+                </button>
+              ) : (
+                <button onClick={handleSubmitExam}
+                  className="flex-1 h-12 rounded-[14px] flex items-center justify-center gap-2 text-[13px] font-bold text-white transition-transform hover:scale-[1.01]"
+                  style={{ background: `linear-gradient(135deg, ${GREEN_D}, #22EE66)`, boxShadow: "0 4px 14px rgba(0,200,83,0.36)", letterSpacing: "-0.1px" }}>
+                  ✓ Submit Exam
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Question dots (col-1) */}
+          <div className="bg-white rounded-[22px] p-6"
+            style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+            <div className="text-[15px] font-bold mb-4" style={{ color: T1, letterSpacing: "-0.3px" }}>All Questions</div>
+            <div className="grid grid-cols-5 gap-2">
+              {questions.map((_, i) => {
+                const isCurrent = i === currentQ;
+                const isAnswered = !!answers[i];
+                return (
+                  <button key={i} onClick={() => setCurrentQ(i)}
+                    className="aspect-square rounded-[10px] flex items-center justify-center text-[12px] font-bold transition-transform hover:scale-105"
+                    style={isCurrent ? {
+                      background: `linear-gradient(135deg, ${B1}, ${B2})`, color: "#fff",
+                      boxShadow: SH_BTN_D,
+                    } : isAnswered ? {
+                      background: `linear-gradient(135deg, ${GREEN_D}, #22EE66)`, color: "#fff",
+                      boxShadow: "0 2px 8px rgba(0,200,83,0.28)",
+                    } : {
+                      background: BG_D, color: T3,
+                      border: `0.5px solid ${BLUE_BDR_D}`,
+                    }}>
+                    {i + 1}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-5 pt-4 space-y-2" style={{ borderTop: `0.5px solid ${BLUE_BDR_D}` }}>
+              <div className="flex items-center gap-2 text-[11px] font-semibold" style={{ color: T3 }}>
+                <div className="w-3 h-3 rounded-[4px]" style={{ background: `linear-gradient(135deg, ${B1}, ${B2})` }} />
+                Current
+              </div>
+              <div className="flex items-center gap-2 text-[11px] font-semibold" style={{ color: T3 }}>
+                <div className="w-3 h-3 rounded-[4px]" style={{ background: `linear-gradient(135deg, ${GREEN_D}, #22EE66)` }} />
+                Answered
+              </div>
+              <div className="flex items-center gap-2 text-[11px] font-semibold" style={{ color: T3 }}>
+                <div className="w-3 h-3 rounded-[4px]" style={{ background: BG_D, border: `0.5px solid ${BLUE_BDR_D}` }} />
+                Not yet
+              </div>
             </div>
           </div>
         </div>
-
-        {/* Progress bar */}
-        <div style={{ height: 4, background: C.s2 }}>
-          <div style={{ height: "100%", background: C.pur, width: `${((currentQ + 1) / questions.length) * 100}%`, transition: "width 0.3s", borderRadius: "0 2px 2px 0" }} />
-        </div>
-
-        <div style={{ padding: "20px 16px 120px" }}>
-          {q && (
-            <>
-              {/* Question type badge */}
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>
-                <span style={{ padding: "4px 10px", borderRadius: 20, background: C.plBg, fontSize: 10, fontWeight: 600, color: C.pur, textTransform: "uppercase" }}>{q.type.replace("_", " ")}</span>
-                <span style={{ fontSize: 11, color: C.ink3 }}>{difficulty}</span>
-              </div>
-
-              {/* Question text */}
-              <p style={{ fontSize: 16, fontWeight: 600, color: C.ink, lineHeight: 1.5, marginBottom: 20 }}>
-                {q.questionText}
-              </p>
-
-              {/* Answer area */}
-              {(q.type === "mcq" || q.type === "true_false") && q.options.length > 0 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {q.options.map((opt, oi) => {
-                    const selected = answers[currentQ] === opt;
-                    return (
-                      <button key={oi} onClick={() => {
-                        const newAns = [...answers]; newAns[currentQ] = opt; setAnswers(newAns);
-                      }} style={{
-                        padding: "14px 16px", borderRadius: 14, textAlign: "left",
-                        background: selected ? C.pur : C.white,
-                        color: selected ? "#fff" : C.ink,
-                        border: selected ? "2px solid " + C.pur : `1.5px solid ${C.bdr}`,
-                        fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
-                        display: "flex", alignItems: "center", gap: 10,
-                        transition: "all 0.15s",
-                      }}>
-                        <span style={{
-                          width: 28, height: 28, borderRadius: 8,
-                          background: selected ? "rgba(255,255,255,0.2)" : C.s1,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 12, fontWeight: 700, flexShrink: 0,
-                          color: selected ? "#fff" : C.ink3,
-                        }}>
-                          {String.fromCharCode(65 + oi)}
-                        </span>
-                        {opt}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {(q.type === "fill_blank" || q.type === "short_answer") && (
-                <textarea
-                  value={answers[currentQ] || ""}
-                  onChange={e => { const newAns = [...answers]; newAns[currentQ] = e.target.value; setAnswers(newAns); }}
-                  placeholder={q.type === "fill_blank" ? "Type your answer..." : "Write your answer (2-3 sentences)..."}
-                  rows={q.type === "short_answer" ? 4 : 2}
-                  style={{
-                    width: "100%", padding: "14px 16px", borderRadius: 14,
-                    border: `1.5px solid ${C.bdr}`, background: C.white,
-                    fontSize: 14, color: C.ink, fontFamily: "inherit",
-                    outline: "none", resize: "none",
-                  }}
-                />
-              )}
-            </>
-          )}
-
-          {/* Navigation */}
-          <div style={{ display: "flex", gap: 8, marginTop: 24 }}>
-            {currentQ > 0 && (
-              <button onClick={() => setCurrentQ(currentQ - 1)} style={{
-                flex: 1, padding: 14, borderRadius: 14,
-                background: C.white, border: `1.5px solid ${C.bdr}`,
-                color: C.ink2, fontSize: 14, fontWeight: 600,
-                cursor: "pointer", fontFamily: "inherit",
-              }}>
-                ← Previous
-              </button>
-            )}
-            {currentQ < questions.length - 1 ? (
-              <button onClick={() => setCurrentQ(currentQ + 1)} style={{
-                flex: 1, padding: 14, borderRadius: 14,
-                background: C.pur, border: "none", color: "#fff",
-                fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
-              }}>
-                Next →
-              </button>
-            ) : (
-              <button onClick={handleSubmitExam} style={{
-                flex: 1, padding: 14, borderRadius: 14,
-                background: C.grn, border: "none", color: "#fff",
-                fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
-              }}>
-                ✓ Submit Exam
-              </button>
-            )}
-          </div>
-
-          {/* Question dots */}
-          <div style={{ display: "flex", gap: 4, justifyContent: "center", marginTop: 16, flexWrap: "wrap" }}>
-            {questions.map((_, i) => (
-              <div key={i} onClick={() => setCurrentQ(i)} style={{
-                width: 24, height: 24, borderRadius: 6,
-                background: i === currentQ ? C.pur : answers[i] ? C.grn : C.s2,
-                color: i === currentQ || answers[i] ? "#fff" : C.ink3,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 10, fontWeight: 600, cursor: "pointer",
-              }}>
-                {i + 1}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      </DesktopShell>
     );
   }
 
   // ── RESULTS VIEW ──────────────────────────────────────────────────────────
   if (view === "results") {
-    const scoreColor = result ? ((result.percentage || 0) >= 80 ? C.grn : (result.percentage || 0) >= 50 ? C.amb : C.red) : C.ink3;
+    const pct = result?.percentage || 0;
+    const passed = pct >= 80;
+    const review = pct >= 50 && pct < 80;
+    const scoreColor = passed ? GREEN_D : review ? ORANGE_D : RED_D;
+    const heroGrad = evaluating
+      ? "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)"
+      : passed
+        ? "linear-gradient(140deg, #005A22 0%, #00A040 50%, #00C853 100%)"
+        : review
+          ? "linear-gradient(140deg, #663300 0%, #CC6600 50%, #FF8800 100%)"
+          : "linear-gradient(140deg, #661122 0%, #AA1144 50%, #FF3355 100%)";
 
     return (
-      <div style={{ minHeight: "100vh", background: C.bg }}>
-        {/* Score hero */}
-        <div style={{
-          background: evaluating ? C.ink : `linear-gradient(145deg, ${scoreColor}cc, ${scoreColor})`,
-          padding: "32px 20px", textAlign: "center",
-          borderRadius: "0 0 28px 28px",
-        }}>
+      <DesktopShell>
+        {/* ── Score Hero ── */}
+        <div className="rounded-[26px] px-10 py-10 mb-5 relative overflow-hidden"
+          style={{ background: heroGrad, boxShadow: "0 8px 30px rgba(0,51,204,0.34), 0 0 0 0.5px rgba(255,255,255,0.14)" }}>
+          <div className="absolute -top-[50px] -right-[40px] w-[340px] h-[340px] rounded-full pointer-events-none"
+            style={{ background: "radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 65%)" }} />
+          <div className="absolute inset-0 pointer-events-none" style={{
+            backgroundImage: "linear-gradient(rgba(255,255,255,0.016) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.016) 1px, transparent 1px)",
+            backgroundSize: "24px 24px"
+          }} />
           {evaluating ? (
-            <>
-              <Loader2 style={{ width: 40, height: 40, color: "#fff", margin: "0 auto 12px" }} className="animate-spin" />
-              <p style={{ fontSize: 16, fontWeight: 600, color: "#fff" }}>AI is evaluating your answers...</p>
-              <p style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", marginTop: 6 }}>This may take a few seconds</p>
-            </>
+            <div className="relative z-10 text-center py-6">
+              <Loader2 className="w-12 h-12 mx-auto mb-4 text-white animate-spin" />
+              <div className="text-[22px] font-bold text-white mb-2" style={{ letterSpacing: "-0.4px" }}>AI is evaluating your answers…</div>
+              <div className="text-[13px]" style={{ color: "rgba(255,255,255,0.7)" }}>This may take a few seconds</div>
+            </div>
           ) : result ? (
-            <>
-              <p style={{ fontSize: 52, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>{result.percentage || 0}%</p>
-              <p style={{ fontSize: 18, fontWeight: 600, color: "rgba(255,255,255,0.9)" }}>
-                {result.score}/{result.total} correct · Grade {result.grade}
-              </p>
-              <p style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", marginTop: 8, lineHeight: 1.5 }}>
-                {result.encouragement || "Keep practicing to improve!"}
-              </p>
-            </>
+            <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.12em] mb-3" style={{ color: "rgba(255,255,255,0.55)" }}>
+                  {examTitle} · Your Result
+                </div>
+                <div className="text-[80px] font-bold text-white leading-none mb-2" style={{ letterSpacing: "-2px" }}>
+                  {pct}<span className="text-[48px]" style={{ color: "rgba(255,255,255,0.55)" }}>%</span>
+                </div>
+                <div className="text-[18px] font-bold text-white mb-2" style={{ letterSpacing: "-0.3px" }}>
+                  {result.score} / {result.total} correct · Grade {result.grade}
+                </div>
+                <p className="text-[14px] leading-[1.6]" style={{ color: "rgba(255,255,255,0.75)" }}>
+                  {result.encouragement || "Keep practicing to improve!"}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { icon: CheckCircle2, val: result.score, label: "Correct", bg: "rgba(255,255,255,0.14)" },
+                  { icon: XCircle, val: (result.total || 0) - (result.score || 0), label: "Wrong", bg: "rgba(255,255,255,0.14)" },
+                  { icon: Clock, val: timeLimit > 0 ? `${Math.floor((timeLimit * 60 - timerSec) / 60)}m` : "—", label: "Time", bg: "rgba(255,255,255,0.14)" },
+                  { icon: Award, val: result.grade || "—", label: "Grade", bg: "rgba(255,255,255,0.14)" },
+                ].map(({ icon: Icon, val, label, bg }) => (
+                  <div key={label} className="rounded-[16px] py-4 px-4 flex flex-col gap-2"
+                    style={{ background: bg, border: "0.5px solid rgba(255,255,255,0.22)", backdropFilter: "blur(8px)" }}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(255,255,255,0.55)" }}>{label}</span>
+                      <Icon className="w-4 h-4" style={{ color: "rgba(255,255,255,0.7)" }} strokeWidth={2.3} />
+                    </div>
+                    <div className="text-[24px] font-bold text-white leading-none" style={{ letterSpacing: "-0.5px" }}>{val}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
           ) : null}
         </div>
 
         {result && !evaluating && (
-          <div style={{ padding: "16px 16px 100px", display: "flex", flexDirection: "column", gap: 12 }}>
-
-            {/* Weak topics */}
-            {result.weakTopics?.length > 0 && (
-              <div style={{ ...card, padding: "14px 16px" }}>
-                <p style={{ fontSize: 12, fontWeight: 600, color: C.red, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>⚠ Weak Areas</p>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {result.weakTopics.map((t: string, i: number) => (
-                    <span key={i} style={{ padding: "5px 12px", borderRadius: 20, background: C.rlBg, color: C.red, fontSize: 12, fontWeight: 500 }}>{t}</span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Per-question breakdown */}
-            <p style={{ fontSize: 12, fontWeight: 600, color: C.ink3, textTransform: "uppercase", letterSpacing: "0.06em" }}>Question Breakdown</p>
-            {(result.evaluations || []).map((ev: any, i: number) => {
-              const q = questions[i];
-              if (!q) return null;
-              return (
-                <div key={i} style={{
-                  ...card, padding: "14px 16px",
-                  borderLeft: `4px solid ${ev.correct ? C.grn : C.red}`,
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                    <div style={{
-                      width: 28, height: 28, borderRadius: 8,
-                      background: ev.correct ? C.glBg : C.rlBg,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                    }}>
-                      {ev.correct ? (
-                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke={C.grn} strokeWidth="2" strokeLinecap="round"><polyline points="2,7 5.5,11 12,3" /></svg>
-                      ) : (
-                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke={C.red} strokeWidth="2" strokeLinecap="round"><line x1="3" y1="3" x2="11" y2="11" /><line x1="11" y1="3" x2="3" y2="11" /></svg>
-                      )}
+          <>
+            {/* ── Action Row + Weak Topics ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+              {/* Weak topics */}
+              {result.weakTopics?.length > 0 ? (
+                <div className="lg:col-span-2 bg-white rounded-[22px] p-6"
+                  style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-10 h-10 rounded-[12px] flex items-center justify-center"
+                      style={{ background: "rgba(255,51,85,0.10)", border: "0.5px solid rgba(255,51,85,0.22)" }}>
+                      <Lightbulb className="w-5 h-5" style={{ color: RED_D }} strokeWidth={2.3} />
                     </div>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: ev.correct ? C.grn : C.red }}>
-                      Q{q.questionNo} — {ev.correct ? "Correct" : "Wrong"}
-                    </span>
+                    <div>
+                      <div className="text-[17px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Weak Areas to Focus On</div>
+                      <div className="text-[11px] font-normal mt-[2px]" style={{ color: T3 }}>Topics AI identified for improvement</div>
+                    </div>
                   </div>
-
-                  <p style={{ fontSize: 13, fontWeight: 500, color: C.ink, lineHeight: 1.5, marginBottom: 8 }}>{q.questionText}</p>
-
-                  {!ev.correct && (
-                    <>
-                      <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-                        <div style={{ flex: 1, padding: "8px 10px", borderRadius: 10, background: C.rlBg }}>
-                          <p style={{ fontSize: 9, fontWeight: 600, color: C.red, textTransform: "uppercase", marginBottom: 2 }}>Your answer</p>
-                          <p style={{ fontSize: 12, color: C.red, margin: 0 }}>{ev.studentAnswer || "—"}</p>
-                        </div>
-                        <div style={{ flex: 1, padding: "8px 10px", borderRadius: 10, background: C.glBg }}>
-                          <p style={{ fontSize: 9, fontWeight: 600, color: C.grn, textTransform: "uppercase", marginBottom: 2 }}>Correct answer</p>
-                          <p style={{ fontSize: 12, color: C.grn, margin: 0 }}>{ev.correctAnswer || q.correctAnswer}</p>
-                        </div>
+                  <div className="flex flex-wrap gap-2">
+                    {result.weakTopics.map((t: string, i: number) => (
+                      <div key={i} className="px-4 py-[8px] rounded-full text-[12px] font-bold"
+                        style={{ background: "rgba(255,51,85,0.08)", color: RED_D, border: "0.5px solid rgba(255,51,85,0.22)" }}>
+                        {t}
                       </div>
-                      {ev.explanation && (
-                        <div style={{ padding: "10px 12px", borderRadius: 10, background: C.blBg, marginTop: 4 }}>
-                          <p style={{ fontSize: 10, fontWeight: 600, color: C.blue, marginBottom: 4, textTransform: "uppercase" }}>💡 Why?</p>
-                          <p style={{ fontSize: 12, color: "#1e40af", lineHeight: 1.5, margin: 0 }}>{ev.explanation}</p>
-                        </div>
-                      )}
-                    </>
-                  )}
+                    ))}
+                  </div>
                 </div>
-              );
-            })}
+              ) : (
+                <div className="lg:col-span-2 bg-white rounded-[22px] p-6"
+                  style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle2 className="w-5 h-5" style={{ color: GREEN_D }} strokeWidth={2.3} />
+                    <div className="text-[17px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Great Performance!</div>
+                  </div>
+                  <div className="text-[13px]" style={{ color: T3 }}>No weak areas flagged. Keep up the consistent practice.</div>
+                </div>
+              )}
 
-            {/* Action buttons */}
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <button onClick={handleRetry} style={{
-                flex: 1, padding: 14, borderRadius: 14,
-                background: C.white, border: `1.5px solid ${C.bdr}`,
-                color: C.ink2, fontSize: 14, fontWeight: 600,
-                cursor: "pointer", fontFamily: "inherit",
-              }}>
-                🔄 Try Again
-              </button>
-              <button onClick={handleNewExam} style={{
-                flex: 1, padding: 14, borderRadius: 14,
-                background: C.pur, border: "none", color: "#fff",
-                fontSize: 14, fontWeight: 600,
-                cursor: "pointer", fontFamily: "inherit",
-              }}>
-                ✨ New Exam
-              </button>
+              {/* Action buttons */}
+              <div className="space-y-3">
+                <button onClick={handleRetry}
+                  className="w-full h-14 rounded-[16px] flex items-center justify-center gap-2 text-[14px] font-bold transition-transform hover:scale-[1.02]"
+                  style={{ background: "#fff", color: T2, border: `0.5px solid ${BLUE_BDR_D}`, boxShadow: SH_D }}>
+                  <RefreshCw className="w-[16px] h-[16px]" strokeWidth={2.3} />
+                  Try Again
+                </button>
+                <button onClick={handleNewExam}
+                  className="w-full h-14 rounded-[16px] flex items-center justify-center gap-2 text-[14px] font-bold text-white transition-transform hover:scale-[1.02]"
+                  style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: SH_BTN_D, letterSpacing: "-0.1px" }}>
+                  <Sparkles className="w-[16px] h-[16px]" strokeWidth={2.3} /> New Exam
+                </button>
+              </div>
             </div>
-          </div>
+
+            {/* ── Per-question breakdown ── */}
+            <div className="text-[10px] font-bold uppercase tracking-[0.12em] mb-3" style={{ color: T4 }}>Question Breakdown</div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {(result.evaluations || []).map((ev: any, i: number) => {
+                const q = questions[i];
+                if (!q) return null;
+                const correct = !!ev.correct;
+                return (
+                  <div key={i} className="bg-white rounded-[18px] p-5 relative overflow-hidden"
+                    style={{ boxShadow: SH_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                    <div className="absolute left-0 top-0 bottom-0 w-[4px] rounded-l-[2px]"
+                      style={{ background: correct ? `linear-gradient(180deg, ${GREEN_D}, #66EE88)` : `linear-gradient(180deg, ${RED_D}, #FF88AA)` }} />
+
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-8 h-8 rounded-[10px] flex items-center justify-center"
+                        style={{ background: correct ? "rgba(0,200,83,0.10)" : "rgba(255,51,85,0.10)", border: `0.5px solid ${correct ? "rgba(0,200,83,0.22)" : "rgba(255,51,85,0.22)"}` }}>
+                        {correct ? <CheckCircle2 className="w-[16px] h-[16px]" style={{ color: GREEN_D }} strokeWidth={2.5} /> : <XCircle className="w-[16px] h-[16px]" style={{ color: RED_D }} strokeWidth={2.5} />}
+                      </div>
+                      <span className="text-[12px] font-bold" style={{ color: correct ? "#007830" : RED_D }}>
+                        Q{q.questionNo} — {correct ? "Correct" : "Wrong"}
+                      </span>
+                    </div>
+
+                    <p className="text-[13px] font-semibold leading-[1.5] mb-3" style={{ color: T1 }}>{q.questionText}</p>
+
+                    {!correct && (
+                      <>
+                        <div className="grid grid-cols-2 gap-2 mb-3">
+                          <div className="px-3 py-[10px] rounded-[12px]"
+                            style={{ background: "rgba(255,51,85,0.06)", border: "0.5px solid rgba(255,51,85,0.18)" }}>
+                            <div className="text-[9px] font-bold uppercase tracking-[0.10em] mb-[4px]" style={{ color: RED_D }}>Your Answer</div>
+                            <div className="text-[12px]" style={{ color: RED_D }}>{ev.studentAnswer || "—"}</div>
+                          </div>
+                          <div className="px-3 py-[10px] rounded-[12px]"
+                            style={{ background: "rgba(0,200,83,0.06)", border: "0.5px solid rgba(0,200,83,0.18)" }}>
+                            <div className="text-[9px] font-bold uppercase tracking-[0.10em] mb-[4px]" style={{ color: "#007830" }}>Correct</div>
+                            <div className="text-[12px]" style={{ color: "#007830" }}>{ev.correctAnswer || q.correctAnswer}</div>
+                          </div>
+                        </div>
+                        {ev.explanation && (
+                          <div className="px-3 py-[10px] rounded-[12px]"
+                            style={{ background: "rgba(0,85,255,0.06)", border: "0.5px solid rgba(0,85,255,0.18)" }}>
+                            <div className="text-[9px] font-bold uppercase tracking-[0.10em] mb-[4px] flex items-center gap-[4px]" style={{ color: B1 }}>
+                              <Lightbulb className="w-[10px] h-[10px]" strokeWidth={2.5} /> Why?
+                            </div>
+                            <p className="text-[12px] leading-[1.55]" style={{ color: T2 }}>{ev.explanation}</p>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
-      </div>
+      </DesktopShell>
     );
   }
 

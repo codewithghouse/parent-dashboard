@@ -363,110 +363,304 @@ const TimetablePage = () => {
   }
 
   /* ═══════════════════════════════════════════════════════════════
-     DESKTOP — Existing UI (unchanged)
+     DESKTOP — Bright Blue Apple UI (matches mobile)
      ═══════════════════════════════════════════════════════════════ */
+  const B1 = "#0055FF";
+  const B2 = "#1166FF";
+  const BG = "#EEF4FF";
+  const BG2 = "#E0ECFF";
+  const T1 = "#001040";
+  const T2 = "#002080";
+  const T3 = "#5070B0";
+  const T4 = "#99AACC";
+  const SEP = "rgba(0,85,255,0.07)";
+  const SH = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.10), 0 10px 28px rgba(0,85,255,0.12)";
+  const SH_BTN = "0 6px 22px rgba(0,85,255,0.42), 0 2px 6px rgba(0,85,255,0.24)";
+
+  // Week dates
+  const now = new Date();
+  const jsDow = now.getDay();
+  const daysSinceMonday = jsDow === 0 ? 6 : jsDow - 1;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - daysSinceMonday);
+  monday.setHours(0, 0, 0, 0);
+  const weekDates = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d;
+  });
+
+  const perDayCount = DAYS.map(day =>
+    timetable.filter((t: any) => (t.day || "").toLowerCase() === day.toLowerCase()).length
+  );
+  const totalPeriodsThisWeek = perDayCount.slice(0, 6).reduce((a, b) => a + b, 0);
+  const periodsByToday = perDayCount.slice(0, selectedDay + 1).reduce((a, b) => a + b, 0);
+  const progressPct = totalPeriodsThisWeek > 0
+    ? Math.round((periodsByToday / totalPeriodsThisWeek) * 100)
+    : 0;
+
+  const subjectAccents = [
+    { bar: "linear-gradient(180deg, #0055FF, #4499FF)",  icoBg: "linear-gradient(135deg, #0044EE, #2277FF)", icoShadow: "0 3px 10px rgba(0,68,238,0.28)" },
+    { bar: "linear-gradient(180deg, #0033CC, #2277FF)",  icoBg: "linear-gradient(135deg, #002DBB, #0055FF)", icoShadow: "0 3px 10px rgba(0,45,187,0.28)" },
+    { bar: "linear-gradient(180deg, #2255DD, #66BBFF)",  icoBg: "linear-gradient(135deg, #1155EE, #44AAFF)", icoShadow: "0 3px 10px rgba(17,85,238,0.28)" },
+  ];
+  const subjectAccentMap = new Map<string, number>();
+  let accentIdx = 0;
+  const getSubjectAccent = (subject: string) => {
+    if (!subjectAccentMap.has(subject)) {
+      subjectAccentMap.set(subject, accentIdx % subjectAccents.length);
+      accentIdx++;
+    }
+    return subjectAccents[subjectAccentMap.get(subject)!];
+  };
+
+  const MONTH = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
   return (
-    <div className="space-y-8 pb-10">
-      {/* Header */}
-      <div className="bg-gradient-to-br from-purple-600 to-indigo-700 rounded-[2rem] md:rounded-[3rem] p-6 sm:p-8 md:p-12 text-white relative overflow-hidden">
-        <div className="absolute top-0 right-0 opacity-10 scale-150"><CalendarDays size={200} /></div>
-        <div className="relative z-10">
-          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-purple-200 mb-3">Weekly Schedule</p>
-          <h1 className="text-4xl font-black tracking-tighter mb-2">Timetable</h1>
-          <p className="text-purple-200 text-sm font-bold">{studentData?.name} · {studentData?.className || "Class"}</p>
-        </div>
-      </div>
+    <div className="animate-in fade-in duration-500 -m-4 sm:-m-6 md:-m-8 min-h-[calc(100vh-64px)]"
+      style={{ fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif", background: BG }}>
+      <div className="w-full px-6 pt-8 pb-12">
 
-      {/* Day Selector */}
-      <div className="flex gap-3 overflow-x-auto pb-2">
-        {DAYS.map((day, i) => {
-          const isToday = new Date().getDay() - 1 === i;
-          return (
-            <button
-              key={day}
-              onClick={() => setSelectedDay(i)}
-              className={`flex flex-col items-center px-5 py-4 rounded-[1.5rem] font-black transition-all shrink-0 border ${
-                selectedDay === i
-                  ? "bg-[#1e294b] text-white border-[#1e294b] shadow-xl shadow-slate-900/20"
-                  : isToday
-                  ? "bg-purple-50 text-purple-700 border-purple-200"
-                  : "bg-white text-slate-400 border-slate-100 hover:bg-slate-50"
-              }`}
-            >
-              <span className="text-[10px] uppercase tracking-widest mb-1">{DAY_SHORT[i]}</span>
-              {isToday && <span className="text-[8px] uppercase tracking-widest font-black text-purple-500">Today</span>}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Schedule for selected day */}
-      <div className="bg-white rounded-[1.5rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-        <div className="px-4 sm:px-6 md:px-10 py-4 md:py-7 border-b border-slate-100 flex items-center justify-between">
-          <h2 className="text-lg md:text-xl font-black text-slate-900 uppercase tracking-tighter">{DAYS[selectedDay]}</h2>
-          <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{todaySlots.length} Periods</span>
-        </div>
-
-        {loading ? (
-          <div className="py-24 flex flex-col items-center justify-center">
-            <Loader2 className="w-8 h-8 text-purple-600 animate-spin mb-4" />
-            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Loading schedule...</p>
-          </div>
-        ) : timetable.length === 0 ? (
-          <div className="py-24 flex flex-col items-center justify-center text-center px-10">
-            <div className="w-20 h-20 rounded-[2rem] bg-slate-50 flex items-center justify-center mb-6">
-              <CalendarDays className="w-10 h-10 text-slate-200" />
+        {/* ── Hero Banner ── */}
+        <div className="rounded-[26px] px-8 pt-8 pb-8 relative overflow-hidden mb-5"
+          style={{
+            background: "linear-gradient(140deg, #0033CC 0%, #0055FF 40%, #2277FF 75%, #55AAFF 100%)",
+            boxShadow: SH_BTN,
+            minHeight: 180,
+          }}>
+          <div className="absolute -top-[40px] -right-[40px] w-[260px] h-[260px] rounded-full pointer-events-none" style={{ background: "rgba(255,255,255,0.14)" }} />
+          <div className="absolute -bottom-[50px] right-[60px] w-[180px] h-[180px] rounded-full pointer-events-none" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)" }} />
+          <div className="absolute -bottom-[10px] right-[200px] w-[120px] h-[120px] rounded-full pointer-events-none" style={{ background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.15)" }} />
+          <div className="absolute bottom-[40px] right-[340px] w-[80px] h-[80px] rounded-full pointer-events-none" style={{ background: "rgba(255,255,255,0.08)" }} />
+          <div className="absolute inset-0 pointer-events-none" style={{
+            backgroundImage: "linear-gradient(rgba(255,255,255,0.016) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.016) 1px, transparent 1px)",
+            backgroundSize: "28px 28px"
+          }} />
+          <div className="flex items-end justify-between gap-6 flex-wrap relative z-10">
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-[0.14em] mb-2" style={{ color: "rgba(255,255,255,0.55)" }}>Weekly Schedule</div>
+              <div className="text-[48px] font-bold text-white mb-3 leading-[1.02]" style={{ letterSpacing: "-1.4px" }}>Timetable</div>
+              <div className="text-[14px] font-medium flex items-center gap-[6px]" style={{ color: "rgba(255,255,255,0.78)" }}>
+                <User className="w-[14px] h-[14px]" style={{ color: "rgba(255,255,255,0.75)" }} strokeWidth={2.2} />
+                <span className="truncate">{studentData?.name || "Student"}</span>
+                {(studentData?.className || (studentData as any)?.class) && (
+                  <>
+                    <span className="w-1 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.55)" }} />
+                    <span>{studentData?.className || (studentData as any)?.class}</span>
+                  </>
+                )}
+              </div>
             </div>
-            <p className="text-lg font-black text-slate-300 uppercase tracking-widest">No timetable yet</p>
-            <p className="text-xs font-bold text-slate-300 mt-2">Your school has not set up the timetable.</p>
-          </div>
-        ) : todaySlots.length === 0 ? (
-          <div className="py-24 flex flex-col items-center justify-center text-center px-10">
-            <div className="w-20 h-20 rounded-[2rem] bg-emerald-50 flex items-center justify-center mb-6">
-              <CalendarDays className="w-10 h-10 text-emerald-300" />
-            </div>
-            <p className="text-lg font-black text-slate-400 uppercase tracking-widest">No classes today</p>
-            <p className="text-xs font-bold text-slate-300 mt-2">Enjoy your day off!</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-50">
-            {todaySlots.map((slot: any, i: number) => {
-              const colorClass = getSubjectColor(slot.subject);
-              return (
-                <div key={slot.id || i} className="px-4 sm:px-6 md:px-10 py-4 md:py-6 flex items-center gap-3 md:gap-6 hover:bg-slate-50/50 transition-all">
-                  <div className="text-center w-10 md:w-16 shrink-0">
-                    <p className="text-xl md:text-2xl font-black text-slate-200">{String(slot.period || i + 1).padStart(2, '0')}</p>
-                    <p className="text-[8px] md:text-[9px] font-black text-slate-300 uppercase tracking-widest hidden sm:block">Period</p>
-                  </div>
-                  <div className={`w-10 h-10 md:w-14 md:h-14 rounded-[1rem] md:rounded-[1.5rem] flex items-center justify-center border shrink-0 ${colorClass}`}>
-                    <BookOpen className="w-5 h-5 md:w-6 md:h-6" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-black text-slate-900 text-base md:text-xl uppercase tracking-tight leading-none mb-1 md:mb-2 truncate">{slot.subject}</p>
-                    <div className="flex flex-wrap items-center gap-2 md:gap-4">
-                      {slot.teacherName && (
-                        <span className="flex items-center gap-1 text-xs font-bold text-slate-400">
-                          <User className="w-3 h-3 md:w-3.5 md:h-3.5" /> <span className="truncate max-w-[100px] md:max-w-none">{slot.teacherName}</span>
-                        </span>
-                      )}
-                      {slot.time && (
-                        <span className="flex items-center gap-1 text-xs font-bold text-slate-400">
-                          <Clock className="w-3 h-3 md:w-3.5 md:h-3.5" /> {slot.time}
-                        </span>
-                      )}
-                      {slot.room && (
-                        <span className="text-xs font-bold text-slate-400 hidden sm:block">Room {slot.room}</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className={`px-2 py-1 md:px-4 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest border ${colorClass} shrink-0`}>
-                    {slot.subject?.substring(0, 3)}
-                  </div>
+            {!loading && timetable.length > 0 && (
+              <div className="flex items-center gap-5">
+                <div className="text-right">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(255,255,255,0.55)" }}>This Week</div>
+                  <div className="text-[30px] font-bold text-white leading-none mt-1" style={{ letterSpacing: "-0.8px" }}>{totalPeriodsThisWeek}</div>
+                  <div className="text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.60)" }}>periods</div>
                 </div>
+                <div className="w-px h-14" style={{ background: "rgba(255,255,255,0.22)" }} />
+                <div className="text-right">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(255,255,255,0.55)" }}>Progress</div>
+                  <div className="text-[30px] font-bold text-white leading-none mt-1" style={{ letterSpacing: "-0.8px" }}>{progressPct}%</div>
+                  <div className="text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.60)" }}>through week</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Day Selector ── */}
+        <div className="flex flex-col gap-3 mb-5">
+          <div className="flex gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
+            {DAY_SHORT.map((lbl, i) => {
+              const isAct = selectedDay === i;
+              const d = weekDates[i];
+              const isToday = new Date().toDateString() === d.toDateString();
+              return (
+                <button
+                  key={lbl}
+                  onClick={() => setSelectedDay(i)}
+                  className="flex flex-col items-center gap-1 min-w-[90px] px-4 py-3 rounded-[18px] transition-transform hover:scale-[1.03] shrink-0"
+                  style={{
+                    background: isAct ? `linear-gradient(135deg, ${B1}, ${B2})` : "#FFFFFF",
+                    border: "0.5px solid rgba(0,85,255,0.10)",
+                    boxShadow: isAct ? "0 4px 16px rgba(0,85,255,0.36), 0 1px 4px rgba(0,85,255,0.22)" : SH,
+                  }}>
+                  <span className="text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color: isAct ? "#FFFFFF" : T3 }}>{lbl}</span>
+                  <span className="text-[22px] font-bold leading-none" style={{ color: isAct ? "#FFFFFF" : T2, letterSpacing: "-0.4px" }}>{d.getDate()}</span>
+                  <span className="text-[9px] font-bold uppercase tracking-[0.08em]" style={{ color: isAct ? "rgba(255,255,255,0.75)" : isToday ? B1 : T4 }}>
+                    {isToday ? "Today" : `${perDayCount[i]} period${perDayCount[i] === 1 ? "" : "s"}`}
+                  </span>
+                </button>
               );
             })}
           </div>
-        )}
+          <div className="h-[3px] rounded-[2px] overflow-hidden" style={{ background: BG2 }}>
+            <div className="h-full rounded-[2px] transition-all duration-500"
+              style={{ width: `${Math.max(progressPct, 4)}%`, background: `linear-gradient(90deg, ${B1}, #4499FF)` }} />
+          </div>
+        </div>
+
+        {/* ── Main content row: Day schedule + Week overview sidebar ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+          {/* Today's periods (lg:col-span-2) */}
+          <div className="lg:col-span-2">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-[22px] font-bold" style={{ color: T1, letterSpacing: "-0.5px" }}>
+                {DAYS[selectedDay]}
+                <span className="text-[14px] font-medium ml-3" style={{ color: T4, letterSpacing: 0 }}>
+                  · {MONTH[weekDates[selectedDay].getMonth()]} {weekDates[selectedDay].getDate()}
+                </span>
+              </div>
+              <div className="text-[12px] font-bold px-3 py-[6px] rounded-full tracking-[0.04em]"
+                style={{ color: B1, background: "rgba(0,85,255,0.10)", border: "0.5px solid rgba(0,85,255,0.18)" }}>
+                {todaySlots.length} {todaySlots.length === 1 ? "Period" : "Periods"}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-[10px]">
+              {loading ? (
+                <div className="flex flex-col items-center gap-[10px] py-16 bg-white rounded-[20px]"
+                  style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: BG2 }}>
+                    <Loader2 className="w-7 h-7 animate-spin" style={{ color: B1 }} />
+                  </div>
+                  <p className="text-[12px] font-bold uppercase tracking-widest" style={{ color: T4 }}>Loading schedule…</p>
+                </div>
+              ) : timetable.length === 0 ? (
+                <div className="flex flex-col items-center gap-[10px] py-20 text-center bg-white rounded-[20px]"
+                  style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                  <div className="w-[70px] h-[70px] rounded-[22px] flex items-center justify-center"
+                    style={{ background: "rgba(0,85,255,0.08)", border: "0.5px solid rgba(0,85,255,0.14)", boxShadow: "0 0 0 10px rgba(0,85,255,0.04)" }}>
+                    <CalendarDays className="w-9 h-9" style={{ color: T4 }} />
+                  </div>
+                  <div className="text-[18px] font-bold" style={{ color: T2, letterSpacing: "-0.3px" }}>No timetable yet</div>
+                  <div className="text-[14px] max-w-[300px] leading-[1.55]" style={{ color: T4 }}>Your school hasn't set up the timetable.</div>
+                </div>
+              ) : todaySlots.length === 0 ? (
+                <div className="flex flex-col items-center gap-[10px] py-20 text-center bg-white rounded-[20px]"
+                  style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                  <div className="w-[70px] h-[70px] rounded-[22px] flex items-center justify-center"
+                    style={{ background: "rgba(0,85,255,0.08)", border: "0.5px solid rgba(0,85,255,0.14)", boxShadow: "0 0 0 10px rgba(0,85,255,0.04)" }}>
+                    <CalendarDays className="w-9 h-9" style={{ color: T4 }} />
+                  </div>
+                  <div className="text-[18px] font-bold" style={{ color: T2, letterSpacing: "-0.3px" }}>No classes today</div>
+                  <div className="text-[14px] max-w-[300px] leading-[1.55]" style={{ color: T4 }}>Enjoy the day off!</div>
+                </div>
+              ) : (
+                <>
+                  {todaySlots.map((slot: any, i: number) => {
+                    const accent = getSubjectAccent(slot.subject || "Subject");
+                    const periodNum = String(slot.period || i + 1).padStart(2, "0");
+                    const subject = slot.subject || "Subject";
+                    const tag = subject.substring(0, 3).toUpperCase();
+                    return (
+                      <div key={slot.id || i}
+                        className="rounded-[20px] px-5 py-4 flex items-center gap-4 relative overflow-hidden bg-white transition-transform hover:-translate-y-0.5"
+                        style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                        <div className="absolute left-0 top-0 bottom-0 w-[3.5px]" style={{ background: accent.bar }} />
+                        <div className="w-10 h-10 rounded-[12px] flex items-center justify-center shrink-0 text-[13px] font-bold"
+                          style={{ background: "rgba(0,85,255,0.10)", border: "0.5px solid rgba(0,85,255,0.18)", color: B1, letterSpacing: "-0.2px" }}>
+                          {periodNum}
+                        </div>
+                        <div className="w-12 h-12 rounded-[14px] flex items-center justify-center shrink-0"
+                          style={{ background: accent.icoBg, boxShadow: accent.icoShadow }}>
+                          <BookOpen className="w-[22px] h-[22px] text-white" strokeWidth={2.2} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[17px] font-bold mb-1 truncate" style={{ color: T1, letterSpacing: "-0.3px" }}>{subject}</div>
+                          <div className="flex items-center gap-4 flex-wrap">
+                            {slot.teacherName && (
+                              <div className="flex items-center gap-1.5 text-[12px] font-medium" style={{ color: T3 }}>
+                                <User className="w-[13px] h-[13px] opacity-70" strokeWidth={2.2} />
+                                <span className="truncate max-w-[200px]">{slot.teacherName}</span>
+                              </div>
+                            )}
+                            {slot.time && (
+                              <div className="flex items-center gap-1.5 text-[12px] font-medium" style={{ color: T3 }}>
+                                <Clock className="w-[13px] h-[13px] opacity-70" strokeWidth={2.2} />
+                                {slot.time}
+                              </div>
+                            )}
+                            {slot.room && (
+                              <div className="text-[12px] font-medium" style={{ color: T3 }}>Room {slot.room}</div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="px-3 py-[6px] rounded-full text-[11px] font-bold shrink-0 tracking-[0.02em]"
+                          style={{ background: "rgba(0,85,255,0.10)", color: B1, border: "0.5px solid rgba(0,85,255,0.20)" }}>
+                          {tag}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <div className="flex items-center justify-center gap-2 py-3">
+                    <div className="flex-1 h-px" style={{ background: "rgba(0,85,255,0.10)" }} />
+                    <div className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(0,85,255,0.30)" }}>No more periods</div>
+                    <div className="flex-1 h-px" style={{ background: "rgba(0,85,255,0.10)" }} />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* This Week sidebar */}
+          {!loading && timetable.length > 0 && (
+            <div className="flex flex-col gap-4">
+              <div className="bg-white rounded-[22px] p-5"
+                style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                <div className="text-[13px] font-bold uppercase tracking-[0.08em] mb-4" style={{ color: T4 }}>This Week Overview</div>
+                <div className="flex flex-col gap-[10px]">
+                  {DAY_SHORT.slice(0, 6).map((lbl, i) => {
+                    const isAct = selectedDay === i;
+                    const count = perDayCount[i];
+                    const d = weekDates[i];
+                    const isToday = new Date().toDateString() === d.toDateString();
+                    const maxCount = Math.max(...perDayCount, 1);
+                    return (
+                      <button key={lbl}
+                        onClick={() => setSelectedDay(i)}
+                        className="flex items-center gap-3 p-3 rounded-[14px] transition-transform hover:-translate-y-0.5 text-left"
+                        style={{
+                          background: isAct ? `linear-gradient(135deg, rgba(0,85,255,0.08), rgba(68,153,255,0.04))` : BG,
+                          border: `0.5px solid ${isAct ? "rgba(0,85,255,0.24)" : "rgba(0,85,255,0.10)"}`,
+                        }}>
+                        <div className="w-11 h-11 rounded-[12px] flex items-center justify-center shrink-0"
+                          style={{
+                            background: isAct ? `linear-gradient(135deg, ${B1}, ${B2})` : "#fff",
+                            boxShadow: isAct ? "0 3px 10px rgba(0,85,255,0.30)" : SH,
+                            border: isAct ? "0.5px solid transparent" : "0.5px solid rgba(0,85,255,0.12)",
+                          }}>
+                          <span className="text-[15px] font-bold" style={{ color: isAct ? "#FFFFFF" : B1, letterSpacing: "-0.3px" }}>{count}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[13px] font-bold" style={{ color: T1 }}>{DAYS[i]}</span>
+                            {isToday && (
+                              <span className="text-[9px] font-bold px-[6px] py-[2px] rounded-full"
+                                style={{ background: "rgba(0,85,255,0.10)", color: B1, border: "0.5px solid rgba(0,85,255,0.22)" }}>
+                                TODAY
+                              </span>
+                            )}
+                          </div>
+                          <div className="h-[4px] rounded-[2px] mt-1.5 overflow-hidden" style={{ background: BG2 }}>
+                            <div className="h-full rounded-[2px]"
+                              style={{ width: `${(count / maxCount) * 100}%`, background: isAct ? `linear-gradient(90deg, ${B1}, #4499FF)` : "rgba(0,85,255,0.35)" }} />
+                          </div>
+                          <div className="text-[10px] mt-1 font-medium" style={{ color: T4 }}>
+                            {count === 0 ? "No classes" : `${count} ${count === 1 ? "period" : "periods"}`}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

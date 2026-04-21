@@ -535,166 +535,363 @@ export default function BehaviourPage() {
   }
 
   /* ═══════════════════════════════════════════════════════════════
-     DESKTOP — Existing UI (unchanged)
+     DESKTOP — Bright Blue Apple UI
      ═══════════════════════════════════════════════════════════════ */
+  const B1 = "#0055FF", B2 = "#1166FF", B3 = "#2277FF", B4 = "#4499FF";
+  const BG_D = "#EEF4FF", BG2_D = "#E0ECFF";
+  const T1 = "#001040", T3 = "#5070B0", T4 = "#99AACC";
+  const SEP_D = "rgba(0,85,255,0.07)";
+  const GREEN = "#00C853", GREEN_D = "#007830";
+  const RED = "#FF3355";
+  const ORANGE = "#FF8800";
+  const GOLD = "#FFAA00";
+  const VIOLET = "#7B3FF4";
+  const BLUE_BDR = "rgba(0,85,255,0.12)";
+  const SH_D = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.09), 0 10px 28px rgba(0,85,255,0.11)";
+  const SH_LG_D = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 18px 44px rgba(0,85,255,0.14)";
+
+  const rateNumD = ratingNum ?? 0;
+  const incidentsD = improvementNotes.length;
+  const conductGradeD = !hasBehaviourSignal ? "—" :
+    rateNumD >= 4.8 ? "A+" :
+    rateNumD >= 4.5 ? "A"  :
+    rateNumD >= 4.0 ? "B+" :
+    rateNumD >= 3.5 ? "B"  :
+    rateNumD >= 3.0 ? "C"  : "D";
+  const punctualityPctD = !hasBehaviourSignal ? 0 : Math.max(0, Math.round(100 - incidentsD * 8));
+  const respectScoreD = !hasBehaviourSignal ? "—" : rateNumD.toFixed(1);
+  const participationScoreD = !hasBehaviourSignal
+    ? "—"
+    : (Math.max(1, Math.min(5, rateNumD - (incidentsD ? 0.2 : 0) + (positiveNotes.length ? 0.1 : 0)))).toFixed(1);
+  const tierForD = (i: number) => i === 0 ? "Gold" : i === 1 ? "Good" : "Nice";
+
+  const renderDesktopStars = (rate: number) => {
+    const stars: any[] = [];
+    const full = Math.floor(rate);
+    const half = rate - full >= 0.5;
+    for (let i = 0; i < full; i++) {
+      stars.push(<Star key={`f${i}`} className="w-7 h-7" style={{ color: GOLD, fill: GOLD }} strokeWidth={1.5} />);
+    }
+    if (half) stars.push(<StarHalf key="half" className="w-7 h-7" style={{ color: GOLD, fill: GOLD }} strokeWidth={1.5} />);
+    const rest = 5 - stars.length;
+    for (let i = 0; i < rest; i++) {
+      stars.push(<Star key={`e${i}`} className="w-7 h-7" style={{ color: "rgba(255,170,0,0.25)", fill: "rgba(255,170,0,0.10)" }} strokeWidth={1.5} />);
+    }
+    return stars;
+  };
+
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-5 duration-700 pb-24 text-left font-sans mx-auto px-4 lg:px-0 pt-8 max-w-6xl">
+    <div className="animate-in fade-in duration-500 -m-4 sm:-m-6 md:-m-8 min-h-[calc(100vh-64px)]"
+      style={{ fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif", background: BG_D }}>
+      <div className="w-full px-6 pt-8 pb-12">
 
-      {loading ? (
-        <div className="flex h-64 items-center justify-center">
-           <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
-        </div>
-      ) : (
-        <>
-          {/* HEADER SECTION */}
-          <div className="mb-6">
-             <h1 className="text-xl font-bold text-slate-800 uppercase tracking-widest leading-none">BEHAVIOUR & DISCIPLINE</h1>
+        {loading ? (
+          <div className="bg-white rounded-[22px] py-24 flex flex-col items-center"
+            style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+            <Loader2 className="w-12 h-12 animate-spin" style={{ color: B1 }} />
+            <p className="text-[13px] font-medium mt-3" style={{ color: T4 }}>Loading behaviour data…</p>
           </div>
-
-          <div className="space-y-6">
-            
-            {/* OVERALL BEHAVIOR RATING */}
-            <div className="bg-white border border-slate-100 rounded-[1rem] p-8 shadow-[0px_2px_15px_rgba(0,0,0,0.02)] flex flex-col md:flex-row justify-between items-center gap-6">
-               <div>
-                  <h2 className="text-[19px] font-black text-slate-800 tracking-tight">Overall Behavior Rating</h2>
-                  <p className="text-[13px] font-medium text-slate-400 mt-1">Based on teacher observations this term</p>
-               </div>
-               
-               <div className="flex items-center gap-6 md:border-l md:border-slate-100 md:pl-8 h-full">
-                  <div className="text-right">
-                     <p className="text-5xl font-black text-emerald-500 tracking-tighter leading-none">{rating}</p>
-                     <p className="text-[10px] font-black uppercase text-slate-400 mt-1.5 tracking-widest text-center">OUT OF 5</p>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                     {renderStars(parseFloat(rating))}
-                  </div>
-               </div>
+        ) : (
+          <>
+            {/* ── Toolbar ── */}
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.12em] mb-1 flex items-center gap-[7px]" style={{ color: T4 }}>
+                  <span className="w-[6px] h-[6px] rounded-full" style={{ background: B1, boxShadow: "0 0 0 3px rgba(0,85,255,0.18)" }} />
+                  Parent Dashboard · Behaviour
+                </div>
+                <h1 className="text-[32px] font-bold leading-none" style={{ color: T1, letterSpacing: "-0.8px" }}>Behaviour &amp; Discipline</h1>
+                <div className="text-[13px] font-normal mt-[6px]" style={{ color: T3 }}>Teacher observations, positive highlights, and improvement areas</div>
+              </div>
+              <div className="flex items-center gap-[10px]">
+                <div className="px-[14px] py-[8px] rounded-full text-[12px] font-bold flex items-center gap-[6px]"
+                  style={{ background: "rgba(0,200,83,0.08)", color: GREEN_D, border: "0.5px solid rgba(0,200,83,0.22)" }}>
+                  <Star className="w-[12px] h-[12px]" style={{ fill: GREEN }} />
+                  {rating} / 5
+                </div>
+                <div className="w-10 h-10 rounded-full flex items-center justify-center text-[14px] font-bold text-white"
+                  style={{ background: `linear-gradient(140deg, ${B1}, ${B2})`, boxShadow: "0 3px 12px rgba(0,85,255,0.36), 0 0 0 2px rgba(255,255,255,0.8)" }}>
+                  {studentData?.name?.[0]?.toUpperCase() || "S"}
+                </div>
+              </div>
             </div>
 
-            {/* 2 COLUMNS: POSITIVE HIGHLIGHTS & AREAS FOR IMPROVEMENT */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-               
-               {/* POSITIVE HIGHLIGHTS */}
-               <div className="bg-white border border-slate-100 rounded-[1rem] p-8 shadow-[0px_2px_15px_rgba(0,0,0,0.02)] flex flex-col">
-                  <div className="flex items-center gap-3 mb-6">
-                     <Trophy className="w-6 h-6 text-emerald-500 fill-emerald-100" />
-                     <h2 className="text-lg font-black text-slate-800 tracking-tight">Positive Highlights</h2>
-                  </div>
-                  
-                  <div className="space-y-4 flex-1">
-                     {positiveNotes.length === 0 ? (
-                        <p className="text-[14px] font-medium text-[#94a3b8] italic">No positive highlights recorded yet.</p>
-                     ) : (
-                        positiveNotes.map((note, idx) => {
-                           const Icon = getIconForPositive(idx);
-                           return (
-                             <div key={note.id || idx} className="bg-white border border-emerald-200 rounded-lg p-5 flex gap-5 transition-all hover:bg-emerald-50/50 shadow-sm">
-                                <Icon className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5 fill-emerald-100" />
-                                <div>
-                                   <p className="text-[15px] font-semibold text-slate-700 leading-snug mb-2">{note.content}</p>
-                                   <div className="flex items-center gap-2 text-[12px] font-medium text-slate-400">
-                                      <span>{formatNoteDate(note)}</span>
-                                      {note.teacherName && (
-                                        <>
-                                          <span className="w-1 h-1 rounded-full bg-slate-300" />
-                                          <span>{typeof note.teacherName === 'string' ? note.teacherName : 'Teacher'}</span>
-                                        </>
-                                      )}
-                                   </div>
-                                </div>
-                             </div>
-                           )
-                        })
-                     )}
-                  </div>
-               </div>
+            {/* ── Hero Row: Rating + Sub-metrics ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-5">
+              {/* Rating Card — col-3 */}
+              <div className="lg:col-span-3 bg-white rounded-[22px] p-7 relative overflow-hidden"
+                style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                <div className="absolute -top-[40px] -right-[20px] w-[260px] h-[260px] rounded-full pointer-events-none"
+                  style={{ background: "radial-gradient(circle, rgba(0,200,83,0.07) 0%, transparent 70%)" }} />
+                <div className="relative z-10">
+                  <div className="text-[18px] font-bold mb-1" style={{ color: T1, letterSpacing: "-0.3px" }}>Overall Behavior Rating</div>
+                  <div className="text-[12px] font-normal mb-6" style={{ color: T3 }}>Based on teacher observations this term</div>
 
-               {/* AREAS FOR IMPROVEMENT */}
-               <div className="bg-white border border-slate-100 rounded-[1rem] p-8 shadow-[0px_2px_15px_rgba(0,0,0,0.02)] flex flex-col">
-                  <div className="flex items-center gap-3 mb-6">
-                     <AlertTriangle className="w-6 h-6 text-amber-500" />
-                     <h2 className="text-lg font-black text-slate-800 tracking-tight">Areas for Improvement</h2>
+                  <div className="flex items-center gap-6 flex-wrap">
+                    <div>
+                      <div className="text-[72px] font-bold leading-none" style={{ color: GREEN, letterSpacing: "-2.5px" }}>{rating}</div>
+                      <div className="text-[11px] font-bold uppercase tracking-[0.10em] mt-2" style={{ color: T4 }}>Out of 5</div>
+                    </div>
+                    <div className="flex gap-[6px]">
+                      {renderDesktopStars(rateNumD)}
+                    </div>
                   </div>
-                  
-                  <div className="space-y-4 flex-1">
-                     {improvementNotes.length === 0 ? (
-                        <p className="text-[14px] font-medium text-[#94a3b8] italic">No areas for improvement recorded! Great job.</p>
-                     ) : (
-                        improvementNotes.map((note, idx) => {
-                           const Icon = getIconForImprovement(idx);
-                           return (
-                             <div key={note.id || idx} className="bg-amber-50/30 border border-amber-200 rounded-lg p-5 flex gap-5 transition-all hover:bg-amber-50/70 shadow-sm">
-                                <Icon className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                                <div>
-                                   <p className="text-[15px] font-semibold text-slate-700 leading-snug mb-2">{note.content}</p>
-                                   <div className="flex items-center gap-2 text-[12px] font-medium text-slate-400">
-                                      <span>{formatNoteDate(note)}</span>
-                                      {note.teacherName && (
-                                        <>
-                                          <span className="w-1 h-1 rounded-full bg-slate-300" />
-                                          <span>{typeof note.teacherName === 'string' ? note.teacherName : 'Teacher'}</span>
-                                        </>
-                                      )}
-                                   </div>
-                                </div>
-                             </div>
-                           )
-                        })
-                     )}
+
+                  {/* Sub metrics */}
+                  <div className="grid grid-cols-3 gap-4 pt-5 mt-6" style={{ borderTop: `0.5px solid ${SEP_D}` }}>
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: T4 }}>Conduct</span>
+                        <span className="text-[17px] font-bold leading-none" style={{ color: GREEN, letterSpacing: "-0.3px" }}>{conductGradeD}</span>
+                      </div>
+                      <div className="h-[6px] rounded-[3px] overflow-hidden" style={{ background: BG2_D }}>
+                        <div className="h-full rounded-[3px]" style={{ width: `${Math.min(100, rateNumD * 20)}%`, background: `linear-gradient(90deg, ${GREEN}, #66EE88)` }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: T4 }}>Punctuality</span>
+                        <span className="text-[17px] font-bold leading-none" style={{ color: B1, letterSpacing: "-0.3px" }}>{!hasBehaviourSignal ? "—" : `${punctualityPctD}%`}</span>
+                      </div>
+                      <div className="h-[6px] rounded-[3px] overflow-hidden" style={{ background: BG2_D }}>
+                        <div className="h-full rounded-[3px]" style={{ width: `${punctualityPctD}%`, background: `linear-gradient(90deg, ${B1}, ${B4})` }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: T4 }}>Respect</span>
+                        <span className="text-[17px] font-bold leading-none" style={{ color: GOLD, letterSpacing: "-0.3px" }}>{respectScoreD}</span>
+                      </div>
+                      <div className="h-[6px] rounded-[3px] overflow-hidden" style={{ background: BG2_D }}>
+                        <div className="h-full rounded-[3px]" style={{ width: `${Math.min(100, rateNumD * 20)}%`, background: `linear-gradient(90deg, ${GOLD}, #FFDD44)` }} />
+                      </div>
+                    </div>
                   </div>
-               </div>
+                </div>
+              </div>
+
+              {/* Breakdown Grid — col-2 */}
+              <div className="lg:col-span-2 grid grid-cols-2 gap-3">
+                {[
+                  { val: conductGradeD, label: "Conduct", color: GREEN, icon: CheckCircle, grad: `linear-gradient(135deg, ${GREEN}, #66EE88)`, sh: "0 3px 10px rgba(0,200,83,0.28)", glow: "rgba(0,200,83,0.08)" },
+                  { val: !hasBehaviourSignal ? "—" : `${punctualityPctD}%`, label: "Punctuality", color: B1, icon: Clock, grad: `linear-gradient(135deg, ${B1}, ${B3})`, sh: "0 3px 10px rgba(0,85,255,0.28)", glow: "rgba(0,85,255,0.08)" },
+                  { val: respectScoreD, label: "Respect", color: GOLD, icon: Star, grad: `linear-gradient(135deg, ${GOLD}, #FFDD44)`, sh: "0 3px 10px rgba(255,170,0,0.28)", glow: "rgba(255,170,0,0.08)" },
+                  { val: participationScoreD, label: "Participation", color: VIOLET, icon: Users, grad: `linear-gradient(135deg, ${VIOLET}, #AA77FF)`, sh: "0 3px 10px rgba(123,63,244,0.28)", glow: "rgba(123,63,244,0.08)" },
+                ].map(({ val, label, color, icon: Icon, grad, sh, glow }) => (
+                  <div key={label} className="bg-white rounded-[18px] px-5 py-5 relative overflow-hidden"
+                    style={{ boxShadow: SH_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                    <div className="absolute -top-[20px] -right-[20px] w-[90px] h-[90px] rounded-full pointer-events-none"
+                      style={{ background: `radial-gradient(circle, ${glow} 0%, transparent 70%)` }} />
+                    <div className="w-10 h-10 rounded-[12px] flex items-center justify-center mb-3 relative z-10"
+                      style={{ background: grad, boxShadow: sh }}>
+                      <Icon className="w-5 h-5 text-white" strokeWidth={2.3} />
+                    </div>
+                    <div className="text-[26px] font-bold leading-none mb-1 relative z-10" style={{ color, letterSpacing: "-0.6px" }}>{val}</div>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.10em] relative z-10" style={{ color: T4 }}>{label}</div>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {/* BEHAVIOR TREND CHART */}
-            <div className="bg-white border border-slate-100 rounded-[1rem] p-8 shadow-[0px_2px_15px_rgba(0,0,0,0.02)]">
-               <h2 className="text-[17px] font-black text-slate-800 tracking-tight mb-8">Behavior Trend</h2>
-               <div className="h-[280px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                     <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            {/* ── Highlights Row ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+              {/* Positive */}
+              <div className="bg-white rounded-[22px] p-6"
+                style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-11 h-11 rounded-[14px] flex items-center justify-center shrink-0"
+                    style={{ background: `linear-gradient(135deg, ${GREEN}, #66EE88)`, boxShadow: "0 3px 12px rgba(0,200,83,0.28)" }}>
+                    <Trophy className="w-5 h-5 text-white" strokeWidth={2.2} />
+                  </div>
+                  <div>
+                    <div className="text-[17px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Positive Highlights</div>
+                    <div className="text-[11px] font-normal mt-[2px]" style={{ color: T3 }}>{positiveNotes.length} recorded</div>
+                  </div>
+                </div>
+
+                {positiveNotes.length === 0 ? (
+                  <div className="py-10 text-center">
+                    <div className="text-[13px] leading-[1.6]" style={{ color: T3 }}>
+                      No positive highlights yet. <strong style={{ color: GREEN_D }}>Keep shining!</strong>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {positiveNotes.slice(0, 6).map((note, idx) => {
+                      const Icon = getIconForPositive(idx);
+                      return (
+                        <div key={note.id || idx}
+                          className="flex items-center gap-3 px-4 py-3 rounded-[14px]"
+                          style={{ background: "rgba(0,200,83,0.06)", border: "0.5px solid rgba(0,200,83,0.18)" }}>
+                          <div className="w-9 h-9 rounded-[11px] flex items-center justify-center shrink-0"
+                            style={{ background: "rgba(0,200,83,0.10)", border: "0.5px solid rgba(0,200,83,0.22)" }}>
+                            <Icon className="w-[16px] h-[16px]" style={{ color: GREEN }} strokeWidth={2.5} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[13px] font-bold mb-[3px]" style={{ color: T1, letterSpacing: "-0.1px" }}>
+                              {note.content || "Great behaviour"}
+                            </div>
+                            <div className="text-[11px] font-semibold flex items-center gap-[4px]" style={{ color: T4 }}>
+                              <Clock className="w-[10px] h-[10px]" strokeWidth={2.5} />
+                              {formatNoteDate(note)}
+                              {note.teacherName && (
+                                <>
+                                  <span className="w-1 h-1 rounded-full" style={{ background: T4 }} />
+                                  <span className="truncate max-w-[140px]">{typeof note.teacherName === "string" ? note.teacherName : "Teacher"}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <div className="px-[10px] py-[3px] rounded-full text-[10px] font-bold shrink-0"
+                            style={{ background: "rgba(0,200,83,0.10)", color: GREEN_D, border: "0.5px solid rgba(0,200,83,0.22)" }}>
+                            {tierForD(idx)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Improvement */}
+              <div className="bg-white rounded-[22px] p-6"
+                style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-11 h-11 rounded-[14px] flex items-center justify-center shrink-0"
+                    style={{ background: `linear-gradient(135deg, ${ORANGE}, #FFAA22)`, boxShadow: "0 3px 12px rgba(255,136,0,0.28)" }}>
+                    <AlertTriangle className="w-5 h-5 text-white" strokeWidth={2.2} />
+                  </div>
+                  <div>
+                    <div className="text-[17px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Areas for Improvement</div>
+                    <div className="text-[11px] font-normal mt-[2px]" style={{ color: T3 }}>{improvementNotes.length} flagged</div>
+                  </div>
+                </div>
+
+                {improvementNotes.length === 0 ? (
+                  <div className="py-10 text-center">
+                    <div className="text-[13px] leading-[1.6]" style={{ color: T3 }}>
+                      No areas flagged. <strong style={{ color: GREEN_D }}>Great job.</strong>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {improvementNotes.slice(0, 6).map((note, idx) => {
+                      const Icon = getIconForImprovement(idx);
+                      return (
+                        <div key={note.id || idx}
+                          className="flex items-center gap-3 px-4 py-3 rounded-[14px]"
+                          style={{ background: "rgba(255,51,85,0.06)", border: "0.5px solid rgba(255,51,85,0.18)" }}>
+                          <div className="w-9 h-9 rounded-[11px] flex items-center justify-center shrink-0"
+                            style={{ background: "rgba(255,51,85,0.10)", border: "0.5px solid rgba(255,51,85,0.22)" }}>
+                            <Icon className="w-[16px] h-[16px]" style={{ color: RED }} strokeWidth={2.5} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[13px] font-bold mb-[3px]" style={{ color: T1, letterSpacing: "-0.1px" }}>
+                              {note.content || "Needs attention"}
+                            </div>
+                            <div className="text-[11px] font-semibold flex items-center gap-[4px]" style={{ color: T4 }}>
+                              <Clock className="w-[10px] h-[10px]" strokeWidth={2.5} />
+                              {formatNoteDate(note)}
+                              {note.teacherName && (
+                                <>
+                                  <span className="w-1 h-1 rounded-full" style={{ background: T4 }} />
+                                  <span className="truncate max-w-[140px]">{typeof note.teacherName === "string" ? note.teacherName : "Teacher"}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <div className="px-[10px] py-[3px] rounded-full text-[10px] font-bold shrink-0"
+                            style={{ background: "rgba(255,51,85,0.10)", color: RED, border: "0.5px solid rgba(255,51,85,0.22)" }}>
+                            Focus
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ── Bottom Row: Trend Chart + Dark Summary ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {/* Trend Chart */}
+              <div className="lg:col-span-2 bg-white rounded-[22px] p-6"
+                style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <div className="text-[17px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Behavior Trend</div>
+                    <div className="text-[11px] font-normal mt-[2px]" style={{ color: T3 }}>Rating progression across months</div>
+                  </div>
+                  <div className="px-[12px] py-[5px] rounded-full text-[12px] font-bold"
+                    style={{ background: "rgba(0,85,255,0.10)", color: B1, border: `0.5px solid ${BLUE_BDR}` }}>
+                    {rating} / 5
+                  </div>
+                </div>
+                {trendData.length > 1 ? (
+                  <div className="h-[280px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                         <defs>
-                           <linearGradient id="colorScore" x1="0" y1="0" x2="1" y2="1">
-                              <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4}/>
-                              <stop offset="50%" stopColor="#8b5cf6" stopOpacity={0.2}/>
-                              <stop offset="95%" stopColor="#10b981" stopOpacity={0.4}/>
-                           </linearGradient>
-                           <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                              <feGaussianBlur stdDeviation="3" result="blur" />
-                              <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                           </filter>
+                          <linearGradient id="behDeskArea" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={B1} stopOpacity={0.22} />
+                            <stop offset="100%" stopColor={B1} stopOpacity={0} />
+                          </linearGradient>
+                          <linearGradient id="behDeskLine" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stopColor={B1} />
+                            <stop offset="100%" stopColor="#66BBFF" />
+                          </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <XAxis dataKey="m" axisLine={false} tickLine={false} tick={{ fontSize: 13, fontWeight: 800, fill: '#cbd5e1' }} dy={10} />
-                        <YAxis domain={[1, 5]} axisLine={false} tickLine={false} tick={{ fontSize: 13, fontWeight: 800, fill: '#cbd5e1' }} dx={-10} />
-                        <Tooltip 
-                           contentStyle={{ borderRadius: '2rem', border: 'none', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)', fontWeight: '900', textTransform: 'uppercase', fontStyle: 'italic', fontSize: '10px', background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(10px)' }} 
-                           labelStyle={{ color: '#6366f1', marginBottom: '4px' }}
-                        />
-                        <Area 
-                           type="monotone" 
-                           dataKey="score" 
-                           stroke="url(#lineGradient)" 
-                           fillOpacity={1} 
-                           fill="url(#colorScore)" 
-                           strokeWidth={5} 
-                           dot={{ r: 6, fill: '#6366f1', strokeWidth: 3, stroke: '#fff' }}
-                           activeDot={{ r: 8, strokeWidth: 0, fill: '#10b981' }}
-                           filter="url(#glow)"
-                        />
-                        <defs>
-                           <linearGradient id="lineGradient" x1="0" y1="0" x2="1" y2="0">
-                              <stop offset="0%" stopColor="#6366f1" />
-                              <stop offset="50%" stopColor="#8b5cf6" />
-                              <stop offset="100%" stopColor="#10b981" />
-                           </linearGradient>
-                        </defs>
-                     </AreaChart>
-                  </ResponsiveContainer>
-               </div>
+                        <CartesianGrid strokeDasharray="0" vertical={false} stroke="rgba(0,85,255,0.07)" />
+                        <XAxis dataKey="m" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: T4 }} dy={8} />
+                        <YAxis domain={[1, 5]} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: T4 }} />
+                        <Tooltip
+                          contentStyle={{ borderRadius: 12, border: `0.5px solid ${BLUE_BDR}`, boxShadow: "0 4px 20px rgba(0,85,255,0.12)", fontSize: 12, fontFamily: "DM Sans", background: "#fff" }}
+                          formatter={(val: any) => [`${val?.toFixed?.(1) ?? val}`, "Rating"]} />
+                        <Area type="monotone" dataKey="score" stroke="url(#behDeskLine)" strokeWidth={3} fill="url(#behDeskArea)"
+                          dot={{ r: 5, fill: B1, strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 7, strokeWidth: 2, stroke: "#fff" }} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="h-[280px] flex items-center justify-center text-[13px]" style={{ color: T4 }}>
+                    Not enough data yet for a trend.
+                  </div>
+                )}
+              </div>
+
+              {/* Dark Summary */}
+              <div className="rounded-[22px] px-6 py-6 relative overflow-hidden"
+                style={{
+                  background: "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)",
+                  boxShadow: "0 8px 30px rgba(0,51,204,0.34), 0 0 0 0.5px rgba(255,255,255,0.14)",
+                }}>
+                <div className="absolute -top-10 -right-7 w-[200px] h-[200px] rounded-full pointer-events-none"
+                  style={{ background: "radial-gradient(circle, rgba(255,255,255,0.14) 0%, transparent 65%)" }} />
+                <div className="absolute inset-0 pointer-events-none" style={{
+                  backgroundImage: "linear-gradient(rgba(255,255,255,0.014) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.014) 1px, transparent 1px)",
+                  backgroundSize: "24px 24px"
+                }} />
+                <div className="text-[10px] font-bold uppercase tracking-[0.12em] mb-2 relative z-10" style={{ color: "rgba(255,255,255,0.50)" }}>Term Summary</div>
+                <div className="text-[19px] font-bold mb-5 relative z-10 text-white" style={{ letterSpacing: "-0.3px" }}>Behaviour Overview</div>
+                <div className="space-y-2 relative z-10">
+                  {[
+                    { label: "Rating", val: rating },
+                    { label: incidentsD === 1 ? "Incident" : "Incidents", val: `${incidentsD}` },
+                    { label: "Grade", val: conductGradeD },
+                    { label: "Positive notes", val: `${positiveNotes.length}` },
+                  ].map(({ label, val }) => (
+                    <div key={label} className="flex items-center justify-between py-3" style={{ borderBottom: "0.5px solid rgba(255,255,255,0.10)" }}>
+                      <span className="text-[11px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(255,255,255,0.50)" }}>{label}</span>
+                      <span className="text-[17px] font-bold text-white" style={{ letterSpacing: "-0.3px" }}>{val}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
 
-          </div>
-        </>
-      )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

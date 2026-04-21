@@ -789,125 +789,360 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
   }
 
   /* ═══════════════════════════════════════════════════════════════
-     DESKTOP — Existing UI (unchanged)
+     DESKTOP — Bright Blue Apple UI
      ═══════════════════════════════════════════════════════════════ */
+  const B1 = "#0055FF", B2 = "#1166FF", B4 = "#4499FF";
+  const BG = "#EEF4FF", BG2 = "#E0ECFF";
+  const T1 = "#001040", T2 = "#002080", T3 = "#5070B0", T4 = "#99AACC";
+  const SEP = "rgba(0,85,255,0.07)";
+  const GREEN = "#00C853", RED = "#FF3355", ORANGE = "#FF8800", VIOLET = "#6B21E8";
+  const BLUE_BDR = "rgba(0,85,255,0.12)";
+  const SH = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.09), 0 10px 28px rgba(0,85,255,0.11)";
+  const SH_LG = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 18px 44px rgba(0,85,255,0.14)";
+  const SH_BTN = "0 6px 22px rgba(0,85,255,0.42), 0 2px 6px rgba(0,85,255,0.22)";
+
+  const parseDueD = (a: any): Date | null => {
+    const v = a.dueDate || a.due_date || a.deadline || a.due || a.dueOn;
+    if (!v) return null;
+    if (typeof v?.toDate === "function") return v.toDate();
+    if (v?.seconds) return new Date(v.seconds * 1000);
+    if (typeof v === "string" || typeof v === "number") {
+      const d = new Date(v);
+      if (!isNaN(d.getTime())) return d;
+    }
+    return null;
+  };
+  const nowD = new Date();
+  const todayStartD = new Date(nowD); todayStartD.setHours(0, 0, 0, 0);
+  const isOverdueD = (a: any) => {
+    const d = parseDueD(a);
+    return !!d && d.getTime() < todayStartD.getTime();
+  };
+  const unsubmittedD = assignments.filter(a => !getSub(a.id));
+  const overdueListD = unsubmittedD.filter(a => isOverdueD(a));
+  const pendingListD = unsubmittedD.filter(a => !isOverdueD(a));
+  const completedListD = assignments.filter(a => !!getSub(a.id));
+  const desktopList =
+    activeTab === 0 ? pendingListD :
+    activeTab === 1 ? completedListD :
+    overdueListD;
+
+  const MONTHS_D = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const daysUntilD = (d: Date) => Math.max(0, Math.round((d.getTime() - todayStartD.getTime()) / 86400000));
+
+  const upcomingD = pendingListD
+    .map(a => ({ a, d: parseDueD(a) }))
+    .filter(x => x.d)
+    .sort((x: any, y: any) => x.d.getTime() - y.d.getTime())
+    .slice(0, 4);
+
+  const rowAccentsD = [
+    { ico: "linear-gradient(135deg, #0044EE, #2277FF)", icoSh: "0 3px 10px rgba(0,68,238,0.26)", bar: `linear-gradient(180deg, ${B1}, ${B4})` },
+    { ico: "linear-gradient(135deg, #FF6600, #FFAA33)", icoSh: "0 3px 10px rgba(255,102,0,0.24)", bar: `linear-gradient(180deg, ${ORANGE}, #FFCC44)` },
+    { ico: "linear-gradient(135deg, #00A040, #00C853)", icoSh: "0 3px 10px rgba(0,160,64,0.26)", bar: `linear-gradient(180deg, ${GREEN}, #66EE88)` },
+    { ico: "linear-gradient(135deg, #6B21E8, #A87FF8)", icoSh: "0 3px 10px rgba(107,33,232,0.26)", bar: `linear-gradient(180deg, ${VIOLET}, #A87FF8)` },
+  ];
+  const getRowAccentD = (idx: number) => rowAccentsD[idx % rowAccentsD.length];
+
+  const tagForD = (a: any) => {
+    if (getSub(a.id)) return { bg: "rgba(0,200,83,0.10)", color: "#007830", border: "rgba(0,200,83,0.22)", label: "Handed In" };
+    if (isOverdueD(a)) return { bg: "rgba(255,51,85,0.10)", color: RED, border: "rgba(255,51,85,0.22)", label: "Overdue" };
+    const d = parseDueD(a);
+    if (d) {
+      const days = daysUntilD(d);
+      if (days <= 3) return { bg: "rgba(255,136,0,0.10)", color: "#884400", border: "rgba(255,136,0,0.22)", label: "Due Soon" };
+    }
+    return { bg: "rgba(0,85,255,0.10)", color: B1, border: "rgba(0,85,255,0.20)", label: "Pending" };
+  };
+
   return (
-    <div className="animate-in fade-in duration-500">
-      <PageHeader
-        title="Assignments & Coursework"
-        subtitle="Manage submissions and track academic tasks"
-        badge={assignments.length > 0 ? `${assignments.length} Total` : ""}
-      />
+    <div className="animate-in fade-in duration-500 -m-4 sm:-m-6 md:-m-8 min-h-[calc(100vh-64px)]"
+      style={{ fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif", background: BG }}>
+      <div className="w-full px-6 pt-8 pb-12">
 
-      {/* STATS - Scrollable on mobile */}
-      <div className="flex overflow-x-auto pb-4 gap-4 scrollbar-none no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 mb-6 font-bold">
-        {[
-          { label: 'Completion', value: '93%', color: 'text-emerald-500', icon: Target },
-          { label: 'On-Time', value: '96%', color: 'text-blue-500', icon: BarChart3 },
-          { label: 'Avg Score', value: '82%', color: 'text-indigo-500', icon: Trophy },
-        ].map((stat, i) => (
-          <div key={i} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-3 min-w-[160px] flex-1">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">{stat.label}</p>
-              <stat.icon className={`w-4 h-4 ${stat.color}`} />
+        {/* ── Toolbar ── */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.12em] mb-1 flex items-center gap-[7px]" style={{ color: T4 }}>
+              <span className="w-[6px] h-[6px] rounded-full" style={{ background: GREEN, boxShadow: "0 0 0 3px rgba(0,200,83,0.2)" }} />
+              Parent Dashboard · Assignments
             </div>
-            <h4 className={`text-2xl font-black ${stat.color}`}>{stat.value}</h4>
+            <h1 className="text-[32px] font-bold leading-none" style={{ color: T1, letterSpacing: "-0.8px" }}>Assignments &amp; Coursework</h1>
+            <div className="text-[13px] font-normal mt-[6px]" style={{ color: T3 }}>Manage submissions and track academic tasks</div>
           </div>
-        ))}
-      </div>
+          <div className="flex items-center gap-[10px]">
+            <div className="px-[14px] py-[8px] rounded-full text-[12px] font-bold" style={{ background: "rgba(0,85,255,0.08)", color: B1, border: `0.5px solid ${BLUE_BDR}` }}>
+              {assignments.length} Total
+            </div>
+            <div className="w-10 h-10 rounded-full flex items-center justify-center text-[14px] font-bold text-white"
+              style={{ background: `linear-gradient(140deg, ${B1}, ${B2})`, boxShadow: "0 3px 12px rgba(0,85,255,0.36), 0 0 0 2px rgba(255,255,255,0.8)" }}>
+              {studentData?.name?.[0]?.toUpperCase() || "S"}
+            </div>
+          </div>
+        </div>
 
-      {/* TABS - Scrollable on mobile */}
-      <div className="flex overflow-x-auto pb-2 mb-6 gap-2 scrollbar-none no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
-        <div className="flex bg-white p-1.5 rounded-2xl border border-slate-100 shadow-sm w-full sm:w-fit">
-          {tabs.map((tab, i) => (
-            <button key={tab} onClick={() => setActiveTab(i)} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${i === activeTab ? "bg-slate-900 text-white shadow-lg" : "text-slate-400"}`}>
-              {tab} ({i === 0 ? assignments.filter(a => !getSub(a.id)).length : i === 1 ? submissions.length : 0})
-            </button>
+        {/* ── Stats Row (4-col) ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+          {[
+            { label: "Completion", value: "93%", color: GREEN, iconBg: "rgba(0,200,83,0.12)", iconBdr: "rgba(0,200,83,0.22)", icon: Target, bar: "linear-gradient(90deg, #00C853, #66EE99)", barPct: 93, glow: "rgba(0,200,83,0.14)" },
+            { label: "On-Time",    value: "96%", color: B1,    iconBg: "rgba(0,85,255,0.10)",   iconBdr: "rgba(0,85,255,0.18)",   icon: BarChart3, bar: `linear-gradient(90deg, ${B1}, ${B4})`, barPct: 96, glow: "rgba(0,85,255,0.10)" },
+            { label: "Avg Score",  value: "82%", color: VIOLET, iconBg: "rgba(107,33,232,0.10)", iconBdr: "rgba(107,33,232,0.20)", icon: Trophy, bar: "linear-gradient(90deg, #6B21E8, #A87FF8)", barPct: 82, glow: "rgba(107,33,232,0.10)" },
+            { label: "Pending",    value: `${pendingListD.length}`, color: ORANGE, iconBg: "rgba(255,136,0,0.10)", iconBdr: "rgba(255,136,0,0.22)", icon: Clock, bar: "linear-gradient(90deg, #FF8800, #FFCC44)", barPct: 60, glow: "rgba(255,136,0,0.14)" },
+          ].map(({ label, value, color, iconBg, iconBdr, icon: Icon, bar, barPct, glow }) => (
+            <div key={label} className="bg-white rounded-[22px] px-6 py-5 relative overflow-hidden"
+              style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+              <div className="absolute -top-[20px] -right-[20px] w-[90px] h-[90px] rounded-full pointer-events-none"
+                style={{ background: `radial-gradient(circle, ${glow} 0%, transparent 70%)`, opacity: 0.65 }} />
+              <div className="flex items-center justify-between mb-3 relative">
+                <span className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: T4 }}>{label}</span>
+                <div className="w-9 h-9 rounded-[11px] flex items-center justify-center"
+                  style={{ background: iconBg, border: `0.5px solid ${iconBdr}` }}>
+                  <Icon className="w-[16px] h-[16px]" style={{ color }} strokeWidth={2.5} />
+                </div>
+              </div>
+              <div className="text-[36px] font-bold leading-none mb-3 relative" style={{ color, letterSpacing: "-1px" }}>{value}</div>
+              <div className="h-[4px] rounded-[2px] relative" style={{ background: BG2, width: "100%" }}>
+                <div className="h-full rounded-[2px]" style={{ width: `${barPct}%`, background: bar }} />
+              </div>
+            </div>
           ))}
         </div>
-      </div>
 
-        {/* LIST */}
-        <div className="space-y-6">
-          {loading ? (
-             <div className="py-24 text-center bg-white border border-dashed border-slate-100 rounded-[3rem]"><Loader2 className="w-10 h-10 text-indigo-600 animate-spin mx-auto mb-4" /></div>
-          ) : filteredAssignments.length === 0 ? (
-             <div className="py-24 bg-white border border-dashed border-slate-200 rounded-[3.5rem] text-center"><FileCheck className="w-12 h-12 text-slate-200 mx-auto mb-6" /><h3 className="text-xl font-black text-slate-800 uppercase">No Curriculums Found</h3></div>
-          ) : (
-             filteredAssignments.map((a) => {
-               const mySub = getSub(a.id);
-               return (
-                 <div key={a.id} className="bg-white rounded-3xl border border-slate-100 p-5 md:p-8 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row items-center gap-6 md:gap-8">
-                   <div className="w-20 h-20 md:w-24 md:h-24 rounded-3xl flex items-center justify-center border-2 shrink-0 bg-slate-50 border-slate-100 shadow-inner">
-                      {getSubjectIcon(a.title)}
-                   </div>
-                   <div className="flex-1 space-y-3 w-full font-bold">
-                     <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                        <h3 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight leading-tight">{a.title}</h3>
-                        <span className={`w-fit px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${mySub ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
-                           {mySub ? 'Handed In' : 'Outstanding'}
-                        </span>
-                     </div>
-                     <p className="text-sm font-bold text-slate-400 line-clamp-2">{a.description}</p>
-                     <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-1 font-bold">
-                        <div className="flex items-center gap-2"><User className="w-4 h-4 text-slate-300"/><span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{a.teacherName || "Teacher unassigned"}</span></div>
-                        {(() => {
-                          // Render the actual due date from Firestore (`dueDate`/`dueOn`/`deadline`).
-                          // Previously hardcoded as "Due Mar 28" — every assignment showed the
-                          // same date which was obvious nonsense to parents.
-                          const raw = a.dueDate || a.dueOn || a.deadline;
-                          if (!raw) {
-                            return (
-                              <div className="flex items-center gap-2 text-slate-400"><Clock className="w-4 h-4"/><span className="text-[10px] font-black uppercase tracking-widest">No due date</span></div>
-                            );
-                          }
-                          const d = raw?.toDate?.() || new Date(raw);
-                          if (Number.isNaN(d.getTime())) {
-                            return (
-                              <div className="flex items-center gap-2 text-slate-400"><Clock className="w-4 h-4"/><span className="text-[10px] font-black uppercase tracking-widest">No due date</span></div>
-                            );
-                          }
-                          const isOverdue = d.getTime() < Date.now();
-                          return (
-                            <div className={`flex items-center gap-2 ${isOverdue ? "text-rose-500" : "text-slate-500"}`}>
-                              <Clock className="w-4 h-4"/>
-                              <span className="text-[10px] font-black uppercase tracking-widest">
-                                Due {d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
-                              </span>
-                            </div>
-                          );
-                        })()}
-                     </div>
-                   </div>
-                   <div className="flex flex-col gap-3 w-full md:w-[200px]">
-                      {mySub ? (
-                         <div className="bg-emerald-50 text-emerald-600 p-4 rounded-2xl border border-emerald-100 text-center flex flex-col items-center shadow-sm">
-                            <CheckCircle2 className="w-5 h-5 mb-1" />
-                            <p className="text-[10px] font-black uppercase tracking-widest">Handed In</p>
-                         </div>
-                      ) : (
-                         <>
-                           <button
-                             onClick={() => { setSelectedTask(a); setInstantFeedback(null); setUploadFile(null); setStudentNote(""); setIsSubmitOpen(true); }}
-                             className="w-full px-6 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-slate-800 shadow-lg active:scale-95 transition-all"
-                           >
-                             Submit Online
-                           </button>
-                           <button
-                             onClick={() => { setHintsTask(a); setHintDoubt(""); setHints([]); setHintIndex(0); setIsHintsOpen(true); }}
-                             className="w-full px-6 py-3 border border-amber-200 bg-amber-50 rounded-2xl text-[10px] font-black text-amber-600 uppercase tracking-widest hover:bg-amber-100 active:scale-95 transition-all flex items-center justify-center gap-2"
-                           >
-                             <Lightbulb className="w-3.5 h-3.5" /> AI Hints
-                           </button>
-                         </>
-                      )}
-                      {a.pdfUrl && <a href={a.pdfUrl} target="_blank" rel="noreferrer" className="w-full px-6 py-3 border border-slate-100 rounded-2xl text-[9px] font-black text-slate-400 uppercase tracking-widest hover:bg-slate-50 transition-all text-center">View Blueprint</a>}
-                   </div>
-                 </div>
-               )
-             })
-          )}
+        {/* ── Segment Tabs ── */}
+        <div className="flex gap-1 p-1 rounded-[18px] bg-white w-fit mb-6"
+          style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+          {[
+            { label: "Pending",   count: pendingListD.length,   idx: 0, over: false },
+            { label: "Completed", count: completedListD.length, idx: 1, over: false },
+            { label: "Overdue",   count: overdueListD.length,   idx: 2, over: true },
+          ].map(({ label, count, idx, over }) => {
+            const isAct = activeTab === idx;
+            return (
+              <button key={label} onClick={() => setActiveTab(idx)}
+                className="px-5 py-[10px] rounded-[14px] text-[12px] font-bold flex items-center gap-2 transition-all"
+                style={{
+                  background: isAct ? `linear-gradient(135deg, ${B1}, ${B2})` : "transparent",
+                  color: isAct ? "#fff" : T4,
+                  boxShadow: isAct ? "0 3px 12px rgba(0,85,255,0.32), 0 1px 3px rgba(0,85,255,0.20)" : "none",
+                }}>
+                {label}
+                <span className="min-w-[22px] h-[22px] rounded-[7px] flex items-center justify-center px-[6px] text-[11px] font-bold"
+                  style={{
+                    background: isAct ? "rgba(255,255,255,0.22)" : over && count > 0 ? "rgba(255,51,85,0.10)" : BG2,
+                    color: isAct ? "#fff" : over && count > 0 ? RED : T3,
+                  }}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
+
+        {/* ── Main Row: List (col-2) + Sidebar (col-1) ── */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+          {/* Assignments list — spans 2 cols */}
+          <div className="xl:col-span-2 space-y-3">
+            {loading ? (
+              <div className="bg-white rounded-[22px] py-16 flex flex-col items-center"
+                style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                <Loader2 className="w-10 h-10 animate-spin" style={{ color: B1 }} />
+                <p className="text-[13px] font-medium mt-3" style={{ color: T4 }}>Loading assignments…</p>
+              </div>
+            ) : desktopList.length === 0 ? (
+              <div className="bg-white rounded-[26px] py-14 flex flex-col items-center text-center relative overflow-hidden px-6"
+                style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                <div className="absolute -top-[60px] -right-[50px] w-[220px] h-[220px] rounded-full pointer-events-none"
+                  style={{ background: "radial-gradient(circle, rgba(0,85,255,0.05) 0%, transparent 70%)" }} />
+                <div className="w-[88px] h-[88px] rounded-[28px] flex items-center justify-center mb-5 relative z-10"
+                  style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: "0 6px 22px rgba(0,85,255,0.42), 0 2px 6px rgba(0,85,255,0.22), 0 0 0 10px rgba(0,85,255,0.08)" }}>
+                  <FileCheck className="w-10 h-10 text-white" strokeWidth={2} />
+                </div>
+                <div className="text-[22px] font-bold mb-2 relative z-10" style={{ color: T1, letterSpacing: "-0.5px" }}>
+                  {activeTab === 0 ? "All Caught Up!" : activeTab === 1 ? "Nothing submitted yet" : "No overdue items"}
+                </div>
+                <div className="text-[14px] font-normal leading-[1.6] max-w-[360px] relative z-10" style={{ color: T3 }}>
+                  {activeTab === 0 ? "No pending assignments right now. New tasks will appear here when added by your teacher." :
+                   activeTab === 1 ? "Once you submit an assignment, it'll show here." :
+                                     "Great — nothing past its deadline. Keep it up!"}
+                </div>
+              </div>
+            ) : (
+              desktopList.map((a: any, idx: number) => {
+                const mySub = getSub(a.id);
+                const accent = getRowAccentD(idx);
+                const tag = tagForD(a);
+                const d = parseDueD(a);
+                return (
+                  <div key={a.id}
+                    className="bg-white rounded-[20px] p-5 flex items-center gap-5 relative overflow-hidden transition-transform hover:-translate-y-[1px]"
+                    style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                    <div className="absolute left-0 top-0 bottom-0 w-[4px] rounded-l-[2px]" style={{ background: accent.bar }} />
+
+                    <div className="w-[52px] h-[52px] rounded-[16px] flex items-center justify-center shrink-0"
+                      style={{ background: accent.ico, boxShadow: accent.icoSh }}>
+                      <FileText className="w-[22px] h-[22px] text-white" strokeWidth={2.2} />
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-[6px]">
+                        <div className="text-[15px] font-bold truncate" style={{ color: T1, letterSpacing: "-0.2px" }}>{a.title || "Assignment"}</div>
+                        <div className="px-[10px] py-[3px] rounded-full text-[10px] font-bold shrink-0 tracking-[0.02em]"
+                          style={{ background: tag.bg, color: tag.color, border: `0.5px solid ${tag.border}` }}>
+                          {tag.label}
+                        </div>
+                      </div>
+                      {a.description && (
+                        <div className="text-[12px] truncate mb-[6px]" style={{ color: T3 }}>{a.description}</div>
+                      )}
+                      <div className="flex items-center gap-4 flex-wrap">
+                        {a.teacherName && (
+                          <div className="flex items-center gap-[5px] text-[12px] font-medium" style={{ color: T3 }}>
+                            <User className="w-[12px] h-[12px]" strokeWidth={2.3} />
+                            <span className="truncate max-w-[180px]">{a.teacherName}</span>
+                          </div>
+                        )}
+                        {d && (
+                          <div className="flex items-center gap-[5px] text-[12px] font-medium" style={{ color: T3 }}>
+                            <Clock className="w-[12px] h-[12px]" strokeWidth={2.3} />
+                            Due {MONTHS_D[d.getMonth()]} {d.getDate()}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {mySub ? (
+                        <div className="flex items-center gap-2 px-4 py-[10px] rounded-[14px]"
+                          style={{ background: "rgba(0,200,83,0.08)", border: "0.5px solid rgba(0,200,83,0.22)" }}>
+                          <CheckCircle2 className="w-[14px] h-[14px]" style={{ color: GREEN }} strokeWidth={2.5} />
+                          <span className="text-[12px] font-bold" style={{ color: "#007830" }}>Handed In</span>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => { setHintsTask(a); setHintDoubt(""); setHints([]); setHintIndex(0); setIsHintsOpen(true); }}
+                            className="w-10 h-10 rounded-[12px] flex items-center justify-center shrink-0 transition-transform hover:scale-105"
+                            style={{ background: "rgba(255,136,0,0.10)", border: "0.5px solid rgba(255,136,0,0.22)" }}
+                            title="Get AI Hints"
+                          >
+                            <Lightbulb className="w-4 h-4" style={{ color: ORANGE }} strokeWidth={2.2} />
+                          </button>
+                          <button
+                            onClick={() => { setSelectedTask(a); setInstantFeedback(null); setUploadFile(null); setStudentNote(""); setIsSubmitOpen(true); }}
+                            className="h-10 px-5 rounded-[12px] flex items-center gap-2 text-[13px] font-bold text-white transition-transform hover:scale-[1.02]"
+                            style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: SH_BTN, letterSpacing: "-0.1px" }}
+                          >
+                            <Upload className="w-[14px] h-[14px]" strokeWidth={2.3} /> Submit
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-4">
+
+            {/* Upcoming Deadlines */}
+            {!loading && upcomingD.length > 0 && (
+              <div className="bg-white rounded-[22px] px-5 py-5"
+                style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="text-[15px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Upcoming Deadlines</div>
+                  <button onClick={() => setActiveTab(0)} className="text-[12px] font-bold" style={{ color: B1 }}>See all</button>
+                </div>
+                {upcomingD.map((x: any, i: number, arr: any[]) => {
+                  const a = x.a;
+                  const d: Date = x.d;
+                  const days = daysUntilD(d);
+                  const urgent = days <= 3;
+                  return (
+                    <div key={a.id}
+                      className="flex items-center gap-3 py-3 cursor-pointer"
+                      style={{ borderBottom: i < arr.length - 1 ? `0.5px solid ${SEP}` : "none" }}
+                      onClick={() => { setSelectedTask(a); setInstantFeedback(null); setUploadFile(null); setStudentNote(""); setIsSubmitOpen(true); }}>
+                      <div className="w-[46px] h-[46px] rounded-[14px] flex flex-col items-center justify-center gap-[1px] shrink-0"
+                        style={{
+                          background: urgent ? "linear-gradient(135deg, #FF6600, #FFAA33)" : `linear-gradient(135deg, ${B1}, ${B2})`,
+                          boxShadow: urgent ? "0 3px 10px rgba(255,102,0,0.24)" : "0 3px 10px rgba(0,85,255,0.28)"
+                        }}>
+                        <div className="text-[17px] font-bold text-white leading-none">{d.getDate()}</div>
+                        <div className="text-[8px] font-bold uppercase tracking-[0.08em]" style={{ color: "rgba(255,255,255,0.65)" }}>{MONTHS_D[d.getMonth()]}</div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[13px] font-bold truncate" style={{ color: T1, letterSpacing: "-0.2px" }}>{a.title || "Assignment"}</div>
+                        <div className="text-[11px] mt-0.5 truncate" style={{ color: T3 }}>
+                          {a.teacherName || "Teacher"}
+                        </div>
+                      </div>
+                      <div className="px-[10px] py-1 rounded-full text-[10px] font-bold shrink-0"
+                        style={{
+                          background: urgent ? "rgba(255,136,0,0.10)" : "rgba(0,85,255,0.10)",
+                          color: urgent ? "#884400" : B1,
+                          border: `0.5px solid ${urgent ? "rgba(255,136,0,0.22)" : "rgba(0,85,255,0.20)"}`
+                        }}>
+                        {days === 0 ? "Today" : days === 1 ? "1 day" : `${days} days`}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Summary Dark Card */}
+            <div className="rounded-[22px] px-6 py-6 relative overflow-hidden"
+              style={{
+                background: "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)",
+                boxShadow: "0 8px 30px rgba(0,51,204,0.34), 0 0 0 0.5px rgba(255,255,255,0.14)",
+              }}>
+              <div className="absolute -top-10 -right-7 w-[200px] h-[200px] rounded-full pointer-events-none"
+                style={{ background: "radial-gradient(circle, rgba(255,255,255,0.14) 0%, transparent 65%)" }} />
+              <div className="absolute inset-0 pointer-events-none" style={{
+                backgroundImage: "linear-gradient(rgba(255,255,255,0.014) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.014) 1px, transparent 1px)",
+                backgroundSize: "24px 24px"
+              }} />
+              <div className="text-[10px] font-bold uppercase tracking-[0.12em] mb-2 relative z-10" style={{ color: "rgba(255,255,255,0.50)" }}>Term Summary</div>
+              <div className="text-[19px] font-bold mb-5 relative z-10 text-white" style={{ letterSpacing: "-0.3px" }}>Assignment Overview</div>
+              <div className="grid grid-cols-3 rounded-[16px] overflow-hidden relative z-10" style={{ gap: "1px", background: "rgba(255,255,255,0.12)" }}>
+                <div className="py-4 px-3 text-center" style={{ background: "rgba(255,255,255,0.08)" }}>
+                  <div className="text-[26px] font-bold text-white leading-none mb-1" style={{ letterSpacing: "-0.6px" }}>{pendingListD.length}</div>
+                  <div className="text-[9px] font-bold uppercase tracking-[0.09em]" style={{ color: "rgba(255,255,255,0.42)" }}>Pending</div>
+                </div>
+                <div className="py-4 px-3 text-center" style={{ background: "rgba(255,255,255,0.08)" }}>
+                  <div className="text-[26px] font-bold text-white leading-none mb-1" style={{ letterSpacing: "-0.6px" }}>{completedListD.length}</div>
+                  <div className="text-[9px] font-bold uppercase tracking-[0.09em]" style={{ color: "rgba(255,255,255,0.42)" }}>Done</div>
+                </div>
+                <div className="py-4 px-3 text-center" style={{ background: "rgba(255,255,255,0.08)" }}>
+                  <div className="text-[26px] font-bold text-white leading-none mb-1" style={{ letterSpacing: "-0.6px" }}>{overdueListD.length}</div>
+                  <div className="text-[9px] font-bold uppercase tracking-[0.09em]" style={{ color: "rgba(255,255,255,0.42)" }}>Overdue</div>
+                </div>
+              </div>
+            </div>
+
+            {/* AI Tips Card */}
+            <div className="bg-white rounded-[22px] px-5 py-5 relative overflow-hidden"
+              style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+              <div className="absolute -top-[20px] -right-[20px] w-[120px] h-[120px] rounded-full pointer-events-none"
+                style={{ background: "radial-gradient(circle, rgba(255,136,0,0.06) 0%, transparent 70%)" }} />
+              <div className="flex items-center gap-2 mb-3 relative z-10">
+                <div className="w-9 h-9 rounded-[12px] flex items-center justify-center"
+                  style={{ background: `linear-gradient(135deg, ${ORANGE}, #FFAA33)`, boxShadow: "0 3px 10px rgba(255,136,0,0.28)" }}>
+                  <Sparkles className="w-4 h-4 text-white" strokeWidth={2.3} />
+                </div>
+                <div className="text-[14px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>AI Hints Available</div>
+              </div>
+              <div className="text-[12px] leading-[1.55] font-normal relative z-10" style={{ color: T3 }}>
+                Stuck on an assignment? Tap the <Lightbulb className="w-3 h-3 inline mx-[2px]" style={{ color: ORANGE }} /> bulb icon next to any task to get Socratic-style AI hints — guides you without giving the answer.
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
 
         {/* ── AI HINTS SHEET ── */}
         <Sheet open={isHintsOpen} onOpenChange={v => { setIsHintsOpen(v); if (!v) { setHints([]); setHintIndex(0); setHintDoubt(""); } }}>

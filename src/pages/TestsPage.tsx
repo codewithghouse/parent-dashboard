@@ -457,136 +457,364 @@ const TestsPage = () => {
   }
 
   /* ═══════════════════════════════════════════════════════════════
-     DESKTOP — Existing UI (unchanged)
+     DESKTOP — Bright Blue Apple UI (matches mobile)
      ═══════════════════════════════════════════════════════════════ */
-  return (
-    <div className="animate-in fade-in duration-500">
-      <PageHeader
-        title="Tests & Examinations"
-        subtitle="Track upcoming assessments and latest outcomes"
-        badge={stats.totalTaken > 0 ? `${stats.totalTaken} Completed` : ""}
-      />
+  const B1 = "#0055FF", B2 = "#1166FF", B4 = "#4499FF";
+  const BG = "#EEF4FF";
+  const T1 = "#001040", T3 = "#5070B0", T4 = "#99AACC";
+  const GREEN = "#00C853";
+  const RED = "#FF3355";
+  const ORANGE = "#FF8800";
+  const SH = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.09), 0 10px 24px rgba(0,85,255,0.10)";
+  const SH_LG = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.11), 0 18px 44px rgba(0,85,255,0.13)";
+  const SH_BTN = "0 6px 22px rgba(0,85,255,0.42), 0 2px 6px rgba(0,85,255,0.22)";
 
-      {/* Upcoming Banner - Optimized for mobile */}
-      <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-5 md:p-8 mb-6 text-white relative overflow-hidden shadow-xl shadow-blue-900/10">
-        <div className="absolute top-0 right-0 opacity-10 scale-150 transform translate-x-1/4 -translate-y-1/4">
-          <GraduationCap size={150} />
-        </div>
-        
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-6 relative z-10">
-          <div className="flex items-center text-center sm:text-left flex-col sm:flex-row gap-5">
-            <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-inner">
-              <Calendar className="w-8 h-8 text-white" />
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  const toSafeDateD = (v: any): Date | null => {
+    if (!v) return null;
+    if (typeof v?.toDate === "function") return v.toDate();
+    if (v?.seconds) return new Date(v.seconds * 1000);
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
+  const getTestTypeTagD = (t: any) => {
+    const raw = (t.type || t.testType || t.mode || t.testName || "").toString().toLowerCase();
+    if (raw.includes("oral") || raw.includes("viva") || raw.includes("speak")) return { label: "Oral", cls: "orange" };
+    if (raw.includes("quiz")) return { label: "Quiz", cls: "blue" };
+    if (raw.includes("practical") || raw.includes("lab")) return { label: "Practical", cls: "green" };
+    return { label: "Written", cls: "blue" };
+  };
+
+  const tagStyleD: Record<string, { bg: string; color: string; border: string }> = {
+    blue:   { bg: "rgba(0,85,255,0.10)",  color: B1,        border: "rgba(0,85,255,0.20)" },
+    green:  { bg: "rgba(0,200,83,0.10)",  color: "#007830", border: "rgba(0,200,83,0.22)" },
+    orange: { bg: "rgba(255,136,0,0.10)", color: "#884400", border: "rgba(255,136,0,0.22)" },
+  };
+
+  const dateChipStyleD = (urgent: boolean) => ({
+    background: urgent ? "linear-gradient(135deg, #FF6600, #FFAA33)" : `linear-gradient(135deg, #0044EE, #2277FF)`,
+    boxShadow: urgent ? "0 3px 10px rgba(255,102,0,0.24)" : "0 3px 10px rgba(0,68,238,0.28)",
+  });
+
+  const scoreGradientD = (pct: number) => {
+    if (pct >= 80) return { bg: "linear-gradient(135deg, #00A040, #00C853)", shadow: "0 3px 10px rgba(0,160,64,0.30)" };
+    if (pct >= 60) return { bg: `linear-gradient(135deg, ${B1}, ${B2})`, shadow: "0 3px 10px rgba(0,85,255,0.30)" };
+    if (pct >= 40) return { bg: "linear-gradient(135deg, #FF6600, #FFAA33)", shadow: "0 3px 10px rgba(255,102,0,0.28)" };
+    return { bg: "linear-gradient(135deg, #FF3355, #FF6688)", shadow: "0 3px 10px rgba(255,51,85,0.28)" };
+  };
+
+  const nowD = new Date();
+  const monthlyActivityD = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(nowD.getFullYear(), nowD.getMonth() - (5 - i), 1);
+    return { label: MONTHS[d.getMonth()], year: d.getFullYear(), month: d.getMonth(), count: 0, isCurrent: i === 5 };
+  });
+  recentResults.forEach((r: any) => {
+    const ts = toSafeDateD(r.timestamp || r.date || r.createdAt);
+    if (!ts) return;
+    const slot = monthlyActivityD.find(m => m.year === ts.getFullYear() && m.month === ts.getMonth());
+    if (slot) slot.count += 1;
+  });
+  const maxMonthlyD = Math.max(1, ...monthlyActivityD.map(m => m.count));
+
+  return (
+    <div className="animate-in fade-in duration-500 -m-4 sm:-m-6 md:-m-8 min-h-[calc(100vh-64px)]"
+      style={{ fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif", background: BG }}>
+      <div className="w-full px-6 pt-8 pb-12">
+
+        {/* ── Toolbar ── */}
+        <div className="flex items-start justify-between gap-6 flex-wrap mb-5">
+          <div>
+            <div className="text-[32px] font-bold" style={{ color: T1, letterSpacing: "-0.9px" }}>Tests &amp; Examinations</div>
+            <div className="text-[14px] mt-2 font-normal" style={{ color: T3 }}>Track upcoming assessments and latest outcomes</div>
+          </div>
+          {stats.totalTaken > 0 && (
+            <div className="px-4 py-[10px] rounded-full text-[13px] font-bold tracking-[0.02em] whitespace-nowrap"
+              style={{ background: "rgba(0,85,255,0.10)", color: B1, border: "0.5px solid rgba(0,85,255,0.20)" }}>
+              {stats.totalTaken} Completed
             </div>
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-100 mb-1">Coming Up Next</p>
-              <h2 className="text-2xl md:text-3xl font-black mb-1">{nextTest?.testName || "No upcoming tests"}</h2>
-              <p className="text-sm text-blue-100 font-bold opacity-80">
-                {nextTest?.date ? formatDate(nextTest.date) : "—"} • {nextTest?.time || "9:00 AM"}
-              </p>
+          )}
+        </div>
+
+        {/* ── Hero Banner ── */}
+        <div className="rounded-[26px] px-8 pt-8 pb-8 relative overflow-hidden mb-5"
+          style={{
+            background: "linear-gradient(140deg, #0033CC 0%, #0055FF 42%, #2277FF 72%, #55AAFF 100%)",
+            boxShadow: SH_BTN,
+            minHeight: 180,
+          }}>
+          <div className="absolute -top-10 -right-10 w-[220px] h-[220px] rounded-full pointer-events-none" style={{ background: "rgba(255,255,255,0.10)" }} />
+          <div className="absolute -bottom-[50px] right-10 w-[180px] h-[180px] rounded-full pointer-events-none" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.10)" }} />
+          <div className="absolute -bottom-[10px] right-[180px] w-[120px] h-[120px] rounded-full pointer-events-none" style={{ background: "rgba(255,255,255,0.07)" }} />
+          <div className="absolute inset-0 pointer-events-none" style={{
+            backgroundImage: "linear-gradient(rgba(255,255,255,0.016) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.016) 1px, transparent 1px)",
+            backgroundSize: "28px 28px"
+          }} />
+          <div className="absolute right-10 top-1/2 -translate-y-1/2 opacity-[0.10] pointer-events-none">
+            <GraduationCap size={220} color="#fff" strokeWidth={0.8} />
+          </div>
+
+          <div className="flex items-center justify-between gap-8 flex-wrap relative z-10">
+            <div className="flex items-center gap-5">
+              <div className="w-16 h-16 rounded-[20px] flex items-center justify-center shrink-0"
+                style={{
+                  background: "rgba(255,255,255,0.22)",
+                  border: "0.5px solid rgba(255,255,255,0.32)",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.15)"
+                }}>
+                <Calendar className="w-8 h-8" style={{ color: "rgba(255,255,255,0.95)" }} strokeWidth={2.2} />
+              </div>
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.14em] mb-2" style={{ color: "rgba(255,255,255,0.55)" }}>Coming Up Next</div>
+                <div className="text-[32px] font-bold text-white mb-2 leading-[1.08]" style={{ letterSpacing: "-0.8px" }}>
+                  {nextTest?.testName || "No upcoming tests"}
+                </div>
+                <div className="flex items-center gap-[8px]">
+                  {nextTest && (
+                    <span className="text-[14px] font-semibold" style={{ color: "rgba(255,255,255,0.68)", letterSpacing: "-0.1px" }}>
+                      {formatDate(nextTest.date)}
+                    </span>
+                  )}
+                  <div className="w-1 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.45)" }} />
+                  <span className="text-[14px] font-semibold" style={{ color: "rgba(255,255,255,0.68)", letterSpacing: "-0.1px" }}>
+                    {nextTest?.time || "9:00 AM"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {nextTest && (
+              <div className="px-8 py-5 rounded-[20px] text-center min-w-[140px]"
+                style={{ background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.20)" }}>
+                <div className="text-[56px] font-bold leading-none text-white" style={{ letterSpacing: "-1.8px" }}>{getDayDiff(nextTest.date)}</div>
+                <div className="text-[10px] font-bold uppercase tracking-widest mt-1" style={{ color: "rgba(255,255,255,0.68)" }}>Days Left</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Row: Upcoming + Recent ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+
+          {/* Upcoming Tests */}
+          <div className="bg-white rounded-[24px] p-6 relative overflow-hidden"
+            style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+            <div className="absolute -top-10 -right-8 w-[140px] h-[140px] rounded-full pointer-events-none"
+              style={{ background: "radial-gradient(circle, rgba(0,85,255,0.05) 0%, transparent 70%)" }} />
+            <div className="flex items-center justify-between mb-4 relative z-10">
+              <div className="text-[18px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Upcoming Tests</div>
+              <div className="text-[11px] font-bold px-3 py-[4px] rounded-full tracking-[0.02em]"
+                style={{ color: B1, background: "rgba(0,85,255,0.10)", border: "0.5px solid rgba(0,85,255,0.18)" }}>
+                {upcomingTests.length} test{upcomingTests.length === 1 ? "" : "s"}
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="flex flex-col items-center gap-3 py-12">
+                <Loader2 className="w-8 h-8 animate-spin" style={{ color: B1 }} />
+                <p className="text-xs font-medium" style={{ color: T4 }}>Loading tests…</p>
+              </div>
+            ) : upcomingTests.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-12 relative z-10">
+                <div className="w-[60px] h-[60px] rounded-[20px] flex items-center justify-center"
+                  style={{ background: "rgba(0,200,83,0.10)", border: "0.5px solid rgba(0,200,83,0.22)", boxShadow: "0 0 0 8px rgba(0,85,255,0.04)" }}>
+                  <CheckCircle className="w-7 h-7" style={{ color: GREEN }} strokeWidth={2.2} />
+                </div>
+                <div className="text-[14px] font-medium" style={{ color: T4, letterSpacing: "-0.1px" }}>No upcoming tests</div>
+                <div className="text-[12px] font-normal text-center max-w-[260px] leading-[1.55]" style={{ color: T4 }}>
+                  You're all clear! New tests will appear here when scheduled by your teacher.
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-[10px] relative z-10">
+                {upcomingTests.map((t: any, i: number) => {
+                  const d = toSafeDateD(t.date || t.testDate);
+                  const days = d ? getDayDiff(d.toISOString()) : 0;
+                  const urgent = days <= 3;
+                  const type = getTestTypeTagD(t);
+                  const tag = tagStyleD[type.cls];
+                  return (
+                    <div key={t.id || i}
+                      className="flex items-center gap-[13px] px-4 py-[13px] rounded-[18px] transition-transform hover:-translate-y-0.5 cursor-pointer"
+                      style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.12)" }}>
+                      <div className="w-12 h-12 rounded-[14px] flex flex-col items-center justify-center gap-[1px] shrink-0"
+                        style={dateChipStyleD(urgent)}>
+                        <div className="text-[18px] font-bold text-white leading-none">{d ? d.getDate() : "—"}</div>
+                        <div className="text-[9px] font-bold uppercase tracking-[0.08em]" style={{ color: "rgba(255,255,255,0.72)" }}>
+                          {d ? MONTHS[d.getMonth()] : ""}
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[14px] font-bold truncate mb-[3px]" style={{ color: T1, letterSpacing: "-0.2px" }}>
+                          {t.testName || t.subject || "Test"}
+                        </div>
+                        <div className="flex items-center gap-3 flex-wrap">
+                          {t.teacherName && (
+                            <div className="flex items-center gap-1 text-[11px] font-medium" style={{ color: T3 }}>
+                              <User className="w-[11px] h-[11px]" strokeWidth={2.5} />
+                              <span className="truncate max-w-[120px]">{t.teacherName}</span>
+                            </div>
+                          )}
+                          {(t.time || d) && (
+                            <div className="flex items-center gap-1 text-[11px] font-medium" style={{ color: T3 }}>
+                              <Clock className="w-[11px] h-[11px]" strokeWidth={2.5} />
+                              {t.time || `${days} day${days === 1 ? "" : "s"}`}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="px-3 py-[5px] rounded-full text-[10px] font-bold shrink-0"
+                        style={{ background: tag.bg, color: tag.color, border: `0.5px solid ${tag.border}` }}>
+                        {type.label}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Recent Results */}
+          <div className="bg-white rounded-[24px] p-6 relative overflow-hidden"
+            style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+            <div className="absolute -top-10 -right-8 w-[140px] h-[140px] rounded-full pointer-events-none"
+              style={{ background: "radial-gradient(circle, rgba(0,85,255,0.05) 0%, transparent 70%)" }} />
+            <div className="flex items-center justify-between mb-4 relative z-10">
+              <div className="text-[18px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Recent Results</div>
+              <div className="text-[11px] font-bold px-3 py-[4px] rounded-full tracking-[0.02em]"
+                style={{ color: B1, background: "rgba(0,85,255,0.10)", border: "0.5px solid rgba(0,85,255,0.18)" }}>
+                {recentResults.length} result{recentResults.length === 1 ? "" : "s"}
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="flex flex-col items-center gap-3 py-12">
+                <Loader2 className="w-8 h-8 animate-spin" style={{ color: B1 }} />
+                <p className="text-xs font-medium" style={{ color: T4 }}>Loading results…</p>
+              </div>
+            ) : recentResults.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-12 relative z-10">
+                <div className="w-[60px] h-[60px] rounded-[20px] flex items-center justify-center"
+                  style={{ background: "rgba(0,85,255,0.08)", border: "0.5px solid rgba(0,85,255,0.16)", boxShadow: "0 0 0 8px rgba(0,85,255,0.04)" }}>
+                  <Clock className="w-7 h-7" style={{ color: "rgba(0,85,255,0.5)" }} strokeWidth={2.2} />
+                </div>
+                <div className="text-[14px] font-medium" style={{ color: T4, letterSpacing: "-0.1px" }}>No results yet</div>
+                <div className="text-[12px] font-normal text-center max-w-[260px] leading-[1.55]" style={{ color: T4 }}>
+                  Completed test results will be shown here after grading.
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-[10px] relative z-10">
+                {recentResults.slice(0, 6).map((r: any, i: number) => {
+                  const raw = r.percentage ?? (r.maxScore > 0 ? (r.score / r.maxScore * 100) : 0);
+                  const pct = isFinite(raw) ? raw : 0;
+                  const grad = scoreGradientD(pct);
+                  return (
+                    <div key={r.id || i}
+                      className="flex items-center gap-[13px] px-4 py-[13px] rounded-[18px] transition-transform hover:-translate-y-0.5 cursor-pointer"
+                      style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.12)" }}>
+                      <div className="w-12 h-12 rounded-[14px] flex items-center justify-center text-[17px] font-bold text-white shrink-0"
+                        style={{ background: grad.bg, boxShadow: grad.shadow }}>
+                        {Math.round(pct)}%
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[14px] font-bold truncate mb-[3px]" style={{ color: T1, letterSpacing: "-0.2px" }}>
+                          {r.testName || r.subject || "Test"}
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[11px] font-medium" style={{ color: T3 }}>
+                            {r.score ?? "—"}/{r.maxScore ?? 100}
+                          </span>
+                          <span className="text-[11px] font-medium" style={{ color: T4 }}>·</span>
+                          <span className="text-[11px] font-medium" style={{ color: T3 }}>
+                            {formatDate(r.timestamp || r.date)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Term Performance + Monthly Activity row ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+          {/* This Term Performance (lg:col-span-2) */}
+          <div className="lg:col-span-2 bg-white rounded-[24px] p-6 relative overflow-hidden"
+            style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+            <div className="absolute -top-10 -right-8 w-[140px] h-[140px] rounded-full pointer-events-none"
+              style={{ background: "radial-gradient(circle, rgba(0,85,255,0.05) 0%, transparent 70%)" }} />
+            <div className="flex items-center justify-between mb-2 relative z-10">
+              <div className="text-[18px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>This Term Performance</div>
+              <div className="text-[12px] font-bold" style={{ color: B1 }}>{stats.totalTaken} taken</div>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4 relative z-10">
+              {[
+                { val: stats.aGrade, label: "A Grade", color: GREEN,  bg: "rgba(0,200,83,0.09)",  border: "rgba(0,200,83,0.20)", bar: "linear-gradient(90deg, #00C853, #66EE88)" },
+                { val: stats.bGrade, label: "B Grade", color: B1,     bg: "rgba(0,85,255,0.09)",  border: "rgba(0,85,255,0.18)", bar: `linear-gradient(90deg, ${B1}, ${B4})` },
+                { val: stats.cGrade, label: "C Grade", color: ORANGE, bg: "rgba(255,136,0,0.09)", border: "rgba(255,136,0,0.20)", bar: "linear-gradient(90deg, #FF8800, #FFCC44)" },
+                { val: stats.belowC, label: "Below C", color: RED,    bg: "rgba(255,51,85,0.09)", border: "rgba(255,51,85,0.18)", bar: "linear-gradient(90deg, #FF3355, #FF88AA)" },
+              ].map(({ val, label, color, bg, border, bar }) => (
+                <div key={label} className="rounded-[20px] px-5 py-6 flex flex-col items-center gap-[8px] transition-transform hover:-translate-y-0.5"
+                  style={{ background: bg, border: `0.5px solid ${border}` }}>
+                  <div className="text-[42px] font-bold leading-none" style={{ color, letterSpacing: "-1.4px" }}>{val}</div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color }}>{label}</div>
+                  <div className="h-[3px] rounded-[2px] mt-1" style={{ width: "70%", background: bar }} />
+                </div>
+              ))}
             </div>
           </div>
-          
-          {nextTest && (
-            <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl px-8 py-4 text-center min-w-[120px]">
-              <p className="text-4xl md:text-5xl font-black leading-none mb-1 text-white">{getDayDiff(nextTest.date)}</p>
-              <p className="text-[10px] font-black uppercase tracking-widest text-blue-100">Days Left</p>
-            </div>
-          )}
-        </div>
-      </div>
 
-      {/* Two-column: Upcoming + Recent */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
-
-        {/* Upcoming Tests */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
-          <h3 className="text-base font-bold text-slate-800 mb-4">Upcoming Tests</h3>
-          {loading ? (
-            <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-slate-300" /></div>
-          ) : upcomingTests.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-slate-300 gap-2">
-              <CheckCircle className="w-10 h-10 text-emerald-200" />
-              <p className="text-xs">No upcoming tests</p>
+          {/* Monthly Activity */}
+          {stats.totalTaken > 0 ? (
+            <div className="bg-white rounded-[22px] px-5 py-5"
+              style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-[15px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>Monthly Activity</div>
+                <div className="text-[11px] font-bold" style={{ color: B1 }}>2025–26</div>
+              </div>
+              <div className="flex items-end gap-[8px] h-[100px] mb-2">
+                {monthlyActivityD.map((m, i) => {
+                  const h = 8 + (m.count / maxMonthlyD) * 86;
+                  const opacity = m.isCurrent ? 1 : m.count === 0 ? 0.22 : 0.55;
+                  return (
+                    <div key={i} className="flex flex-col items-center gap-1 flex-1">
+                      <div
+                        className="w-full rounded-t-[6px] min-h-[5px]"
+                        style={{
+                          height: h,
+                          background: `linear-gradient(180deg, ${B1}, ${B4})`,
+                          opacity,
+                          boxShadow: m.isCurrent ? "0 0 0 3px rgba(0,85,255,0.18)" : "none",
+                        }}
+                      />
+                      <span className="text-[10px] font-bold uppercase tracking-[0.04em]" style={{ color: m.isCurrent ? B1 : T4 }}>
+                        {m.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex items-center justify-between pt-3 mt-2" style={{ borderTop: "0.5px solid rgba(0,85,255,0.08)" }}>
+                <span className="text-[11px] font-medium" style={{ color: T4 }}>Tests this month</span>
+                <span className="text-[13px] font-bold" style={{ color: B1 }}>{monthlyActivityD[monthlyActivityD.length - 1].count}</span>
+              </div>
             </div>
           ) : (
-            <div className="space-y-3">
-              {upcomingTests.map((t, i) => {
-                const { icon, bg } = getSubjectIcon(t.testName || t.subject);
-                return (
-                  <div key={i} className="flex items-center justify-between p-3.5 rounded-xl hover:bg-slate-50 transition-all">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center`}>{icon}</div>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-800">{t.testName}</p>
-                        <p className="text-xs text-slate-400">{formatDate(t.date)}</p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full">
-                      {getDayDiff(t.date)} days
-                    </span>
-                  </div>
-                );
-              })}
+            <div className="bg-white rounded-[22px] px-5 py-12 flex flex-col items-center gap-3 text-center"
+              style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+              <div className="w-[60px] h-[60px] rounded-[18px] flex items-center justify-center"
+                style={{ background: "rgba(0,85,255,0.08)", border: "0.5px solid rgba(0,85,255,0.16)" }}>
+                <GraduationCap className="w-8 h-8" style={{ color: "rgba(0,85,255,0.5)" }} strokeWidth={2.2} />
+              </div>
+              <div className="text-[14px] font-bold" style={{ color: T1 }}>No activity yet</div>
+              <div className="text-[11px]" style={{ color: T4 }}>Monthly test activity will appear here</div>
             </div>
           )}
-        </div>
-
-        {/* Recent Results */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
-          <h3 className="text-base font-bold text-slate-800 mb-4">Recent Results</h3>
-          {loading ? (
-            <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-slate-300" /></div>
-          ) : recentResults.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-slate-300 gap-2">
-              <Clock className="w-10 h-10 text-slate-200" />
-              <p className="text-xs">No results yet</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {recentResults.slice(0, 5).map((r, i) => {
-                const raw = r.percentage ?? (r.maxScore > 0 ? (r.score / r.maxScore * 100) : 0);
-                const pct = isFinite(raw) ? raw : 0;
-                const isHigh = pct >= 80;
-                const { icon, bg } = getSubjectIcon(r.testName || r.subject);
-                return (
-                  <div key={i} className="flex items-center justify-between p-3.5 rounded-xl hover:bg-slate-50 transition-all">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center`}>{icon}</div>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-800">{r.testName}</p>
-                        <p className="text-xs text-slate-400">{formatDate(r.timestamp)}</p>
-                      </div>
-                    </div>
-                    <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${isHigh ? "bg-emerald-100 text-emerald-700" : "bg-orange-100 text-orange-600"}`}>
-                      {r.score}/{r.maxScore}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* This Term Performance */}
-      <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-base font-bold text-slate-800">This Term Performance</h3>
-          <p className="text-sm text-slate-400">{stats.totalTaken} tests taken</p>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[
-            { val: stats.aGrade, label: "A Grade", color: "text-emerald-600", bg: "bg-emerald-50" },
-            { val: stats.bGrade, label: "B Grade", color: "text-blue-600", bg: "bg-blue-50" },
-            { val: stats.cGrade, label: "C Grade", color: "text-orange-500", bg: "bg-orange-50" },
-            { val: stats.belowC, label: "Below C", color: "text-rose-600", bg: "bg-rose-50" },
-          ].map((g, i) => (
-            <div key={i} className={`${g.bg} rounded-xl p-5 text-center`}>
-              <p className={`text-4xl font-bold ${g.color} mb-1`}>{g.val}</p>
-              <p className="text-xs text-slate-500">{g.label}</p>
-            </div>
-          ))}
         </div>
       </div>
     </div>

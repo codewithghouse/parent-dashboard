@@ -76,6 +76,20 @@ service firebase.storage {
              ];
     }
 
+    // Used by teacher assignment attachments + test blueprints.
+    // 10 MB cap aligns with the client-side validator in CreateAssignment.tsx
+    // and CreateTest.tsx (MAX_UPLOAD_BYTES = 10 MB).
+    function isAllowedTeacherUploadType() {
+      return request.resource != null
+          && request.resource.size < 10 * 1024 * 1024
+          && request.resource.contentType in [
+               'application/pdf',
+               'image/jpeg', 'image/png',
+               'application/msword',
+               'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+             ];
+    }
+
     function isImage() {
       return request.resource != null
           && request.resource.contentType.matches('image/(jpeg|png|webp|gif)');
@@ -119,6 +133,40 @@ service firebase.storage {
                     && request.resource.size < 10 * 1024 * 1024
                     && isImage();
       allow delete: if isOwnerOf(schoolId);
+    }
+
+
+    // ═════════════════════════════════════════════════════════════════════
+    // ── Assignment attachments (teacher creates) ────────────────────────
+    //   Path: assignments/{teacherId}_{timestamp}_{fileName}
+    //   Write: staff role only, and the filename MUST start with the
+    //          uploader's UID — prevents one teacher from impersonating
+    //          another teacher's file attribution.
+    //   Read: any signed-in user (students/parents need to download) —
+    //         actual file access goes through tokenized download URLs
+    //         anyway, so this is defense in depth.
+    //   Delete: staff role only.
+    // ═════════════════════════════════════════════════════════════════════
+    match /assignments/{fileName} {
+      allow read:   if signedIn();
+      allow write:  if hasStaffRole()
+                    && fileName.matches(uid() + '_.*')
+                    && isAllowedTeacherUploadType();
+      allow delete: if hasStaffRole();
+    }
+
+
+    // ═════════════════════════════════════════════════════════════════════
+    // ── Test blueprints (teacher creates) ───────────────────────────────
+    //   Path: test_blueprints/{teacherId}_{timestamp}_{fileName}
+    //   Same model as /assignments/ — uploader-scoped write, signed-in read.
+    // ═════════════════════════════════════════════════════════════════════
+    match /test_blueprints/{fileName} {
+      allow read:   if signedIn();
+      allow write:  if hasStaffRole()
+                    && fileName.matches(uid() + '_.*')
+                    && isAllowedTeacherUploadType();
+      allow delete: if hasStaffRole();
     }
 
 

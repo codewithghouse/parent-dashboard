@@ -36,7 +36,7 @@ export const ParentLayout = () => {
           style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'none' }}
         >
           <PageTransition>
-            <div className="max-w-7xl mx-auto w-full flex-1 flex flex-col">
+            <div className="max-w-[1600px] mx-auto w-full flex-1 flex flex-col">
               <Outlet />
             </div>
           </PageTransition>
