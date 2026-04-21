@@ -11,6 +11,7 @@ import { InstallBanner } from "./components/InstallBanner";
 import { PWAUpdatePrompt } from "./components/PWAUpdatePrompt";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { OfflineBanner } from "./components/OfflineBanner";
+import { SplashScreen } from "./components/SplashScreen";
 
 // ── Lazy-loaded pages (code splitting) ──────────────────────────────────────
 const DashboardPage       = lazy(() => import("./pages/DashboardPage"));
@@ -121,6 +122,8 @@ const App = () => (
           {/* PWA: install banner + update prompt (outside routes so always visible) */}
           <InstallBanner />
           <PWAUpdatePrompt />
+          {/* Mobile-only brand splash — shows once per session, above everything */}
+          <SplashScreen />
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>
