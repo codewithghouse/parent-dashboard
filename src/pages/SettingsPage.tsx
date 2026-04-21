@@ -11,7 +11,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useSchoolSettings, resolveAcademicYear } from "@/hooks/useSchoolSettings";
 
 const SettingsPage = () => {
-  const { studentData, user } = useAuth();
+  const { studentData } = useAuth();
   const isMobile = useIsMobile();
   const settings = useSchoolSettings();
   const academicYear = resolveAcademicYear(settings);
@@ -458,224 +458,425 @@ const SettingsPage = () => {
   }
 
   /* ═══════════════════════════════════════════════════════════════
-     DESKTOP — Existing UI (unchanged)
+     DESKTOP — Bright Blue Apple UI + 3D hover cards
      ═══════════════════════════════════════════════════════════════ */
-  return (
-    <div className="animate-in fade-in slide-in-from-bottom-10 duration-1000 pb-24 text-left font-sans">
+  const B1 = "#0055FF", B2 = "#1166FF", B3 = "#2277FF";
+  const BG_D = "#EEF4FF";
+  const T1 = "#001040", T2 = "#002080", T3 = "#5070B0", T4 = "#99AACC";
+  const GREEN = "#00C853", GREEN_D_COL = "#007830";
+  const RED = "#FF3355";
+  const GOLD = "#FFAA00";
+  const BLUE_BDR = "rgba(0,85,255,0.12)";
+  const SH_D = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.09), 0 10px 28px rgba(0,85,255,0.11)";
+  const SH_LG_D = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 18px 44px rgba(0,85,255,0.14)";
+  const SH_BTN_D = "0 6px 22px rgba(0,85,255,0.42), 0 2px 6px rgba(0,85,255,0.22)";
 
-      {/* ─── HEADER ─── */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-6 md:gap-10 mb-8 md:mb-20 px-0 md:px-4">
-        <div className="text-left w-full md:w-auto">
-           <div className="flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 rounded-[1.5rem] bg-[#1e3a8a] flex items-center justify-center text-white shadow-xl shadow-blue-200">
-                 <Settings size={26} />
+  const firstInitialD = profileForm.name?.[0]?.toUpperCase() || "G";
+  const shortIdD = (studentData?.id || "").substring(0, 8).toUpperCase();
+  const studentInitialD = studentData?.name?.[0]?.toUpperCase() || "S";
+
+  // 3D tilt handlers
+  const handle3DEnter = (e: React.MouseEvent<HTMLElement>) => {
+    const el = e.currentTarget;
+    el.style.transition = "transform 0.06s cubic-bezier(0.2,0.8,0.2,1), box-shadow 0.2s ease";
+  };
+  const handle3DMove = (e: React.MouseEvent<HTMLElement>) => {
+    const el = e.currentTarget;
+    const rect = el.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const rotX = (((y / rect.height) - 0.5) * -7).toFixed(2);
+    const rotY = (((x / rect.width) - 0.5) * 7).toFixed(2);
+    el.style.transform = `perspective(1100px) rotateX(${rotX}deg) rotateY(${rotY}deg) translateY(-3px) scale(1.006)`;
+    const glow = el.querySelector<HTMLDivElement>('[data-glow]');
+    if (glow) {
+      glow.style.opacity = "1";
+      glow.style.background = `radial-gradient(420px circle at ${x}px ${y}px, rgba(0,85,255,0.13), transparent 45%)`;
+    }
+  };
+  const handle3DLeave = (e: React.MouseEvent<HTMLElement>) => {
+    const el = e.currentTarget;
+    el.style.transition = "transform 0.5s cubic-bezier(0.2,0.8,0.2,1), box-shadow 0.3s ease";
+    el.style.transform = "perspective(1100px) rotateX(0deg) rotateY(0deg) translateY(0) scale(1)";
+    const glow = el.querySelector<HTMLDivElement>('[data-glow]');
+    if (glow) glow.style.opacity = "0";
+  };
+
+  // iOS-style toggle
+  const ToggleD = ({ on, onClick }: { on: boolean; onClick: (e: React.MouseEvent) => void }) => (
+    <div onClick={onClick}
+      className="cursor-pointer flex-shrink-0 relative"
+      style={{
+        width: 50, height: 29, borderRadius: 15,
+        background: on ? `linear-gradient(135deg, ${GREEN}, #22EE66)` : "rgba(0,0,0,0.10)",
+        boxShadow: on ? "0 2px 8px rgba(0,200,83,0.28)" : "none",
+        transition: "background 0.2s",
+      }}>
+      <div style={{
+        position: "absolute", top: 2, left: on ? 23 : 2,
+        width: 25, height: 25, borderRadius: "50%", background: "#fff",
+        boxShadow: "0 1px 5px rgba(0,0,0,0.18)",
+        transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)",
+      }} />
+    </div>
+  );
+
+  const togglesD: { key: keyof typeof notifications; title: string; sub: string; icon: any; grad: string; shadow: string; glow: string }[] = [
+    { key: "assignments", title: "Scholastic Deadlines", sub: "AI reminders for upcoming assignments", icon: Zap, grad: `linear-gradient(135deg, ${B1}, ${B2})`, shadow: "0 3px 10px rgba(0,85,255,0.28)", glow: "rgba(0,85,255,0.08)" },
+    { key: "attendance", title: "Real-Time Presence", sub: "Immediate alerts for attendance logs", icon: Users, grad: `linear-gradient(135deg, ${GREEN}, #22EE66)`, shadow: "0 3px 10px rgba(0,200,83,0.28)", glow: "rgba(0,200,83,0.08)" },
+    { key: "grades", title: "Scholastic Results", sub: "Notification upon new grade entry", icon: BarChart3, grad: "linear-gradient(135deg, #6B21E8, #A87FF8)", shadow: "0 3px 10px rgba(107,33,232,0.28)", glow: "rgba(107,33,232,0.08)" },
+    { key: "messages", title: "Faculty Direct", sub: "Secure messages from teaching staff", icon: MessageSquare, grad: "linear-gradient(135deg, #FF8800, #FFCC22)", shadow: "0 3px 10px rgba(255,136,0,0.28)", glow: "rgba(255,136,0,0.08)" },
+  ];
+
+  const activeCount = Object.values(notifications).filter(Boolean).length;
+
+  return (
+    <div className="animate-in fade-in duration-500 -m-4 sm:-m-6 md:-m-8 min-h-[calc(100vh-64px)]"
+      style={{ fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif", background: BG_D }}>
+      <div className="w-full px-6 pt-8 pb-12">
+
+        {/* ── Toolbar ── */}
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.12em] mb-1 flex items-center gap-[7px]" style={{ color: T4 }}>
+              <span className="w-[6px] h-[6px] rounded-full animate-pulse" style={{ background: GREEN, boxShadow: "0 0 0 3px rgba(0,200,83,0.2)" }} />
+              Parent Dashboard · Settings
+            </div>
+            <h1 className="text-[32px] font-bold leading-none" style={{ color: T1, letterSpacing: "-0.8px" }}>Portal Preferences</h1>
+            <div className="text-[13px] font-normal mt-[6px]" style={{ color: T3 }}>Manage your parental profile and predictive intelligence alerts</div>
+          </div>
+          <div className="flex items-center gap-[10px]">
+            <div className="px-[14px] py-[8px] rounded-full text-[12px] font-bold flex items-center gap-[6px]"
+              style={{ background: "rgba(0,200,83,0.08)", color: GREEN_D_COL, border: "0.5px solid rgba(0,200,83,0.22)" }}>
+              <ShieldCheck className="w-[12px] h-[12px]" strokeWidth={2.5} />
+              Verified Guardian
+            </div>
+            <div className="w-10 h-10 rounded-full flex items-center justify-center text-[14px] font-bold text-white"
+              style={{ background: `linear-gradient(140deg, ${B1}, ${B2})`, boxShadow: "0 3px 12px rgba(0,85,255,0.36), 0 0 0 2px rgba(255,255,255,0.8)" }}>
+              {(studentData?.name?.[0] || "S").toUpperCase()}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Quick Stats Row (3D hover) ── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5" style={{ perspective: "1200px" }}>
+          {[
+            { label: "Identity", val: "Verified", color: GREEN, icon: ShieldCheck, grad: `linear-gradient(135deg, ${GREEN}, #22EE66)`, sh: "0 3px 10px rgba(0,200,83,0.28)", glow: "rgba(0,200,83,0.09)" },
+            { label: "Alerts On", val: `${activeCount}/4`, color: B1, icon: Bell, grad: `linear-gradient(135deg, ${B1}, ${B2})`, sh: "0 3px 10px rgba(0,85,255,0.28)", glow: "rgba(0,85,255,0.09)" },
+            { label: "Language", val: profileForm.language.slice(0, 3).toUpperCase(), color: "#6B21E8", icon: Globe, grad: "linear-gradient(135deg, #6B21E8, #A87FF8)", sh: "0 3px 10px rgba(107,33,232,0.28)", glow: "rgba(107,33,232,0.09)" },
+            { label: "Sync ID", val: shortIdD.slice(0, 5) || "—", color: "#FF8800", icon: Sparkles, grad: "linear-gradient(135deg, #FF8800, #FFCC22)", sh: "0 3px 10px rgba(255,136,0,0.28)", glow: "rgba(255,136,0,0.09)" },
+          ].map(({ label, val, color, icon: Icon, grad, sh, glow }) => (
+            <div key={label}
+              onMouseEnter={handle3DEnter}
+              onMouseMove={handle3DMove}
+              onMouseLeave={handle3DLeave}
+              className="bg-white rounded-[22px] px-6 py-5 relative overflow-hidden"
+              style={{ boxShadow: SH_D, border: "0.5px solid rgba(0,85,255,0.10)", transformStyle: "preserve-3d", willChange: "transform" }}>
+              <div data-glow className="absolute inset-0 pointer-events-none transition-opacity duration-300" style={{ opacity: 0 }} />
+              <div className="absolute -top-[20px] -right-[20px] w-[100px] h-[100px] rounded-full pointer-events-none"
+                style={{ background: `radial-gradient(circle, ${glow} 0%, transparent 70%)` }} />
+              <div className="flex items-center justify-between mb-3 relative">
+                <span className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: T4 }}>{label}</span>
+                <div className="w-10 h-10 rounded-[12px] flex items-center justify-center"
+                  style={{ background: grad, boxShadow: sh, transform: "translateZ(18px)" }}>
+                  <Icon className="w-[18px] h-[18px] text-white" strokeWidth={2.3} />
+                </div>
+              </div>
+              <div className="text-[26px] font-bold leading-none relative" style={{ color, letterSpacing: "-0.7px", transform: "translateZ(10px)" }}>{val}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Main Grid: Profile (col-2) + Student Card (col-1) ── */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 mb-5" style={{ perspective: "1200px" }}>
+
+          {/* Profile Form — spans 2 cols */}
+          <div
+            onMouseEnter={handle3DEnter}
+            onMouseMove={handle3DMove}
+            onMouseLeave={handle3DLeave}
+            className="xl:col-span-2 bg-white rounded-[22px] p-8 relative overflow-hidden"
+            style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)", transformStyle: "preserve-3d", willChange: "transform" }}>
+            <div data-glow className="absolute inset-0 pointer-events-none transition-opacity duration-300" style={{ opacity: 0 }} />
+            <div className="absolute -top-[50px] -right-[40px] w-[260px] h-[260px] rounded-full pointer-events-none"
+              style={{ background: "radial-gradient(circle, rgba(0,85,255,0.05) 0%, transparent 70%)" }} />
+
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-6 relative z-10" style={{ transform: "translateZ(14px)" }}>
+              <div className="w-12 h-12 rounded-[14px] flex items-center justify-center"
+                style={{ background: "rgba(255,51,85,0.10)", border: "0.5px solid rgba(255,51,85,0.22)" }}>
+                <Heart className="w-6 h-6" style={{ color: RED }} strokeWidth={2.2} />
               </div>
               <div>
-                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-1">Institutional Portal Registry</p>
-                 <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse border-2 border-white shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
-                    <p className="text-xs font-black text-slate-500 uppercase tracking-widest leading-none">Settings Sync Active</p>
-                 </div>
+                <div className="text-[17px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Account Identity</div>
+                <div className="text-[11px] font-normal" style={{ color: T3 }}>Verified parental profile &amp; contact</div>
               </div>
-           </div>
-           <h1 className="text-3xl sm:text-4xl md:text-6xl font-black text-slate-900 tracking-tighter leading-none mb-4">Portal Preferences</h1>
-           <p className="text-sm md:text-xl font-bold text-slate-400 italic">Manage your parental profile and predictive intelligence alerts.</p>
+            </div>
+
+            {/* Avatar row */}
+            <div className="flex items-center gap-6 mb-8 relative z-10" style={{ transform: "translateZ(20px)" }}>
+              <div className="relative">
+                <div className="w-24 h-24 rounded-[28px] flex items-center justify-center text-[36px] font-bold text-white"
+                  style={{ background: `linear-gradient(140deg, ${B1}, ${B2})`, boxShadow: `${SH_BTN_D}, 0 0 0 5px rgba(255,255,255,0.85)` }}>
+                  {firstInitialD}
+                </div>
+                <button className="absolute -bottom-1 -right-1 w-9 h-9 rounded-[12px] flex items-center justify-center transition-transform hover:scale-110"
+                  style={{ background: "#fff", border: `2px solid ${BLUE_BDR}`, boxShadow: SH_D }}>
+                  <Camera className="w-[15px] h-[15px]" style={{ color: B1 }} strokeWidth={2.3} />
+                </button>
+              </div>
+              <div>
+                <div className="text-[26px] font-bold" style={{ color: T1, letterSpacing: "-0.6px" }}>{profileForm.name || "Guardian"}</div>
+                <div className="flex items-center gap-2 flex-wrap mt-2">
+                  <div className="px-[13px] py-[5px] rounded-full text-[10px] font-bold text-white tracking-[0.06em] uppercase"
+                    style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: "0 2px 8px rgba(0,85,255,0.28)" }}>
+                    Parent Guardian
+                  </div>
+                  {shortIdD && (
+                    <div className="px-[13px] py-[5px] rounded-full text-[10px] font-bold tracking-[0.06em] uppercase"
+                      style={{ background: "rgba(0,85,255,0.08)", border: `0.5px solid ${BLUE_BDR}`, color: B1 }}>
+                      ID: {shortIdD}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Fields grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
+              {/* Authorized Name */}
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.10em] mb-2 pl-1" style={{ color: T4 }}>Authorized Name</div>
+                <div className="flex items-center gap-3 px-4 py-[11px] rounded-[14px] focus-within:ring-2 focus-within:ring-offset-2"
+                  style={{ background: BG_D, border: `0.5px solid ${BLUE_BDR}` }}>
+                  <User className="w-4 h-4" style={{ color: "rgba(0,85,255,0.55)" }} strokeWidth={2.3} />
+                  <input type="text" value={profileForm.name}
+                    onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                    className="flex-1 bg-transparent outline-none text-[14px] font-semibold"
+                    style={{ color: T1, letterSpacing: "-0.1px" }} />
+                </div>
+              </div>
+              {/* Primary Email */}
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.10em] mb-2 pl-1" style={{ color: T4 }}>Primary Email</div>
+                <div className="flex items-center gap-3 px-4 py-[11px] rounded-[14px] opacity-75"
+                  style={{ background: BG_D, border: `0.5px solid ${BLUE_BDR}` }}>
+                  <Mail className="w-4 h-4" style={{ color: "rgba(0,85,255,0.55)" }} strokeWidth={2.3} />
+                  <span className="flex-1 text-[13px] font-semibold truncate" style={{ color: T1 }}>{profileForm.email || "—"}</span>
+                  <Lock className="w-3 h-3" style={{ color: T4 }} strokeWidth={2.3} />
+                </div>
+              </div>
+              {/* Contact Line */}
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.10em] mb-2 pl-1" style={{ color: T4 }}>Contact Line</div>
+                <div className="flex items-center gap-3 px-4 py-[11px] rounded-[14px]"
+                  style={{ background: BG_D, border: `0.5px solid ${BLUE_BDR}` }}>
+                  <Phone className="w-4 h-4" style={{ color: "rgba(0,85,255,0.55)" }} strokeWidth={2.3} />
+                  <input type="tel" value={profileForm.phone}
+                    onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                    placeholder="+00 000 000 00"
+                    className="flex-1 bg-transparent outline-none text-[14px] font-semibold placeholder:font-normal"
+                    style={{ color: T1, letterSpacing: "-0.1px" }} />
+                </div>
+              </div>
+              {/* Interface Locality */}
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.10em] mb-2 pl-1" style={{ color: T4 }}>Interface Locality</div>
+                <div className="flex items-center gap-3 px-4 py-[11px] rounded-[14px]"
+                  style={{ background: BG_D, border: `0.5px solid ${BLUE_BDR}` }}>
+                  <Globe className="w-4 h-4" style={{ color: "rgba(0,85,255,0.55)" }} strokeWidth={2.3} />
+                  <select value={profileForm.language}
+                    onChange={(e) => setProfileForm({ ...profileForm, language: e.target.value })}
+                    className="flex-1 bg-transparent outline-none text-[14px] font-semibold appearance-none cursor-pointer"
+                    style={{ color: T1, letterSpacing: "-0.1px" }}>
+                    <option value="English">ENG · Institutional English</option>
+                    <option value="Hindi">HIN · Northern Dialect</option>
+                    <option value="Urdu">URD · Standard Urdu</option>
+                  </select>
+                  <ChevronRight className="w-4 h-4 rotate-90" style={{ color: "rgba(0,85,255,0.45)" }} strokeWidth={2.5} />
+                </div>
+              </div>
+            </div>
+
+            {/* Commit button */}
+            <button onClick={handleUpdateProfile} disabled={isUpdating}
+              className="mt-7 w-full md:w-auto md:min-w-[260px] h-14 px-8 rounded-[16px] flex items-center justify-center gap-2 text-[13px] font-bold text-white uppercase tracking-[0.06em] disabled:opacity-50 relative overflow-hidden transition-transform hover:scale-[1.02]"
+              style={{
+                background: `linear-gradient(135deg, ${B1}, ${B2})`,
+                boxShadow: SH_BTN_D,
+                letterSpacing: "0.04em",
+                transform: "translateZ(16px)",
+              }}>
+              <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.14) 0%, transparent 52%)" }} />
+              {isUpdating ? <Loader2 className="w-4 h-4 animate-spin relative z-10" /> : <Zap className="w-4 h-4 relative z-10" style={{ color: GOLD }} strokeWidth={2.5} />}
+              <span className="relative z-10">{isUpdating ? "Synchronizing Vault…" : "Commit Changes"}</span>
+            </button>
+          </div>
+
+          {/* Student Card — dark blue */}
+          <div
+            onMouseEnter={handle3DEnter}
+            onMouseMove={handle3DMove}
+            onMouseLeave={handle3DLeave}
+            className="rounded-[22px] p-7 relative overflow-hidden text-white"
+            style={{
+              background: "linear-gradient(140deg, #001040 0%, #001888 40%, #0033CC 80%, #0055FF 100%)",
+              boxShadow: "0 10px 36px rgba(0,8,64,0.35), 0 0 0 0.5px rgba(255,255,255,0.14)",
+              transformStyle: "preserve-3d",
+              willChange: "transform",
+            }}>
+            <div data-glow className="absolute inset-0 pointer-events-none transition-opacity duration-300" style={{ opacity: 0 }} />
+            <div className="absolute -top-10 -right-7 w-[200px] h-[200px] rounded-full pointer-events-none"
+              style={{ background: "radial-gradient(circle, rgba(255,255,255,0.14) 0%, transparent 65%)" }} />
+            <div className="absolute inset-0 pointer-events-none" style={{
+              backgroundImage: "linear-gradient(rgba(255,255,255,0.014) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.014) 1px, transparent 1px)",
+              backgroundSize: "24px 24px",
+            }} />
+            <div className="relative z-10" style={{ transform: "translateZ(14px)" }}>
+              <div className="inline-flex items-center gap-[5px] px-3 py-[5px] rounded-full text-[10px] font-bold uppercase tracking-[0.12em] mb-6"
+                style={{ background: "rgba(255,255,255,0.16)", border: "0.5px solid rgba(255,255,255,0.26)", color: "rgba(255,255,255,0.80)", backdropFilter: "blur(8px)" }}>
+                <Sparkles className="w-[11px] h-[11px]" strokeWidth={2.5} />
+                Institutional Link
+              </div>
+              <div className="flex flex-col items-center gap-3 mb-6" style={{ transform: "translateZ(22px)" }}>
+                <div className="w-20 h-20 rounded-[24px] flex items-center justify-center text-[32px] font-bold"
+                  style={{ background: "rgba(255,255,255,0.92)", color: B1, boxShadow: "0 4px 24px rgba(0,0,0,0.22), 0 0 0 4px rgba(255,255,255,0.20)" }}>
+                  {studentInitialD}
+                </div>
+                <div className="text-center">
+                  <div className="text-[20px] font-bold text-white" style={{ letterSpacing: "-0.4px" }}>{studentData?.name || "Student"}</div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.12em] mt-1" style={{ color: "rgba(255,255,255,0.50)" }}>Grade Subdivision Matrix</div>
+                </div>
+              </div>
+              <div className="rounded-[16px] overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+                {[
+                  { lbl: "Roll No", val: studentData?.rollNo || "—" },
+                  { lbl: "Sync ID", val: (studentData?.id || "").substring(0, 8) || "—" },
+                  { lbl: "Class", val: studentData?.className ? `${studentData.className}${(studentData as any)?.section ? ` · ${(studentData as any).section}` : ""}` : studentData?.grade ? `Grade ${studentData.grade}` : "—" },
+                  { lbl: "Year", val: academicYear },
+                ].map((row, i, arr) => (
+                  <div key={row.lbl} className="flex items-center justify-between px-4 py-[13px]"
+                    style={{ borderBottom: i < arr.length - 1 ? "0.5px solid rgba(255,255,255,0.08)" : "none" }}>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(255,255,255,0.45)" }}>{row.lbl}</span>
+                    <span className="text-[13px] font-bold text-white truncate max-w-[60%] text-right" style={{ letterSpacing: "-0.1px" }}>{row.val}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
-        
-        <div className="flex bg-white border border-slate-100 p-4 rounded-[2.5rem] shadow-sm items-center gap-6 group hover:shadow-2xl transition-all">
-           <div className="w-16 h-16 rounded-[1.8rem] bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-inner group-hover:rotate-12 transition-transform">
-              <ShieldCheck size={30} />
-           </div>
-           <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Identity Status</p>
-              <p className="text-xl font-black text-[#1e3a8a] uppercase tracking-tighter">Verified Guardian</p>
-           </div>
+
+        {/* ── Notifications Matrix (4-col 3D hover toggles) ── */}
+        <div className="mb-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-11 h-11 rounded-[14px] flex items-center justify-center"
+              style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: SH_BTN_D }}>
+              <Bell className="w-5 h-5 text-white" strokeWidth={2.3} />
+            </div>
+            <div>
+              <div className="text-[17px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Intelligence Alerts Matrix</div>
+              <div className="text-[11px] font-normal" style={{ color: T3 }}>Toggle per-category alerts · syncs to vault instantly</div>
+            </div>
+            <div className="ml-auto px-[12px] py-[6px] rounded-full text-[11px] font-bold"
+              style={{ background: "rgba(0,200,83,0.08)", color: GREEN_D_COL, border: "0.5px solid rgba(0,200,83,0.22)" }}>
+              {activeCount} / 4 active
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4" style={{ perspective: "1200px" }}>
+            {togglesD.map(t => {
+              const Icon = t.icon;
+              const on = !!notifications[t.key];
+              return (
+                <div key={t.key}
+                  onMouseEnter={handle3DEnter}
+                  onMouseMove={handle3DMove}
+                  onMouseLeave={handle3DLeave}
+                  onClick={() => toggleNotification(t.key)}
+                  className="bg-white rounded-[22px] p-6 relative overflow-hidden cursor-pointer"
+                  style={{
+                    boxShadow: on ? `${SH_LG_D}, 0 0 0 2px ${B1}` : SH_D,
+                    border: "0.5px solid rgba(0,85,255,0.10)",
+                    transformStyle: "preserve-3d",
+                    willChange: "transform",
+                  }}>
+                  <div data-glow className="absolute inset-0 pointer-events-none transition-opacity duration-300" style={{ opacity: 0 }} />
+                  <div className="absolute -top-[20px] -right-[20px] w-[120px] h-[120px] rounded-full pointer-events-none"
+                    style={{ background: `radial-gradient(circle, ${t.glow} 0%, transparent 70%)` }} />
+
+                  <div className="flex items-start justify-between mb-4 relative z-10">
+                    <div className="w-12 h-12 rounded-[14px] flex items-center justify-center"
+                      style={{ background: t.grad, boxShadow: t.shadow, transform: "translateZ(22px)" }}>
+                      <Icon className="w-[22px] h-[22px] text-white" strokeWidth={2.2} />
+                    </div>
+                    <ToggleD on={on} onClick={(e) => { e.stopPropagation(); toggleNotification(t.key); }} />
+                  </div>
+
+                  <div className="relative z-10" style={{ transform: "translateZ(12px)" }}>
+                    <div className="text-[14px] font-bold mb-1" style={{ color: T1, letterSpacing: "-0.2px" }}>{t.title}</div>
+                    <div className="text-[11px] leading-[1.55]" style={{ color: T3 }}>{t.sub}</div>
+                  </div>
+
+                  <div className="flex items-center gap-[5px] mt-4 pt-3 relative z-10" style={{ borderTop: `0.5px solid ${BLUE_BDR}`, transform: "translateZ(6px)" }}>
+                    {on ? (
+                      <>
+                        <CheckCircle2 className="w-[12px] h-[12px]" style={{ color: GREEN }} strokeWidth={2.5} />
+                        <span className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: GREEN_D_COL }}>Delivering live</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: T4 }}>Paused</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-12 px-0 md:px-2">
-         
-         {/* LEFT: CORE PROFILE */}
-         <div className="lg:col-span-8 flex flex-col gap-12">
-            <div className="bg-white border border-slate-100 rounded-[2rem] md:rounded-[4.5rem] p-6 md:p-12 shadow-sm relative overflow-hidden group hover:shadow-2xl transition-all">
-               <div className="absolute top-0 right-0 p-12 opacity-5 scale-150 group-hover:-rotate-12 transition-transform duration-1000">
-                  <User className="w-48 h-48 text-[#1e3a8a]" />
-               </div>
+        {/* ── Security Ops (3-col functional cards) ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4" style={{ perspective: "1200px" }}>
+          {[
+            { name: "Biometric Key", sub: "Authorized device · Face/Touch ID ready", icon: Smartphone, grad: `linear-gradient(135deg, ${B1}, ${B3})`, sh: "0 3px 12px rgba(0,85,255,0.26)", glow: "rgba(0,85,255,0.08)", status: "Ready", statusBg: "rgba(0,85,255,0.08)", statusColor: B1, statusBdr: BLUE_BDR },
+            { name: "Two-Factor Auth", sub: "SMS verification layer active on this account", icon: Lock, grad: `linear-gradient(135deg, ${GREEN}, #22EE66)`, sh: "0 3px 12px rgba(0,200,83,0.26)", glow: "rgba(0,200,83,0.08)", status: "ON", statusBg: "rgba(0,200,83,0.10)", statusColor: GREEN_D_COL, statusBdr: "rgba(0,200,83,0.22)" },
+            { name: "Data Privacy", sub: "GDPR-compliant storage · institutional admin controlled", icon: ShieldAlert, grad: "linear-gradient(135deg, #6B21E8, #A87FF8)", sh: "0 3px 12px rgba(107,33,232,0.26)", glow: "rgba(107,33,232,0.08)", status: "Compliant", statusBg: "rgba(107,33,232,0.08)", statusColor: "#6B21E8", statusBdr: "rgba(107,33,232,0.22)" },
+          ].map(({ name, sub, icon: Icon, grad, sh, glow, status, statusBg, statusColor, statusBdr }) => (
+            <div key={name}
+              onMouseEnter={handle3DEnter}
+              onMouseMove={handle3DMove}
+              onMouseLeave={handle3DLeave}
+              className="bg-white rounded-[22px] p-6 relative overflow-hidden cursor-pointer"
+              style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)", transformStyle: "preserve-3d", willChange: "transform" }}>
+              <div data-glow className="absolute inset-0 pointer-events-none transition-opacity duration-300" style={{ opacity: 0 }} />
+              <div className="absolute -top-[20px] -right-[20px] w-[140px] h-[140px] rounded-full pointer-events-none"
+                style={{ background: `radial-gradient(circle, ${glow} 0%, transparent 70%)` }} />
 
-               <div className="relative z-10">
-                  <div className="flex items-center gap-4 mb-6 md:mb-12">
-                     <div className="w-14 h-14 rounded-[2rem] bg-indigo-50 flex items-center justify-center text-[#1e3a8a] shadow-inner">
-                        <Heart size={28} />
-                     </div>
-                     <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none">Account Identity Matrix</h3>
-                  </div>
+              <div className="flex items-start justify-between mb-4 relative z-10">
+                <div className="w-12 h-12 rounded-[14px] flex items-center justify-center"
+                  style={{ background: grad, boxShadow: sh, transform: "translateZ(22px)" }}>
+                  <Icon className="w-[22px] h-[22px] text-white" strokeWidth={2.2} />
+                </div>
+                <div className="px-[10px] py-[5px] rounded-full text-[11px] font-bold"
+                  style={{ background: statusBg, color: statusColor, border: `0.5px solid ${statusBdr}`, transform: "translateZ(14px)" }}>
+                  {status}
+                </div>
+              </div>
 
-                  <div className="flex flex-col md:flex-row items-center gap-6 md:gap-10 mb-8 md:mb-16">
-                     <div className="relative">
-                        <div className="w-32 h-32 rounded-[3.5rem] bg-gradient-to-br from-[#1e3a8a] to-blue-900 border-8 border-white shadow-2xl flex items-center justify-center text-white font-black text-4xl italic overflow-hidden group/avatar">
-                           <div className="absolute inset-0 bg-black/20 translate-y-full group-hover/avatar:translate-y-0 transition-transform duration-500" />
-                           <span className="relative z-10">{profileForm.name?.[0] || 'G'}</span>
-                        </div>
-                        <button className="absolute -bottom-2 -right-2 w-12 h-12 rounded-[1.5rem] bg-white border-4 border-white shadow-xl flex items-center justify-center text-indigo-600 hover:scale-110 transition-all active:scale-95">
-                           <Camera size={20} />
-                        </button>
-                     </div>
-                     <div className="text-center md:text-left">
-                        <h2 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tighter mb-2">{profileForm.name}</h2>
-                        <div className="flex flex-wrap justify-center md:justify-start gap-3">
-                           <span className="px-4 py-1.5 bg-indigo-50 text-indigo-500 text-[10px] font-black uppercase tracking-widest rounded-full border border-indigo-100 italic">Parent Guardian</span>
-                           <span className="px-4 py-1.5 bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest rounded-full italic">ID: {studentData?.id?.substring(0,8).toUpperCase()}</span>
-                        </div>
-                     </div>
-                  </div>
+              <div className="text-[15px] font-bold mb-1 relative z-10" style={{ color: T1, letterSpacing: "-0.2px", transform: "translateZ(10px)" }}>{name}</div>
+              <div className="text-[11px] leading-[1.6] relative z-10" style={{ color: T3 }}>{sub}</div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-10">
-                     <SettingsInput label="Authorized Name" value={profileForm.name} onChange={(v) => setProfileForm({...profileForm, name: v})} icon={User} />
-                     <SettingsInput label="Primary Email" value={profileForm.email} disabled icon={Mail} />
-                     <SettingsInput label="Contact Line" value={profileForm.phone} onChange={(v) => setProfileForm({...profileForm, phone: v})} placeholder="+00 000 000 00" icon={Phone} />
-                     <div className="space-y-4">
-                        <label className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] pl-2 leading-none">Interface Locality</label>
-                        <div className="flex items-center gap-4 bg-slate-50/50 rounded-[2rem] px-8 py-5 border border-slate-100 focus-within:ring-4 focus-within:ring-indigo-100/50 transition-all">
-                           <Globe className="w-5 h-5 text-slate-400" />
-                           <select 
-                              value={profileForm.language}
-                              onChange={(e) => setProfileForm({...profileForm, language: e.target.value})}
-                              className="bg-transparent border-none outline-none text-base font-black text-slate-800 w-full appearance-none cursor-pointer"
-                           >
-                              <option value="English">ENG: Institutional English</option>
-                              <option value="Hindi">HIN: Northern Dialect</option>
-                              <option value="Urdu">URD: Standard Urdu</option>
-                           </select>
-                        </div>
-                     </div>
-                  </div>
-
-                  <div className="mt-8 md:mt-16 pt-6 md:pt-12 border-t border-slate-50 flex justify-end">
-                     <button
-                        onClick={handleUpdateProfile}
-                        disabled={isUpdating}
-                        className="h-14 md:h-20 px-8 md:px-12 bg-[#1e3a8a] text-white rounded-[1.5rem] md:rounded-[2.5rem] text-[11px] font-black uppercase tracking-[0.3em] flex items-center gap-3 md:gap-4 shadow-xl md:shadow-2xl shadow-blue-900/20 hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition-all"
-                     >
-                        {isUpdating ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20} className="text-amber-400" />}
-                        {isUpdating ? "Synchronizing Vault..." : "Commit Changes"}
-                     </button>
-                  </div>
-               </div>
+              <div className="flex items-center gap-[5px] mt-5 pt-3 relative z-10" style={{ borderTop: `0.5px solid ${BLUE_BDR}` }}>
+                <span className="text-[11px] font-bold" style={{ color: B1, letterSpacing: "-0.1px" }}>Manage</span>
+                <ChevronRight className="w-[13px] h-[13px]" style={{ color: B1 }} strokeWidth={2.5} />
+              </div>
             </div>
-
-            {/* NOTIFICATIONS MATRIX */}
-            <div className="bg-white border border-slate-100 rounded-[2rem] md:rounded-[4.5rem] p-6 md:p-12 shadow-sm text-left">
-               <div className="flex items-center gap-4 mb-6 md:mb-12">
-                  <div className="w-14 h-14 rounded-[2rem] bg-amber-50 flex items-center justify-center text-amber-500 shadow-inner">
-                     <Bell size={28} />
-                  </div>
-                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none">Intelligence Alerts Matrix</h3>
-               </div>
-
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-8">
-                  <NotificationToggle label="Scholastic Deadlines" desc="AI reminders for upcoming assignments" active={notifications.assignments} onToggle={() => toggleNotification('assignments')} />
-                  <NotificationToggle label="Real-time Presence" desc="Immediate alerts for attendance logs" active={notifications.attendance} onToggle={() => toggleNotification('attendance')} />
-                  <NotificationToggle label="Scholastic Results" desc="Notification upon new grade entry" active={notifications.grades} onToggle={() => toggleNotification('grades')} />
-                  <NotificationToggle label="Faculty Direct" desc="Secure messages from teaching staff" active={notifications.messages} onToggle={() => toggleNotification('messages')} />
-               </div>
-            </div>
-         </div>
-
-         {/* RIGHT SIDE: SECURITY & STUDENT CARD */}
-         <div className="lg:col-span-4 flex flex-col gap-6 md:gap-12">
-            <div className="bg-slate-900 rounded-[2rem] md:rounded-[4.5rem] p-6 md:p-12 text-white shadow-2xl relative overflow-hidden group">
-               <ShieldAlert className="absolute -right-8 -bottom-8 w-48 h-48 text-white/5 group-hover:scale-110 transition-transform duration-700" />
-               <div className="flex items-center gap-4 mb-12 relative z-10">
-                  <Sparkles className="w-6 h-6 text-amber-400 animate-pulse" />
-                  <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Institutional Link</h3>
-               </div>
-               
-               <div className="flex flex-col items-center text-center relative z-10">
-                  <div className="w-24 h-24 rounded-[2.5rem] bg-white text-[#1e3a8a] flex items-center justify-center font-black text-3xl shadow-2xl mb-6">
-                     {studentData?.name?.[0] || 'S'}
-                  </div>
-                  <h4 className="text-2xl font-black tracking-tighter mb-2">{studentData?.name}</h4>
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400 italic">Grade {studentData?.grade} Subdivision Matrix</p>
-                  
-                  <div className="w-full mt-10 pt-10 border-t border-white/5 space-y-4">
-                     <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-500">
-                        <span>Roll No</span>
-                        <span className="text-white">{studentData?.rollNo || '001'}</span>
-                     </div>
-                     <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-500">
-                        <span>Sync ID</span>
-                        <span className="text-white">{studentData?.id?.substring(0,8)}</span>
-                     </div>
-                  </div>
-               </div>
-            </div>
-
-            <div className="bg-white border border-slate-100 rounded-[2rem] md:rounded-[4.5rem] p-6 md:p-10 shadow-sm relative overflow-hidden group text-left">
-               <div className="flex items-center gap-4 mb-10">
-                  <Lock className="w-6 h-6 text-[#1e3a8a]" />
-                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none">Security Ops</h3>
-               </div>
-               
-               <p className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-relaxed mb-10">
-                  Encryption and access controls are managed by the institutional administrator.
-               </p>
-
-               <div className="space-y-6">
-                  <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 flex items-center justify-between group/cell hover:bg-white hover:shadow-xl transition-all">
-                     <div>
-                        <p className="text-sm font-black text-slate-800 uppercase tracking-tight">Biometric Key</p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Authorized Device</p>
-                     </div>
-                     <ChevronRight className="w-5 h-5 text-slate-200 group-hover/cell:translate-x-2 transition-transform" />
-                  </div>
-                  <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 flex items-center justify-between opacity-40">
-                     <div>
-                        <p className="text-sm font-black text-slate-800 uppercase tracking-tight">Quantum Shield</p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Monitoring</p>
-                     </div>
-                     <Smartphone className="w-5 h-5 text-slate-200" />
-                  </div>
-               </div>
-            </div>
-         </div>
+          ))}
+        </div>
 
       </div>
     </div>
   );
 };
-
-const SettingsInput = ({ label, value, onChange, disabled, icon: Icon, placeholder }: any) => (
-  <div className="space-y-4 text-left">
-    <label className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] pl-2 leading-none">{label}</label>
-    <div className={`flex items-center gap-5 bg-slate-50/50 rounded-[2rem] px-8 py-5 border border-slate-100 transition-all ${disabled ? 'opacity-50' : 'focus-within:ring-4 focus-within:ring-indigo-100/50'}`}>
-      <Icon className="w-5 h-5 text-slate-400" />
-      <input 
-        type="text" 
-        value={value} 
-        onChange={(e) => onChange?.(e.target.value)}
-        disabled={disabled}
-        placeholder={placeholder}
-        className="bg-transparent border-none outline-none text-base font-black text-slate-800 w-full placeholder:text-slate-200"
-      />
-    </div>
-  </div>
-);
-
-const NotificationToggle = ({ label, desc, active, onToggle }: any) => (
-  <button onClick={onToggle} className={`p-5 md:p-8 rounded-[1.5rem] md:rounded-[3rem] border transition-all text-left flex flex-col justify-between min-h-[140px] md:h-48 gap-4 group ${active ? 'bg-indigo-50 border-indigo-100 shadow-indigo-100/50' : 'bg-slate-50 border-slate-100'}`}>
-    <div className="flex justify-between items-start w-full">
-       <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${active ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-300'}`}>
-          <Zap size={22} className={active ? 'animate-pulse' : ''} />
-       </div>
-       <div className={`w-12 h-6 rounded-full transition-all relative ${active ? 'bg-emerald-500' : 'bg-slate-200'}`}>
-          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${active ? 'translate-x-7' : 'translate-x-1'}`} />
-       </div>
-    </div>
-    <div className="mt-4">
-       <p className={`text-base font-black uppercase tracking-tight leading-none mb-1 ${active ? 'text-[#1e3a8a]' : 'text-slate-400'}`}>{label}</p>
-       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{desc}</p>
-    </div>
-  </button>
-);
 
 export default SettingsPage;

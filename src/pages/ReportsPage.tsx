@@ -370,119 +370,389 @@ const ReportsPage = () => {
   }
 
   /* ═══════════════════════════════════════════════════════════════
-     DESKTOP — Existing UI (unchanged)
+     DESKTOP — Bright Blue Apple UI + 3D hover cards
      ═══════════════════════════════════════════════════════════════ */
+  const B1 = "#0055FF", B2 = "#1166FF", B3 = "#2277FF";
+  const BG_D = "#EEF4FF";
+  const T1 = "#001040", T2 = "#002080", T3 = "#5070B0", T4 = "#99AACC";
+  const GREEN = "#00C853", ORANGE = "#FF8800";
+  const BLUE_BDR = "rgba(0,85,255,0.12)";
+  const SH_D = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.09), 0 10px 28px rgba(0,85,255,0.11)";
+  const SH_LG_D = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 18px 44px rgba(0,85,255,0.14)";
+  const SH_BTN_D = "0 6px 22px rgba(0,85,255,0.42), 0 2px 6px rgba(0,85,255,0.22)";
+
+  const detectFormatD = (r: any): "pdf" | "excel" | "other" => {
+    const f = (r.format || "").toString().toLowerCase();
+    if (f.includes("excel") || f === "xlsx" || f === "xls" || f === "csv") return "excel";
+    if (f.includes("pdf")) return "pdf";
+    return "other";
+  };
+
+  const pdfCountD = reports.filter(r => detectFormatD(r) === "pdf").length;
+  const excelCountD = reports.filter(r => detectFormatD(r) === "excel").length;
+  const verifiedCountD = reports.length;
+
+  let filteredDesktop = filteredReports;
+  if (formatFilter === "pdf") filteredDesktop = filteredReports.filter(r => detectFormatD(r) === "pdf");
+  else if (formatFilter === "excel") filteredDesktop = filteredReports.filter(r => detectFormatD(r) === "excel");
+
+  const FILTERS_D: { key: typeof formatFilter; label: string; count: number }[] = [
+    { key: "all", label: "All Reports", count: reports.length },
+    { key: "pdf", label: "PDF", count: pdfCountD },
+    { key: "excel", label: "Excel", count: excelCountD },
+    { key: "verified", label: "Verified", count: verifiedCountD },
+  ];
+
+  const formatDateD = (createdAt: any) => {
+    try {
+      const d = createdAt?.toDate?.() || (createdAt ? new Date(createdAt) : null);
+      if (!d || isNaN(d.getTime())) return "Recent";
+      return d.toLocaleString("en-US", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    } catch { return "Recent"; }
+  };
+
+  // 3D tilt handlers — track mouse inside card
+  const handle3DEnter = (e: React.MouseEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    el.style.transition = "transform 0.06s cubic-bezier(0.2,0.8,0.2,1), box-shadow 0.2s ease";
+  };
+  const handle3DMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    const rect = el.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const rotX = (((y / rect.height) - 0.5) * -8).toFixed(2);
+    const rotY = (((x / rect.width) - 0.5) * 8).toFixed(2);
+    el.style.transform = `perspective(1100px) rotateX(${rotX}deg) rotateY(${rotY}deg) translateY(-4px) scale(1.008)`;
+    const glow = el.querySelector<HTMLDivElement>('[data-glow]');
+    if (glow) {
+      glow.style.opacity = "1";
+      glow.style.background = `radial-gradient(420px circle at ${x}px ${y}px, rgba(0,85,255,0.13), transparent 45%)`;
+    }
+  };
+  const handle3DLeave = (e: React.MouseEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    el.style.transition = "transform 0.5s cubic-bezier(0.2,0.8,0.2,1), box-shadow 0.3s ease";
+    el.style.transform = "perspective(1100px) rotateX(0deg) rotateY(0deg) translateY(0) scale(1)";
+    const glow = el.querySelector<HTMLDivElement>('[data-glow]');
+    if (glow) glow.style.opacity = "0";
+  };
+
   return (
-    <div className="space-y-8 animate-in fade-in duration-700 pb-12 text-left font-sans">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-6 pb-2">
-        <div className="space-y-1">
-          <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3 italic">
-            Academic Reports <FileText className="w-6 h-6 md:w-8 md:h-8 text-indigo-600" />
-          </h1>
-          <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] md:text-[11px]">Authorized academic intelligence & documentation pipeline</p>
-        </div>
+    <div className="animate-in fade-in duration-500 -m-4 sm:-m-6 md:-m-8 min-h-[calc(100vh-64px)]"
+      style={{ fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif", background: BG_D }}>
+      <div className="w-full px-6 pt-8 pb-12">
 
-        <div className="flex items-center gap-3 w-full md:w-auto">
-           <div className="relative group flex-1 md:flex-none">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-hover:text-indigo-400 transition-colors" />
-              <input
-                type="text"
-                placeholder="Search documents..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-12 pr-6 py-4 bg-white border-2 border-slate-50 rounded-2xl text-[10px] font-black uppercase tracking-widest outline-none focus:border-indigo-100 transition-all w-full md:w-64 shadow-sm"
-              />
-           </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-         <div className="lg:col-span-12 space-y-6">
-            {loading ? (
-                <div className="py-24 text-center bg-white border-2 border-slate-50 rounded-[3rem] shadow-sm flex flex-col items-center">
-                    <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
-                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Accessing Document Repository...</p>
-                </div>
-            ) : filteredReports.length === 0 ? (
-                <div className="py-32 text-center bg-white border-2 border-slate-50 rounded-[3.5rem] flex flex-col items-center shadow-sm">
-                    <div className="w-24 h-24 bg-slate-50 border-2 border-slate-100 rounded-[2.5rem] flex items-center justify-center mb-8 shadow-inner">
-                        <FileCheck className="w-10 h-10 text-slate-200" />
-                    </div>
-                    <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-3">Repository Empty</h3>
-                    <p className="text-sm font-bold text-slate-400 max-w-sm leading-relaxed px-10 italic">
-                        Official academic reports for the current term have not been published by the faculty team yet.
-                    </p>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   {filteredReports.map((r) => (
-                      <div key={r.id} className="bg-white rounded-[2.5rem] border-2 border-slate-50 p-8 shadow-sm hover:shadow-2xl hover:translate-y-[-4px] transition-all group relative overflow-hidden flex flex-col">
-                         <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:rotate-12 transition-all">
-                            <Sparkles className="w-24 h-24 text-indigo-600" />
-                         </div>
-                         
-                         <div className="flex items-center gap-4 mb-6">
-                            <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-black text-xl shadow-inner">
-                               <FileText className="w-6 h-6" />
-                            </div>
-                            <div className="flex-1">
-                               <h3 className="text-xl font-black text-slate-800 tracking-tight group-hover:text-indigo-600 transition-colors uppercase italic mb-0.5">{r.title}</h3>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                   <GraduationCap className="w-3 h-3"/> {r.teacherName || "Faculty"} • <Clock className="w-3 h-3"/> {new Date(r.createdAt?.toDate?.()).toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                </p>
-                            </div>
-                         </div>
-
-                         <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 mb-8 flex-grow">
-                            <p className="text-xs font-bold text-slate-600 leading-relaxed italic">
-                               "{r.data?.ai_remark || r.data?.aiRemarks || "Institutional assessment data compiled by the academic department. This document contains verified academic standing and behavioral metrics."}"
-                            </p>
-                         </div>
-
-                         <div className="flex items-center justify-between pt-4">
-                            <div className="flex items-center gap-2">
-                               <span className="px-3 py-1 bg-indigo-600 text-white text-[9px] font-black uppercase tracking-widest rounded-lg shadow-lg">Verified</span>
-                               <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{r.format?.toUpperCase()} FORMAT</span>
-                            </div>
-                            <button 
-                               onClick={() => handleDownload(r)}
-                               className="bg-slate-900 text-white px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-slate-800 transition-all shadow-xl shadow-slate-200"
-                            >
-                               <Download className="w-4 h-4" /> Download Report
-                            </button>
-                         </div>
-                      </div>
-                   ))}
-                </div>
-            )}
-         </div>
-
-         {/* Side Context */}
-         <div className="lg:col-span-12 mt-10">
-            <div className="bg-[#1e3a8a] rounded-[3.5rem] p-12 text-white relative overflow-hidden shadow-2xl group flex flex-col md:flex-row items-center gap-10">
-                <div className="relative z-10 space-y-4 max-w-xl">
-                    <h3 className="text-3xl font-black leading-tight italic uppercase">Document Infrastructure Policy</h3>
-                    <p className="text-base font-bold text-blue-100/80 leading-relaxed">
-                        Academic reports are generated by the instructional faculty and mirrored to the parent portal for peak transparency. Each document is cryptographically verified to ensure record integrity.
-                    </p>
-                    <div className="flex gap-6 pt-4">
-                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-blue-200">
-                            <Clock className="w-4 h-4"/> Retention: 30 Days
-                        </div>
-                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-blue-200">
-                            <ArrowRightCircle className="w-4 h-4"/> Direct Sync Active
-                        </div>
-                    </div>
-                </div>
-                <div className="relative h-48 w-48 flex items-center justify-center shrink-0">
-                    <div className="absolute inset-0 bg-white/10 rounded-full animate-ping opacity-20" />
-                    <div className="absolute inset-4 bg-white/10 rounded-full animate-pulse opacity-40" />
-                    <div className="relative w-24 h-24 bg-white rounded-3xl flex items-center justify-center shadow-2xl shadow-indigo-500/50">
-                        <FileText className="w-12 h-12 text-[#1e3a8a] rotate-12" />
-                    </div>
-                </div>
+        {/* ── Toolbar ── */}
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.12em] mb-1 flex items-center gap-[7px]" style={{ color: T4 }}>
+              <span className="w-[6px] h-[6px] rounded-full" style={{ background: B1, boxShadow: "0 0 0 3px rgba(0,85,255,0.18)" }} />
+              Parent Dashboard · Reports
             </div>
-         </div>
+            <h1 className="text-[32px] font-bold leading-none" style={{ color: T1, letterSpacing: "-0.8px" }}>Academic Reports</h1>
+            <div className="text-[13px] font-normal mt-[6px] flex items-center gap-[6px]" style={{ color: T3 }}>
+              <ShieldCheck className="w-[13px] h-[13px]" style={{ color: B1 }} strokeWidth={2.3} />
+              Authorized academic intelligence &amp; documentation pipeline
+            </div>
+          </div>
+          <div className="flex items-center gap-[10px]">
+            <div className="relative">
+              <Search className="absolute left-[14px] top-1/2 -translate-y-1/2 w-[15px] h-[15px]" style={{ color: "rgba(0,85,255,0.40)" }} strokeWidth={2.3} />
+              <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search documents…"
+                className="pl-10 pr-5 py-[11px] rounded-[14px] text-[13px] outline-none w-[260px]"
+                style={{ background: "#fff", border: `0.5px solid ${BLUE_BDR}`, boxShadow: SH_D, color: T1, letterSpacing: "-0.1px" }} />
+            </div>
+            <div className="w-10 h-10 rounded-full flex items-center justify-center text-[14px] font-bold text-white"
+              style={{ background: `linear-gradient(140deg, ${B1}, ${B2})`, boxShadow: "0 3px 12px rgba(0,85,255,0.36), 0 0 0 2px rgba(255,255,255,0.8)" }}>
+              {(studentData?.name?.[0] || "S").toUpperCase()}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Stat Cards (4-col, 3D hover) ── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5" style={{ perspective: "1200px" }}>
+          {[
+            { label: "All Reports", val: reports.length, color: B1, icon: FileText, grad: `linear-gradient(135deg, ${B1}, ${B3})`, sh: "0 3px 10px rgba(0,85,255,0.28)", glow: "rgba(0,85,255,0.09)", key: "all" as const },
+            { label: "PDF Files", val: pdfCountD, color: ORANGE, icon: FileText, grad: `linear-gradient(135deg, ${ORANGE}, #FFAA22)`, sh: "0 3px 10px rgba(255,136,0,0.28)", glow: "rgba(255,136,0,0.09)", key: "pdf" as const },
+            { label: "Excel", val: excelCountD, color: GREEN, icon: FileCheck, grad: `linear-gradient(135deg, ${GREEN}, #22EE66)`, sh: "0 3px 10px rgba(0,200,83,0.28)", glow: "rgba(0,200,83,0.09)", key: "excel" as const },
+            { label: "Verified", val: verifiedCountD, color: "#6B21E8", icon: ShieldCheck, grad: "linear-gradient(135deg, #6B21E8, #A87FF8)", sh: "0 3px 10px rgba(107,33,232,0.28)", glow: "rgba(107,33,232,0.09)", key: "verified" as const },
+          ].map(({ label, val, color, icon: Icon, grad, sh, glow, key }) => {
+            const isAct = formatFilter === key;
+            return (
+              <button key={label}
+                onMouseEnter={handle3DEnter}
+                onMouseMove={handle3DMove}
+                onMouseLeave={handle3DLeave}
+                onClick={() => setFormatFilter(key)}
+                className="bg-white rounded-[22px] px-6 py-5 relative overflow-hidden text-left cursor-pointer"
+                style={{
+                  boxShadow: isAct ? `${SH_LG_D}, 0 0 0 2px ${color}` : SH_D,
+                  border: "0.5px solid rgba(0,85,255,0.10)",
+                  transformStyle: "preserve-3d",
+                  willChange: "transform",
+                }}>
+                <div data-glow className="absolute inset-0 pointer-events-none transition-opacity duration-300"
+                  style={{ opacity: 0 }} />
+                <div className="absolute -top-[20px] -right-[20px] w-[100px] h-[100px] rounded-full pointer-events-none"
+                  style={{ background: `radial-gradient(circle, ${glow} 0%, transparent 70%)` }} />
+                <div className="flex items-center justify-between mb-3 relative">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: T4 }}>{label}</span>
+                  <div className="w-10 h-10 rounded-[12px] flex items-center justify-center"
+                    style={{ background: grad, boxShadow: sh, transform: "translateZ(18px)" }}>
+                    <Icon className="w-[18px] h-[18px] text-white" strokeWidth={2.3} />
+                  </div>
+                </div>
+                <div className="text-[34px] font-bold leading-none relative" style={{ color, letterSpacing: "-1px", transform: "translateZ(10px)" }}>{val}</div>
+                {isAct && (
+                  <div className="absolute bottom-3 right-5 text-[10px] font-bold uppercase tracking-[0.10em] flex items-center gap-[4px]" style={{ color }}>
+                    <CheckCircle2 className="w-[11px] h-[11px]" strokeWidth={2.5} /> Active
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ── Filter chips ── */}
+        <div className="flex gap-2 flex-wrap mb-5">
+          {FILTERS_D.map(f => {
+            const isAct = formatFilter === f.key;
+            return (
+              <button key={f.key} onClick={() => setFormatFilter(f.key)}
+                className="flex items-center gap-2 px-4 py-[9px] rounded-[14px] text-[12px] font-bold transition-transform hover:scale-[1.02]"
+                style={isAct ? {
+                  background: `linear-gradient(135deg, ${B1}, ${B2})`, color: "#fff",
+                  boxShadow: SH_BTN_D, letterSpacing: "-0.1px",
+                } : {
+                  background: "#fff", color: T3,
+                  border: `0.5px solid ${BLUE_BDR}`, boxShadow: SH_D, letterSpacing: "-0.1px",
+                }}>
+                {f.label}
+                <span className="min-w-[20px] h-[20px] rounded-[6px] flex items-center justify-center text-[11px] font-bold px-[5px]"
+                  style={{ background: isAct ? "rgba(255,255,255,0.22)" : "rgba(0,85,255,0.08)", color: isAct ? "#fff" : B1 }}>
+                  {f.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ── Main Row: Reports grid + Policy dark card ── */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+
+          {/* Reports grid — spans 2 cols */}
+          <div className="xl:col-span-2">
+            {loading ? (
+              <div className="bg-white rounded-[22px] py-24 flex flex-col items-center"
+                style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                <Loader2 className="w-12 h-12 animate-spin" style={{ color: B1 }} />
+                <p className="text-[13px] font-medium mt-3" style={{ color: T4 }}>Accessing Document Repository…</p>
+              </div>
+            ) : filteredDesktop.length === 0 ? (
+              <div className="bg-white rounded-[22px] py-20 px-8 flex flex-col items-center text-center relative overflow-hidden"
+                style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                <div className="absolute -top-[60px] -right-[40px] w-[240px] h-[240px] rounded-full pointer-events-none"
+                  style={{ background: "radial-gradient(circle, rgba(0,85,255,0.05) 0%, transparent 70%)" }} />
+                <div className="w-[88px] h-[88px] rounded-[28px] flex items-center justify-center mb-5 relative z-10"
+                  style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: `${SH_BTN_D}, 0 0 0 10px rgba(0,85,255,0.08)` }}>
+                  <FileCheck className="w-10 h-10 text-white" strokeWidth={2} />
+                </div>
+                <div className="text-[22px] font-bold mb-2 relative z-10" style={{ color: T1, letterSpacing: "-0.5px" }}>
+                  {searchQuery || formatFilter !== "all" ? "No matches found" : "Repository empty"}
+                </div>
+                <div className="text-[13px] leading-[1.6] max-w-[400px] relative z-10" style={{ color: T3 }}>
+                  {searchQuery
+                    ? "Try a different search term."
+                    : formatFilter !== "all"
+                      ? `No ${formatFilter.toUpperCase()} reports available yet.`
+                      : "Official academic reports have not been published by the faculty team yet."}
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4" style={{ perspective: "1200px" }}>
+                {filteredDesktop.map((r: any) => {
+                  const type = detectFormatD(r);
+                  const grad = type === "excel" ? "linear-gradient(135deg, #007830, #00C853)" : `linear-gradient(135deg, ${B1}, ${B3})`;
+                  const icoSh = type === "excel" ? "0 4px 14px rgba(0,120,48,0.28)" : "0 4px 14px rgba(0,85,255,0.28)";
+                  return (
+                    <div key={r.id}
+                      onMouseEnter={handle3DEnter}
+                      onMouseMove={handle3DMove}
+                      onMouseLeave={handle3DLeave}
+                      onClick={() => handleDownload(r)}
+                      className="bg-white rounded-[22px] p-6 relative overflow-hidden cursor-pointer flex flex-col"
+                      style={{
+                        boxShadow: SH_LG_D,
+                        border: "0.5px solid rgba(0,85,255,0.10)",
+                        transformStyle: "preserve-3d",
+                        willChange: "transform",
+                      }}>
+                      <div data-glow className="absolute inset-0 pointer-events-none transition-opacity duration-300"
+                        style={{ opacity: 0 }} />
+                      <div className="absolute -top-[36px] -right-[24px] w-[160px] h-[160px] rounded-full pointer-events-none"
+                        style={{ background: "radial-gradient(circle, rgba(0,85,255,0.05) 0%, transparent 70%)" }} />
+                      <div className="absolute bottom-4 right-5 opacity-[0.04] pointer-events-none">
+                        <FileText size={130} color={B1} strokeWidth={0.6} />
+                      </div>
+
+                      {/* Header */}
+                      <div className="flex items-start gap-4 mb-4 relative z-10">
+                        <div className="w-14 h-14 rounded-[16px] flex items-center justify-center shrink-0"
+                          style={{ background: grad, boxShadow: icoSh, transform: "translateZ(22px)" }}>
+                          {type === "excel" ? (
+                            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round">
+                              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                              <polyline points="14 2 14 8 20 8" />
+                              <line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="16" y2="17" />
+                              <line x1="12" y1="9" x2="12" y2="21" />
+                            </svg>
+                          ) : <FileText className="w-[26px] h-[26px] text-white" strokeWidth={2.2} />}
+                        </div>
+                        <div className="flex-1 min-w-0" style={{ transform: "translateZ(12px)" }}>
+                          <div className="text-[17px] font-bold mb-[5px] leading-[1.3]" style={{ color: T1, letterSpacing: "-0.3px" }}>
+                            {r.title || "Academic Report"}
+                          </div>
+                          <div className="flex items-center gap-[6px] flex-wrap">
+                            <div className="flex items-center gap-[4px] text-[11px] font-medium" style={{ color: T3 }}>
+                              <GraduationCap className="w-[12px] h-[12px]" strokeWidth={2.3} />
+                              {r.teacherName || "Faculty"}
+                            </div>
+                            <span className="w-[3px] h-[3px] rounded-full" style={{ background: T4 }} />
+                            <div className="flex items-center gap-[4px] text-[11px] font-medium" style={{ color: T3 }}>
+                              <Clock className="w-[12px] h-[12px]" strokeWidth={2.3} />
+                              {formatDateD(r.createdAt)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Quote */}
+                      <div className="rounded-[14px] px-4 py-[14px] mb-5 flex-1 relative z-10"
+                        style={{ background: "rgba(0,85,255,0.04)", borderLeft: `3px solid ${B1}`, transform: "translateZ(6px)" }}>
+                        <p className="text-[12.5px] italic leading-[1.7]" style={{ color: T2, letterSpacing: "-0.1px" }}>
+                          "{r.data?.ai_remark || r.data?.aiRemarks || "Institutional assessment data compiled by the academic department. This document contains verified academic standing and behavioral metrics."}"
+                        </p>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center justify-between relative z-10" style={{ transform: "translateZ(14px)" }}>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-[5px] px-[10px] py-[5px] rounded-full text-[10px] font-bold text-white"
+                            style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: "0 2px 8px rgba(0,85,255,0.30)" }}>
+                            <CheckCircle2 className="w-[11px] h-[11px]" strokeWidth={2.5} /> Verified
+                          </div>
+                          <div className="px-[10px] py-[5px] rounded-full text-[10px] font-bold"
+                            style={{ background: type === "excel" ? "rgba(0,200,83,0.10)" : "rgba(0,85,255,0.10)", color: type === "excel" ? "#007830" : B1, border: `0.5px solid ${type === "excel" ? "rgba(0,200,83,0.22)" : BLUE_BDR}` }}>
+                            {(r.format || type).toUpperCase()}
+                          </div>
+                        </div>
+                        <button onClick={e => { e.stopPropagation(); handleDownload(r); }}
+                          className="h-10 px-5 rounded-[12px] flex items-center gap-2 text-[12px] font-bold text-white transition-transform hover:scale-[1.03]"
+                          style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: SH_BTN_D, letterSpacing: "-0.1px" }}>
+                          <Download className="w-4 h-4" strokeWidth={2.3} /> Download
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Policy + Summary sidebar */}
+          <div className="space-y-4">
+            {/* Policy dark card with 3D hover */}
+            <div
+              onMouseEnter={handle3DEnter}
+              onMouseMove={handle3DMove}
+              onMouseLeave={handle3DLeave}
+              className="rounded-[22px] p-7 relative overflow-hidden text-white"
+              style={{
+                background: "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)",
+                boxShadow: "0 8px 30px rgba(0,51,204,0.34), 0 0 0 0.5px rgba(255,255,255,0.14)",
+                transformStyle: "preserve-3d",
+                willChange: "transform",
+              }}>
+              <div data-glow className="absolute inset-0 pointer-events-none transition-opacity duration-300"
+                style={{ opacity: 0 }} />
+              <div className="absolute -top-[50px] -right-[35px] w-[220px] h-[220px] rounded-full pointer-events-none"
+                style={{ background: "radial-gradient(circle, rgba(255,255,255,0.14) 0%, transparent 65%)" }} />
+              <div className="absolute inset-0 pointer-events-none" style={{
+                backgroundImage: "linear-gradient(rgba(255,255,255,0.014) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.014) 1px, transparent 1px)",
+                backgroundSize: "22px 22px",
+              }} />
+              <div className="relative z-10" style={{ transform: "translateZ(14px)" }}>
+                <div className="inline-flex items-center gap-[5px] px-3 py-[5px] rounded-full mb-4 text-[10px] font-bold uppercase tracking-[0.12em]"
+                  style={{ background: "rgba(255,255,255,0.18)", border: "0.5px solid rgba(255,255,255,0.28)", color: "rgba(255,255,255,0.80)", backdropFilter: "blur(8px)" }}>
+                  <ShieldCheck className="w-[11px] h-[11px]" strokeWidth={2.5} />
+                  Infrastructure Policy
+                </div>
+                <div className="text-[22px] font-bold leading-[1.2] mb-3" style={{ letterSpacing: "-0.5px" }}>
+                  Document Infrastructure
+                </div>
+                <p className="text-[13px] leading-[1.65]" style={{ color: "rgba(255,255,255,0.75)" }}>
+                  Academic reports are generated by the <strong style={{ color: "#fff", fontWeight: 700 }}>instructional faculty</strong> and mirrored to the parent portal. All documents are encrypted, verified, and timestamped.
+                </p>
+                <div className="h-[0.5px] my-4" style={{ background: "rgba(255,255,255,0.16)" }} />
+                <div className="space-y-3">
+                  {[
+                    { icon: ShieldCheck, text: "End-to-end encrypted storage" },
+                    { icon: Clock, text: "Real-time faculty synchronization" },
+                    { icon: CheckCircle2, text: "All reports faculty-verified" },
+                    { icon: ArrowRightCircle, text: "30-day retention · direct sync" },
+                  ].map(({ icon: Icon, text }) => (
+                    <div key={text} className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0"
+                        style={{ background: "rgba(255,255,255,0.18)", border: "0.5px solid rgba(255,255,255,0.26)" }}>
+                        <Icon className="w-[14px] h-[14px]" style={{ color: "rgba(255,255,255,0.85)" }} strokeWidth={2.3} />
+                      </div>
+                      <span className="text-[12px] font-semibold" style={{ color: "rgba(255,255,255,0.80)", letterSpacing: "-0.1px" }}>{text}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* AI Insight card */}
+            <div
+              onMouseEnter={handle3DEnter}
+              onMouseMove={handle3DMove}
+              onMouseLeave={handle3DLeave}
+              className="bg-white rounded-[22px] p-5 relative overflow-hidden"
+              style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)", transformStyle: "preserve-3d", willChange: "transform" }}>
+              <div data-glow className="absolute inset-0 pointer-events-none transition-opacity duration-300" style={{ opacity: 0 }} />
+              <div className="absolute -top-[20px] -right-[20px] w-[120px] h-[120px] rounded-full pointer-events-none"
+                style={{ background: "radial-gradient(circle, rgba(107,33,232,0.08) 0%, transparent 70%)" }} />
+              <div className="flex items-center gap-3 mb-3 relative z-10" style={{ transform: "translateZ(12px)" }}>
+                <div className="w-11 h-11 rounded-[14px] flex items-center justify-center"
+                  style={{ background: "linear-gradient(135deg, #6B21E8, #A87FF8)", boxShadow: "0 3px 12px rgba(107,33,232,0.28)" }}>
+                  <Sparkles className="w-5 h-5 text-white" strokeWidth={2.3} />
+                </div>
+                <div>
+                  <div className="text-[15px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>AI Quick Insights</div>
+                  <div className="text-[11px] font-normal" style={{ color: T3 }}>Auto-generated this term</div>
+                </div>
+              </div>
+              <div className="space-y-2 relative z-10" style={{ transform: "translateZ(6px)" }}>
+                {[
+                  { label: "Total published", val: reports.length },
+                  { label: "This month", val: reports.filter((r: any) => {
+                    const d = r.createdAt?.toDate?.();
+                    return d && d.getMonth() === new Date().getMonth() && d.getFullYear() === new Date().getFullYear();
+                  }).length },
+                  { label: "PDF / Excel", val: `${pdfCountD} / ${excelCountD}` },
+                ].map(({ label, val }) => (
+                  <div key={label} className="flex items-center justify-between py-[9px]" style={{ borderBottom: `0.5px solid ${BLUE_BDR}` }}>
+                    <span className="text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color: T4 }}>{label}</span>
+                    <span className="text-[15px] font-bold" style={{ color: B1, letterSpacing: "-0.3px" }}>{val}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

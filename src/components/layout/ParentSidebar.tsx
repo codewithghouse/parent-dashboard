@@ -3,7 +3,7 @@ import { useAuth } from "../../lib/AuthContext";
 import {
   Home, User, TrendingUp, CalendarCheck, ClipboardList,
   FileText, Brain, SmilePlus, StickyNote,
-  Bell, Settings, GraduationCap, LogOut, CreditCard, CalendarDays, School, X,
+  Bell, Settings, GraduationCap, LogOut, CalendarDays, School, X,
   Sparkles, Library
 } from "lucide-react";
 
@@ -12,7 +12,7 @@ interface ParentSidebarProps {
   onClose: () => void;
 }
 
-const navItems = [
+const navItems: { title: string; path: string; icon: any; badge?: string | number }[] = [
   { title: "Dashboard", path: "/", icon: Home },
   { title: "My Child", path: "/my-child", icon: User },
   { title: "Classes", path: "/classes", icon: GraduationCap },
@@ -27,7 +27,6 @@ const navItems = [
   { title: "Behaviour", path: "/behaviour", icon: SmilePlus },
   { title: "Teacher Notes", path: "/teacher-notes", icon: StickyNote },
   { title: "Principal Notes", path: "/principal-notes", icon: School },
-  { title: "Fee Status", path: "/fees", icon: CreditCard },
   { title: "Reports", path: "/reports", icon: FileText },
   { title: "Alerts", path: "/alerts", icon: Bell },
   { title: "Settings", path: "/settings", icon: Settings },
