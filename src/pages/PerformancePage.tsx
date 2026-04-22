@@ -53,6 +53,17 @@ const PerformancePage = () => {
       return 0;
     };
 
+    // Normalize any date-like value (Firestore Timestamp, seconds, ISO string, number)
+    // into a JS Date. Hoisted to the top of processScores because the sort on
+    // line below used to reference this before its declaration, which put the
+    // const in its TDZ and would ReferenceError as soon as scores.length >= 2.
+    const toSafeDate = (v: any): Date => {
+      if (v?.toDate) return v.toDate();
+      if (v?.seconds) return new Date(v.seconds * 1000);
+      if (typeof v === "string" || typeof v === "number") { const d = new Date(v); if (!isNaN(d.getTime())) return d; }
+      return new Date();
+    };
+
     const processScores = () => {
       if (!mountedRef.current) return;
       const scoreMap = new Map();
@@ -113,15 +124,9 @@ const PerformancePage = () => {
         });
       }
 
-      // Trend chart — handle all date formats
+      // Trend chart — handle all date formats (toSafeDate hoisted above)
       const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
       const scoresByMonth = new Map<string, Map<string, { total: number; count: number }>>();
-      const toSafeDate = (v: any): Date => {
-        if (v?.toDate) return v.toDate();
-        if (v?.seconds) return new Date(v.seconds * 1000);
-        if (typeof v === "string" || typeof v === "number") { const d = new Date(v); if (!isNaN(d.getTime())) return d; }
-        return new Date();
-      };
       scores.forEach(s => {
         const date = toSafeDate(s.timestamp || s.createdAt || s.date);
         const month = monthNames[date.getMonth()];
@@ -219,6 +224,9 @@ const PerformancePage = () => {
           // for legacy gradebook rows that may have used studentEmail instead
           // of studentId.
           const studentGbDocs = gbSnaps.flatMap(s => s.docs);
+          // Bail if component unmounted while gradebook was being fetched —
+          // otherwise processScores calls setState on an unmounted component.
+          if (!mountedRef.current) return;
           if (studentGbDocs.length > 0) {
             snap3Cache = { docs: studentGbDocs };
             processScores();
@@ -465,8 +473,12 @@ const PerformancePage = () => {
                 : `linear-gradient(90deg, ${B1}, ${B4})`;
             return (
               <div key={i}
+                role="button"
+                tabIndex={0}
+                aria-label={`Open ${s.name} performance detail`}
                 onClick={() => setSelectedSubject(s.name)}
-                className="mx-5 mt-3 bg-white rounded-[22px] px-5 py-[18px] relative overflow-hidden active:scale-[0.98] transition-transform cursor-pointer"
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedSubject(s.name); } }}
+                className="mx-5 mt-3 bg-white rounded-[22px] px-5 py-[18px] relative overflow-hidden active:scale-[0.98] transition-transform cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
                 style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)", transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
                 <div className="flex items-center justify-between mb-[14px]">
                   <div className="flex items-center gap-[10px]">
@@ -687,7 +699,13 @@ const PerformancePage = () => {
 
               return (
                 <div key={i} className="mb-3">
-                  <div className="flex items-center justify-between px-4 py-[14px] rounded-[16px]"
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Open ${s.name} performance detail`}
+                    onClick={() => setSelectedSubject(s.name)}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedSubject(s.name); } }}
+                    className="flex items-center justify-between px-4 py-[14px] rounded-[16px] cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
                     style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
                     <div className="flex items-center gap-[10px]">
                       <div className="w-10 h-10 rounded-[13px] flex items-center justify-center shrink-0"
@@ -885,8 +903,12 @@ const PerformancePage = () => {
                   : `linear-gradient(90deg, ${B1}, ${B4})`;
               return (
                 <div key={i}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open ${s.name} performance detail`}
                   onClick={() => setSelectedSubject(s.name)}
-                  className="bg-white rounded-[22px] px-5 py-5 relative overflow-hidden transition-transform hover:-translate-y-0.5 cursor-pointer"
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedSubject(s.name); } }}
+                  className="bg-white rounded-[22px] px-5 py-5 relative overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
                   style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-[10px]">
@@ -1105,7 +1127,13 @@ const PerformancePage = () => {
 
                   return (
                     <div key={i}>
-                      <div className="flex items-center justify-between px-4 py-3 rounded-[16px]"
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Open ${s.name} performance detail`}
+                        onClick={() => setSelectedSubject(s.name)}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedSubject(s.name); } }}
+                        className="flex items-center justify-between px-4 py-3 rounded-[16px] cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
                         style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
                         <div className="flex items-center gap-[10px]">
                           <div className="w-10 h-10 rounded-[13px] flex items-center justify-center shrink-0"

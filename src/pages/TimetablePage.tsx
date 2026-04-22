@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { db } from "../lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { useAuth } from "../lib/AuthContext";
@@ -21,6 +22,7 @@ const SUBJECT_COLORS = [
 
 const TimetablePage = () => {
   const { studentData } = useAuth();
+  const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [timetable, setTimetable] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,24 +68,11 @@ const TimetablePage = () => {
           return;
         }
 
-        // Fallback: build from teaching_assignments (teachers + subjects per class)
-        const taSnap = await getDocs(query(
-          collection(db, "teaching_assignments"),
-          where("schoolId", "==", schoolId),
-          where("classId", "==", classId),
-        ));
-        if (!taSnap.empty) {
-          const teachers = taSnap.docs.map(d => d.data());
-          // Build a simple view showing each teacher's subject
-          const slots = teachers.map((t: any, i: number) => ({
-            subject: t.subject || t.subjectId || "Subject",
-            teacherName: t.teacherName || "Teacher",
-            day: DAYS[i % 5],
-            time: `${8 + i}:00 - ${9 + i}:00`,
-            period: i + 1
-          }));
-          setTimetable(slots);
-        }
+        // No timetable found. Earlier code tried to "recover" by fabricating
+        // slots from teaching_assignments — assigning a random day (index % 5)
+        // and a made-up "8:00 - 9:00" time. That showed parents a confident
+        // but completely fake schedule. Now we honestly leave timetable empty
+        // and let the UI render the "No timetable yet" empty state.
       } catch (err) {
         // Surface the error in the console so a support engineer can see why
         // the timetable is empty; the UI still falls through to the "No
@@ -95,7 +84,7 @@ const TimetablePage = () => {
     };
 
     fetchTimetable();
-  }, [studentData?.classId, studentData?.id]);
+  }, [studentData?.classId, studentData?.id, studentData?.schoolId]);
 
   const today = DAYS[selectedDay];
   const todaySlots = timetable.filter((t: any) =>
@@ -279,7 +268,12 @@ const TimetablePage = () => {
                 const tag = subject.substring(0, 3).toUpperCase();
                 return (
                   <div key={slot.id || i}
-                    className="rounded-[20px] px-4 py-4 flex items-center gap-[14px] relative overflow-hidden bg-white active:scale-[0.97] transition-transform"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Open ${subject} syllabus`}
+                    onClick={() => navigate("/syllabus", { state: { subject } })}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/syllabus", { state: { subject } }); } }}
+                    className="rounded-[20px] px-4 py-4 flex items-center gap-[14px] relative overflow-hidden bg-white cursor-pointer active:scale-[0.97] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
                     style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)", transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
                     <div className="absolute left-0 top-0 bottom-0 w-[3.5px] rounded-l-[2px]" style={{ background: accent.bar }} />
                     <div className="w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 text-[12px] font-bold"
@@ -338,7 +332,9 @@ const TimetablePage = () => {
                   <button
                     key={lbl}
                     onClick={() => setSelectedDay(i)}
-                    className="flex flex-col items-center gap-[5px]"
+                    aria-label={`Show ${DAYS[i]} schedule`}
+                    aria-pressed={isAct}
+                    className="flex flex-col items-center gap-[5px] active:scale-[0.94] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40 rounded-[12px]"
                   >
                     <div
                       className="w-9 h-9 rounded-[12px] flex items-center justify-center"
@@ -557,7 +553,12 @@ const TimetablePage = () => {
                     const tag = subject.substring(0, 3).toUpperCase();
                     return (
                       <div key={slot.id || i}
-                        className="rounded-[20px] px-5 py-4 flex items-center gap-4 relative overflow-hidden bg-white transition-transform hover:-translate-y-0.5"
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Open ${subject} syllabus`}
+                        onClick={() => navigate("/syllabus", { state: { subject } })}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/syllabus", { state: { subject } }); } }}
+                        className="rounded-[20px] px-5 py-4 flex items-center gap-4 relative overflow-hidden bg-white cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
                         style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
                         <div className="absolute left-0 top-0 bottom-0 w-[3.5px]" style={{ background: accent.bar }} />
                         <div className="w-10 h-10 rounded-[12px] flex items-center justify-center shrink-0 text-[13px] font-bold"
