@@ -200,7 +200,14 @@ const ClassesPage = () => {
               const isClassTeacher = !!en.isClassTeacher || !!en.classTeacher;
 
               return (
-                <div key={en.id} className="mx-5 mt-[14px] rounded-[26px] overflow-hidden bg-white"
+                <div
+                  key={en.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open ${subject || "class"} teacher notes`}
+                  onClick={() => navigate("/teacher-notes", { state: { teacherId: en.teacherId } })}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/teacher-notes", { state: { teacherId: en.teacherId } }); } }}
+                  className="mx-5 mt-[14px] rounded-[26px] overflow-hidden bg-white cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/50"
                   style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
 
                   {/* Hero */}
@@ -292,7 +299,7 @@ const ClassesPage = () => {
 
                     {/* Message button */}
                     <button
-                      onClick={() => navigate("/teacher-notes", { state: { teacherId: en.teacherId } })}
+                      onClick={(e) => { e.stopPropagation(); navigate("/teacher-notes", { state: { teacherId: en.teacherId } }); }}
                       className="w-full rounded-[16px] px-[18px] py-[14px] flex items-center justify-between relative overflow-hidden active:scale-[0.97] transition-transform"
                       style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: "0 4px 18px rgba(0,85,255,0.34), 0 1px 4px rgba(0,85,255,0.20)" }}
                     >
@@ -312,7 +319,13 @@ const ClassesPage = () => {
             })}
 
             {/* ── Enrollment verified card ── */}
-            <div className="mx-5 mt-[14px] rounded-[24px] p-[22px] relative overflow-hidden"
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label="Open my child profile"
+              onClick={() => navigate("/my-child")}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/my-child"); } }}
+              className="mx-5 mt-[14px] rounded-[24px] p-[22px] relative overflow-hidden cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
               style={{
                 background: "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)",
                 boxShadow: "0 10px 36px rgba(0,51,204,0.38), 0 0 0 0.5px rgba(255,255,255,0.16)",
@@ -342,7 +355,7 @@ const ClassesPage = () => {
                   <div className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(255,255,255,0.42)" }}>Subjects</div>
                 </div>
                 <div className="py-[18px] flex flex-col items-center gap-[5px]" style={{ background: "rgba(255,255,255,0.09)" }}>
-                  <div className="text-[34px] font-bold text-white leading-none" style={{ letterSpacing: "-1.5px" }}>{uniqueTeacherCount || enrollments.length}</div>
+                  <div className="text-[34px] font-bold text-white leading-none" style={{ letterSpacing: "-1.5px" }}>{uniqueTeacherCount}</div>
                   <div className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(255,255,255,0.42)" }}>Teachers</div>
                 </div>
               </div>
@@ -369,10 +382,15 @@ const ClassesPage = () => {
                 const avatar = BLUE_AVATARS[idx % BLUE_AVATARS.length];
                 const schedule = en.schedule || "—";
                 return (
-                  <div key={en.id}
-                    className="flex items-center gap-[13px] px-[18px] py-[14px] cursor-pointer active:bg-[#EEF4FF] transition-colors"
+                  <div
+                    key={en.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Open ${subject || "class"} teacher notes`}
+                    className="flex items-center gap-[13px] px-[18px] py-[14px] cursor-pointer active:bg-[#EEF4FF] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0055FF]/40"
                     style={{ borderBottom: idx < arr.length - 1 ? `0.5px solid ${SEP}` : "none" }}
-                    onClick={() => navigate("/teacher-notes", { state: { teacherId: en.teacherId } })}>
+                    onClick={() => navigate("/teacher-notes", { state: { teacherId: en.teacherId } })}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/teacher-notes", { state: { teacherId: en.teacherId } }); } }}>
                     <div className="w-11 h-11 rounded-[14px] flex items-center justify-center shrink-0"
                       style={{ background: avatar.bg, boxShadow: avatar.shadow }}>
                       <BookOpen className="w-5 h-5 text-white" strokeWidth={2.2} />
@@ -470,7 +488,14 @@ const ClassesPage = () => {
                 const isClassTeacher = !!en.isClassTeacher || !!en.classTeacher;
 
                 return (
-                  <div key={en.id} className="rounded-[26px] overflow-hidden bg-white flex flex-col transition-transform hover:-translate-y-0.5"
+                  <div
+                    key={en.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Open ${subject || "class"} teacher notes`}
+                    onClick={() => navigate("/teacher-notes", { state: { teacherId: en.teacherId } })}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/teacher-notes", { state: { teacherId: en.teacherId } }); } }}
+                    className="rounded-[26px] overflow-hidden bg-white flex flex-col cursor-pointer transition-all hover:-translate-y-1 hover:shadow-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/50"
                     style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
 
                     {/* Hero */}
@@ -562,7 +587,7 @@ const ClassesPage = () => {
                       {/* CTA */}
                       <div className="mt-auto">
                         <button
-                          onClick={() => navigate("/teacher-notes", { state: { teacherId: en.teacherId } })}
+                          onClick={(e) => { e.stopPropagation(); navigate("/teacher-notes", { state: { teacherId: en.teacherId } }); }}
                           className="w-full rounded-[16px] px-5 py-[14px] flex items-center justify-between relative overflow-hidden transition-transform hover:scale-[1.01]"
                           style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: "0 4px 18px rgba(0,85,255,0.34), 0 1px 4px rgba(0,85,255,0.20)" }}>
                           <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 52%)" }} />
@@ -586,7 +611,13 @@ const ClassesPage = () => {
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 mt-5">
 
               {/* Enrollment Verified (lg:col-span-2) */}
-              <div className="lg:col-span-2 rounded-[24px] p-7 relative overflow-hidden"
+              <div
+                role="button"
+                tabIndex={0}
+                aria-label="Open my child profile"
+                onClick={() => navigate("/my-child")}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/my-child"); } }}
+                className="lg:col-span-2 rounded-[24px] p-7 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-1 hover:shadow-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                 style={{
                   background: "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)",
                   boxShadow: "0 10px 36px rgba(0,51,204,0.38), 0 0 0 0.5px rgba(255,255,255,0.16)",
@@ -616,7 +647,7 @@ const ClassesPage = () => {
                     <div className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(255,255,255,0.42)" }}>Subjects</div>
                   </div>
                   <div className="py-5 flex flex-col items-center gap-[5px]" style={{ background: "rgba(255,255,255,0.09)" }}>
-                    <div className="text-[42px] font-bold text-white leading-none" style={{ letterSpacing: "-2px" }}>{uniqueTeacherCount || enrollments.length}</div>
+                    <div className="text-[42px] font-bold text-white leading-none" style={{ letterSpacing: "-2px" }}>{uniqueTeacherCount}</div>
                     <div className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(255,255,255,0.42)" }}>Teachers</div>
                   </div>
                 </div>
@@ -637,10 +668,15 @@ const ClassesPage = () => {
                   const avatar = BLUE_AVATARS[idx % BLUE_AVATARS.length];
                   const schedule = en.schedule || "—";
                   return (
-                    <div key={en.id}
-                      className="flex items-center gap-[13px] px-6 py-4 cursor-pointer transition-colors hover:bg-[#F5F9FF]"
+                    <div
+                      key={en.id}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Open ${subject || "class"} teacher notes`}
+                      className="flex items-center gap-[13px] px-6 py-4 cursor-pointer transition-colors hover:bg-[#F5F9FF] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0055FF]/40"
                       style={{ borderBottom: idx < arr.length - 1 ? `0.5px solid ${SEP}` : "none" }}
-                      onClick={() => navigate("/teacher-notes", { state: { teacherId: en.teacherId } })}>
+                      onClick={() => navigate("/teacher-notes", { state: { teacherId: en.teacherId } })}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/teacher-notes", { state: { teacherId: en.teacherId } }); } }}>
                       <div className="w-11 h-11 rounded-[14px] flex items-center justify-center shrink-0"
                         style={{ background: avatar.bg, boxShadow: avatar.shadow }}>
                         <BookOpen className="w-5 h-5 text-white" strokeWidth={2.2} />
