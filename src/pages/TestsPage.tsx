@@ -1,20 +1,27 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Calendar, CheckCircle, Clock, Loader2, User,
-  FlaskConical, Calculator, Book, History, GraduationCap
+  GraduationCap
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
-import { useSchoolSettings } from "@/hooks/useSchoolSettings";
+import { useSchoolSettings, resolveAcademicYear } from "@/hooks/useSchoolSettings";
 import { where, onSnapshot, limit } from "firebase/firestore";
 import { scopedQuery } from "@/lib/scopedQuery";
 import { subscribeEnrollments } from "@/lib/enrollmentQuery";
-import { PageHeader } from "@/components/ui/PageHeader";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const TestsPage = () => {
   const { studentData } = useAuth();
-  const { gradeScale } = useSchoolSettings();
+  const navigate = useNavigate();
+  const settings = useSchoolSettings();
+  const { gradeScale } = settings;
+  // Real academic year — replaces the two hardcoded "2025–26" strings that
+  // showed the same year to every school regardless of date.
+  const academicYear = resolveAcademicYear(settings);
   const isMobile = useIsMobile();
+  const mountedRef = useRef(true);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
   const [loading, setLoading] = useState(true);
   const [upcomingTests, setUpcomingTests] = useState<any[]>([]);
   const [recentResults, setRecentResults] = useState<any[]>([]);
@@ -27,13 +34,20 @@ const TestsPage = () => {
 
     // Enrollments → classIds → tests (single query, scoped to school)
     let enrollSnap: any = null;
-    let unsubTests: any = () => {};
+    // Previously this stored ONLY the last chunk's unsub, silently leaking
+    // every earlier chunk's listener after a re-render. Now every chunk's
+    // unsub is collected and cleaned up on effect teardown.
+    let testUnsubs: Array<() => void> = [];
+    const cleanupTests = () => {
+      testUnsubs.forEach(u => { try { u(); } catch { /* noop */ } });
+      testUnsubs = [];
+    };
 
     const processEnrollments = () => {
       const classIds = Array.from(new Set((enrollSnap?.docs || []).map((d: any) => d.data().classId).filter(Boolean))) as string[];
       const searchIds = classIds.length > 0 ? classIds : [studentData.classId || "General"];
 
-      unsubTests();
+      cleanupTests();
       // Chunk classIds to handle >10 (Firestore "in" limit)
       const chunks: string[][] = [];
       for (let i = 0; i < searchIds.length; i += 10) chunks.push(searchIds.slice(i, i + 10));
@@ -43,6 +57,7 @@ const TestsPage = () => {
       chunks.forEach(chunk => {
         const q = scopedQuery("tests", schoolId, where("classId", "in", chunk));
         const unsub = onSnapshot(q, (snap) => {
+          if (!mountedRef.current) return;
           snap.docs.forEach(d => {
             const idx = allTests.findIndex(t => t.id === d.id);
             const item = { id: d.id, ...(d.data() as any) };
@@ -57,7 +72,7 @@ const TestsPage = () => {
             setUpcomingTests(filtered);
           }
         });
-        unsubTests = unsub; // keep last chunk unsub (simplified; all chunks clean up on effect cleanup)
+        testUnsubs.push(unsub);
       });
     };
 
@@ -72,6 +87,7 @@ const TestsPage = () => {
     const scoresQ = scopedQuery("test_scores", schoolId, where("studentId", "==", studentData.id), limit(20));
 
     const unsubScores = onSnapshot(scoresQ, (snap) => {
+      if (!mountedRef.current) return;
       const scores = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .sort((a: any, b: any) => {
@@ -93,17 +109,8 @@ const TestsPage = () => {
       setLoading(false);
     });
 
-    return () => { unsubEnroll(); unsubScores(); unsubTests(); };
+    return () => { unsubEnroll(); unsubScores(); cleanupTests(); };
   }, [studentData?.id, studentData?.schoolId]);
-
-  const getSubjectIcon = (title: string = "") => {
-    const t = title.toLowerCase();
-    if (t.includes("sci")) return { icon: <FlaskConical className="w-5 h-5" />, bg: "bg-green-100 text-green-600" };
-    if (t.includes("math")) return { icon: <Calculator className="w-5 h-5" />, bg: "bg-blue-100 text-blue-600" };
-    if (t.includes("history")) return { icon: <History className="w-5 h-5" />, bg: "bg-rose-100 text-rose-500" };
-    if (t.includes("english") || t.includes("lang")) return { icon: <Book className="w-5 h-5" />, bg: "bg-orange-100 text-orange-500" };
-    return { icon: <GraduationCap className="w-5 h-5" />, bg: "bg-slate-100 text-slate-500" };
-  };
 
   const getDayDiff = (dateStr: string) => {
     if (!dateStr) return 0;
@@ -196,7 +203,13 @@ const TestsPage = () => {
         </div>
 
         {/* ── Hero Banner ── */}
-        <div className="mx-5 mt-[18px] rounded-[26px] px-[22px] py-6 relative overflow-hidden flex flex-col items-center text-center"
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="Open syllabus page to prepare for upcoming test"
+          onClick={() => navigate("/syllabus")}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/syllabus"); } }}
+          className="mx-5 mt-[18px] rounded-[26px] px-[22px] py-6 relative overflow-hidden flex flex-col items-center text-center cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
           style={{
             background: "linear-gradient(140deg, #0033CC 0%, #0055FF 42%, #2277FF 72%, #55AAFF 100%)",
             boxShadow: SH_BTN,
@@ -230,18 +243,20 @@ const TestsPage = () => {
           <div className="flex items-center justify-center gap-[7px] relative z-10">
             {nextTest && (
               <>
-                <div className="w-1 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.45)" }} />
                 <span className="text-[12px] font-semibold" style={{ color: "rgba(255,255,255,0.65)", letterSpacing: "-0.1px" }}>
                   {formatDate(nextTest.date)}
                 </span>
-              </>
-            )}
-            <div className="w-1 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.45)" }} />
-            <span className="text-[12px] font-semibold" style={{ color: "rgba(255,255,255,0.65)", letterSpacing: "-0.1px" }}>
-              {nextTest?.time || "9:00 AM"}
-            </span>
-            {nextTest && (
-              <>
+                {/* Only show the time when the test doc actually has one —
+                    previously we fell back to a hardcoded "9:00 AM" which
+                    looked like real scheduled time to the parent. */}
+                {nextTest.time && (
+                  <>
+                    <div className="w-1 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.45)" }} />
+                    <span className="text-[12px] font-semibold" style={{ color: "rgba(255,255,255,0.65)", letterSpacing: "-0.1px" }}>
+                      {nextTest.time}
+                    </span>
+                  </>
+                )}
                 <div className="w-1 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.45)" }} />
                 <span className="text-[12px] font-semibold" style={{ color: "rgba(255,255,255,0.65)", letterSpacing: "-0.1px" }}>
                   {getDayDiff(nextTest.date)} day{getDayDiff(nextTest.date) === 1 ? "" : "s"}
@@ -252,7 +267,13 @@ const TestsPage = () => {
         </div>
 
         {/* ── Upcoming Tests Section ── */}
-        <div className="mx-5 mt-[14px] bg-white rounded-[24px] p-5 relative overflow-hidden"
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="Open syllabus page"
+          onClick={() => navigate("/syllabus")}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/syllabus"); } }}
+          className="mx-5 mt-[14px] bg-white rounded-[24px] p-5 relative overflow-hidden cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
           style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
           <div className="absolute -top-10 -right-8 w-[120px] h-[120px] rounded-full pointer-events-none"
             style={{ background: "radial-gradient(circle, rgba(0,85,255,0.05) 0%, transparent 70%)" }} />
@@ -288,9 +309,16 @@ const TestsPage = () => {
                 const urgent = days <= 3;
                 const type = getTestTypeTag(t);
                 const tag = tagStyle[type.cls];
+                const subject = t.subject || t.testName || "";
+                const openRow = () => navigate("/syllabus", { state: { subject } });
                 return (
                   <div key={t.id || i}
-                    className="flex items-center gap-[13px] px-[15px] py-[13px] rounded-[18px] active:scale-[0.97] transition-transform cursor-pointer"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Open syllabus for ${subject || "test"}`}
+                    onClick={(e) => { e.stopPropagation(); openRow(); }}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); openRow(); } }}
+                    className="flex items-center gap-[13px] px-[15px] py-[13px] rounded-[18px] active:scale-[0.97] transition-transform cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
                     style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.12)", transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
                     <div className="w-11 h-11 rounded-[14px] flex flex-col items-center justify-center gap-[1px] shrink-0"
                       style={dateChipStyle(urgent)}>
@@ -330,7 +358,13 @@ const TestsPage = () => {
         </div>
 
         {/* ── Recent Results Section ── */}
-        <div className="mx-5 mt-[14px] bg-white rounded-[24px] p-5 relative overflow-hidden"
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="Open performance page for detailed results"
+          onClick={() => navigate("/performance")}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/performance"); } }}
+          className="mx-5 mt-[14px] bg-white rounded-[24px] p-5 relative overflow-hidden cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
           style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
           <div className="absolute -top-10 -right-8 w-[120px] h-[120px] rounded-full pointer-events-none"
             style={{ background: "radial-gradient(circle, rgba(0,85,255,0.05) 0%, transparent 70%)" }} />
@@ -364,9 +398,16 @@ const TestsPage = () => {
                 const raw = r.percentage ?? (r.maxScore > 0 ? (r.score / r.maxScore * 100) : 0);
                 const pct = isFinite(raw) ? raw : 0;
                 const grad = scoreGradient(pct);
+                const subject = r.subject || r.testName || "";
+                const openRow = () => navigate("/performance", { state: { subject } });
                 return (
                   <div key={r.id || i}
-                    className="flex items-center gap-[13px] px-[15px] py-[13px] rounded-[18px] active:scale-[0.97] transition-transform cursor-pointer"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Open performance for ${subject || "result"}`}
+                    onClick={(e) => { e.stopPropagation(); openRow(); }}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); openRow(); } }}
+                    className="flex items-center gap-[13px] px-[15px] py-[13px] rounded-[18px] active:scale-[0.97] transition-transform cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
                     style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.12)", transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
                     <div className="w-11 h-11 rounded-[14px] flex items-center justify-center text-[16px] font-bold text-white shrink-0"
                       style={{ background: grad.bg, boxShadow: grad.shadow }}>
@@ -394,7 +435,13 @@ const TestsPage = () => {
         </div>
 
         {/* ── This Term Performance (Grade grid) ── */}
-        <div className="mx-5 mt-[14px] bg-white rounded-[24px] p-5 relative overflow-hidden"
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="Open performance page for term breakdown"
+          onClick={() => navigate("/performance")}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/performance"); } }}
+          className="mx-5 mt-[14px] bg-white rounded-[24px] p-5 relative overflow-hidden cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
           style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
           <div className="absolute -top-10 -right-8 w-[120px] h-[120px] rounded-full pointer-events-none"
             style={{ background: "radial-gradient(circle, rgba(0,85,255,0.05) 0%, transparent 70%)" }} />
@@ -421,10 +468,17 @@ const TestsPage = () => {
 
         {/* ── Monthly Activity ── */}
         {!loading && stats.totalTaken > 0 && (
-          <div className="mx-5 mt-3 bg-white rounded-[20px] px-[18px] py-4" style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="Open performance page for monthly activity"
+            onClick={() => navigate("/performance")}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/performance"); } }}
+            className="mx-5 mt-3 bg-white rounded-[20px] px-[18px] py-4 cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+            style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
             <div className="flex items-center justify-between mb-3">
               <div className="text-[14px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>Monthly Activity</div>
-              <div className="text-[11px] font-bold" style={{ color: B1 }}>2025–26 Term</div>
+              <div className="text-[11px] font-bold" style={{ color: B1 }}>{academicYear} Term</div>
             </div>
             <div className="flex items-end gap-[7px] h-12 mb-[7px]">
               {monthlyActivity.map((m, i) => {
@@ -538,7 +592,13 @@ const TestsPage = () => {
         </div>
 
         {/* ── Hero Banner ── */}
-        <div className="rounded-[26px] px-8 pt-8 pb-8 relative overflow-hidden mb-5"
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="Open syllabus page to prepare for upcoming test"
+          onClick={() => navigate("/syllabus")}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/syllabus"); } }}
+          className="rounded-[26px] px-8 pt-8 pb-8 relative overflow-hidden mb-5 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
           style={{
             background: "linear-gradient(140deg, #0033CC 0%, #0055FF 42%, #2277FF 72%, #55AAFF 100%)",
             boxShadow: SH_BTN,
@@ -576,10 +636,16 @@ const TestsPage = () => {
                       {formatDate(nextTest.date)}
                     </span>
                   )}
-                  <div className="w-1 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.45)" }} />
-                  <span className="text-[14px] font-semibold" style={{ color: "rgba(255,255,255,0.68)", letterSpacing: "-0.1px" }}>
-                    {nextTest?.time || "9:00 AM"}
-                  </span>
+                  {/* Only render time when the test doc provides one —
+                      previously defaulted to "9:00 AM" which looked real. */}
+                  {nextTest?.time && (
+                    <>
+                      <div className="w-1 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.45)" }} />
+                      <span className="text-[14px] font-semibold" style={{ color: "rgba(255,255,255,0.68)", letterSpacing: "-0.1px" }}>
+                        {nextTest.time}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -598,7 +664,13 @@ const TestsPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
 
           {/* Upcoming Tests */}
-          <div className="bg-white rounded-[24px] p-6 relative overflow-hidden"
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="Open syllabus page"
+            onClick={() => navigate("/syllabus")}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/syllabus"); } }}
+            className="bg-white rounded-[24px] p-6 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
             style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
             <div className="absolute -top-10 -right-8 w-[140px] h-[140px] rounded-full pointer-events-none"
               style={{ background: "radial-gradient(circle, rgba(0,85,255,0.05) 0%, transparent 70%)" }} />
@@ -634,9 +706,16 @@ const TestsPage = () => {
                   const urgent = days <= 3;
                   const type = getTestTypeTagD(t);
                   const tag = tagStyleD[type.cls];
+                  const subject = t.subject || t.testName || "";
+                  const openRow = () => navigate("/syllabus", { state: { subject } });
                   return (
                     <div key={t.id || i}
-                      className="flex items-center gap-[13px] px-4 py-[13px] rounded-[18px] transition-transform hover:-translate-y-0.5 cursor-pointer"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Open syllabus for ${subject || "test"}`}
+                      onClick={(e) => { e.stopPropagation(); openRow(); }}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); openRow(); } }}
+                      className="flex items-center gap-[13px] px-4 py-[13px] rounded-[18px] transition-all hover:-translate-y-0.5 hover:shadow-md cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
                       style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.12)" }}>
                       <div className="w-12 h-12 rounded-[14px] flex flex-col items-center justify-center gap-[1px] shrink-0"
                         style={dateChipStyleD(urgent)}>
@@ -676,7 +755,13 @@ const TestsPage = () => {
           </div>
 
           {/* Recent Results */}
-          <div className="bg-white rounded-[24px] p-6 relative overflow-hidden"
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="Open performance page for detailed results"
+            onClick={() => navigate("/performance")}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/performance"); } }}
+            className="bg-white rounded-[24px] p-6 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
             style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
             <div className="absolute -top-10 -right-8 w-[140px] h-[140px] rounded-full pointer-events-none"
               style={{ background: "radial-gradient(circle, rgba(0,85,255,0.05) 0%, transparent 70%)" }} />
@@ -710,9 +795,16 @@ const TestsPage = () => {
                   const raw = r.percentage ?? (r.maxScore > 0 ? (r.score / r.maxScore * 100) : 0);
                   const pct = isFinite(raw) ? raw : 0;
                   const grad = scoreGradientD(pct);
+                  const subject = r.subject || r.testName || "";
+                  const openRow = () => navigate("/performance", { state: { subject } });
                   return (
                     <div key={r.id || i}
-                      className="flex items-center gap-[13px] px-4 py-[13px] rounded-[18px] transition-transform hover:-translate-y-0.5 cursor-pointer"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Open performance for ${subject || "result"}`}
+                      onClick={(e) => { e.stopPropagation(); openRow(); }}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); openRow(); } }}
+                      className="flex items-center gap-[13px] px-4 py-[13px] rounded-[18px] transition-all hover:-translate-y-0.5 hover:shadow-md cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
                       style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.12)" }}>
                       <div className="w-12 h-12 rounded-[14px] flex items-center justify-center text-[17px] font-bold text-white shrink-0"
                         style={{ background: grad.bg, boxShadow: grad.shadow }}>
@@ -744,7 +836,13 @@ const TestsPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
           {/* This Term Performance (lg:col-span-2) */}
-          <div className="lg:col-span-2 bg-white rounded-[24px] p-6 relative overflow-hidden"
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="Open performance page for term breakdown"
+            onClick={() => navigate("/performance")}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/performance"); } }}
+            className="lg:col-span-2 bg-white rounded-[24px] p-6 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
             style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
             <div className="absolute -top-10 -right-8 w-[140px] h-[140px] rounded-full pointer-events-none"
               style={{ background: "radial-gradient(circle, rgba(0,85,255,0.05) 0%, transparent 70%)" }} />
@@ -771,11 +869,17 @@ const TestsPage = () => {
 
           {/* Monthly Activity */}
           {stats.totalTaken > 0 ? (
-            <div className="bg-white rounded-[22px] px-5 py-5"
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label="Open performance page for monthly activity"
+              onClick={() => navigate("/performance")}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/performance"); } }}
+              className="bg-white rounded-[22px] px-5 py-5 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
               style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
               <div className="flex items-center justify-between mb-4">
                 <div className="text-[15px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>Monthly Activity</div>
-                <div className="text-[11px] font-bold" style={{ color: B1 }}>2025–26</div>
+                <div className="text-[11px] font-bold" style={{ color: B1 }}>{academicYear}</div>
               </div>
               <div className="flex items-end gap-[8px] h-[100px] mb-2">
                 {monthlyActivityD.map((m, i) => {

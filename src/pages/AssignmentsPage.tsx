@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { User, Clock, CheckCircle2, Loader2, Upload, FileCheck, X, FileText, BarChart3, Target, Trophy, Send, Lightbulb, Sparkles, ChevronDown } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { db, storage } from "@/lib/firebase";
@@ -14,6 +15,7 @@ import { callAI } from "../ai/utils/callAI";
 
 const AssignmentsPage = () => {
   const { studentData } = useAuth();
+  const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState(0);
   const [submittingFile, setSubmittingFile] = useState(false);
@@ -410,7 +412,14 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
               { label: "On-Time",    value: onTimeDisplay,    color: B1,    iconBg: "rgba(0,85,255,0.10)",   iconBorder: "rgba(0,85,255,0.18)",   icon: BarChart3, bar: `linear-gradient(90deg, ${B1}, ${B4})`, barPct: onTimePct ?? 0, glow: "rgba(0,85,255,0.10)" },
               { label: "Avg Score",  value: avgScoreDisplay,  color: VIOLET, iconBg: "rgba(107,33,232,0.10)", iconBorder: "rgba(107,33,232,0.20)", icon: Trophy, bar: "linear-gradient(90deg, #6B21E8, #A87FF8)", barPct: avgScorePct ?? 0, glow: "rgba(107,33,232,0.10)" },
             ].map(({ label, value, color, iconBg, iconBorder, icon: Icon, bar, barPct, glow }) => (
-              <div key={label} className="bg-white rounded-[22px] px-[18px] py-4 min-w-[110px] flex-shrink-0 relative overflow-hidden active:scale-[0.96] transition-transform"
+              <div
+                key={label}
+                role="button"
+                tabIndex={0}
+                aria-label={`Open reports page for ${label}`}
+                onClick={() => navigate("/reports")}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
+                className="bg-white rounded-[22px] px-[18px] py-4 min-w-[110px] flex-shrink-0 relative overflow-hidden cursor-pointer active:scale-[0.96] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
                 style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)", transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
                 <div className="absolute -top-[16px] -right-[16px] w-[60px] h-[60px] rounded-full pointer-events-none"
                   style={{ background: `radial-gradient(circle, ${glow} 0%, transparent 70%)`, opacity: 0.55 }} />
@@ -562,7 +571,7 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
 
           {/* ── Upcoming Deadlines (only if there are upcoming pending items) ── */}
           {!loading && upcoming.length > 0 && (
-            <div className="mx-5 mt-3 bg-white rounded-[24px] px-5 py-[18px]"
+            <div className="mx-5 mt-3 bg-white rounded-[24px] px-5 py-[18px] transition-transform"
               style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
               <div className="flex items-center justify-between mb-[14px]">
                 <div className="text-[16px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Upcoming Deadlines</div>
@@ -611,7 +620,13 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
           )}
 
           {/* ── Summary Dark Card ── */}
-          <div className="mx-5 mt-[14px] rounded-[24px] px-[22px] py-5 relative overflow-hidden"
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="Open reports page for term summary"
+            onClick={() => navigate("/reports")}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
+            className="mx-5 mt-[14px] rounded-[24px] px-[22px] py-5 relative overflow-hidden cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
             style={{
               background: "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)",
               boxShadow: "0 8px 30px rgba(0,51,204,0.34), 0 0 0 0.5px rgba(255,255,255,0.14)",
@@ -951,7 +966,14 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
             // hardcoded to 60% regardless of real data.
             { label: "Pending",    value: `${pendingListD.length}`, color: ORANGE, iconBg: "rgba(255,136,0,0.10)", iconBdr: "rgba(255,136,0,0.22)", icon: Clock, bar: "linear-gradient(90deg, #FF8800, #FFCC44)", barPct: totalAssignments === 0 ? 0 : Math.round((pendingListD.length / totalAssignments) * 100), glow: "rgba(255,136,0,0.14)" },
           ].map(({ label, value, color, iconBg, iconBdr, icon: Icon, bar, barPct, glow }) => (
-            <div key={label} className="bg-white rounded-[22px] px-6 py-5 relative overflow-hidden"
+            <div
+              key={label}
+              role="button"
+              tabIndex={0}
+              aria-label={`Open reports page for ${label}`}
+              onClick={() => navigate("/reports")}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
+              className="bg-white rounded-[22px] px-6 py-5 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
               style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
               <div className="absolute -top-[20px] -right-[20px] w-[90px] h-[90px] rounded-full pointer-events-none"
                 style={{ background: `radial-gradient(circle, ${glow} 0%, transparent 70%)`, opacity: 0.65 }} />
@@ -1174,7 +1196,13 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
             )}
 
             {/* Summary Dark Card */}
-            <div className="rounded-[22px] px-6 py-6 relative overflow-hidden"
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label="Open reports page for term summary"
+              onClick={() => navigate("/reports")}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
+              className="rounded-[22px] px-6 py-6 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
               style={{
                 background: "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)",
                 boxShadow: "0 8px 30px rgba(0,51,204,0.34), 0 0 0 0.5px rgba(255,255,255,0.14)",
@@ -1203,8 +1231,8 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
               </div>
             </div>
 
-            {/* AI Tips Card */}
-            <div className="bg-white rounded-[22px] px-5 py-5 relative overflow-hidden"
+            {/* AI Tips Card — info-only (describes how to use the lightbulb icon). */}
+            <div className="bg-white rounded-[22px] px-5 py-5 relative overflow-hidden transition-all hover:shadow-lg"
               style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
               <div className="absolute -top-[20px] -right-[20px] w-[120px] h-[120px] rounded-full pointer-events-none"
                 style={{ background: "radial-gradient(circle, rgba(255,136,0,0.06) 0%, transparent 70%)" }} />
