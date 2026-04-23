@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { CheckCircle, XCircle, Clock, ChevronLeft, ChevronRight, Loader2, Calendar as CalendarIcon, Users } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
-import { PageHeader } from "@/components/ui/PageHeader";
 import { useSchoolSettings } from "@/hooks/useSchoolSettings";
 import { scopedQuery } from "@/lib/scopedQuery";
 import { where, onSnapshot } from "firebase/firestore";
@@ -11,6 +11,7 @@ type DayStatus = "present" | "absent" | "late" | "weekend" | "forgotten" | "empt
 
 const AttendancePage = () => {
   const { studentData } = useAuth();
+  const navigate = useNavigate();
   const { attendanceThreshold } = useSchoolSettings();
   const isMobile = useIsMobile();
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -30,7 +31,10 @@ const AttendancePage = () => {
     const processLogs = (snap: any) => {
       if (!mountedRef.current) return;
       const uniqueLogs = Array.from(new Map(snap.docs.map((d: any) => [d.id, { id: d.id, ...d.data() as any }])).values())
-        .sort((a: any, b: any) => b.date.localeCompare(a.date));
+        // Null-safe: an attendance doc missing `date` used to crash the sort
+        // with `TypeError: cannot read 'localeCompare' of undefined`. Defaulting
+        // to "" pushes those to the end and keeps the page alive.
+        .sort((a: any, b: any) => (b.date || "").localeCompare(a.date || ""));
       setAttendanceLogs(uniqueLogs);
 
       const pCount = uniqueLogs.filter((l: any) => l.status === "present").length;
@@ -71,6 +75,11 @@ const AttendancePage = () => {
   const handlePrevMonth = () => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1));
   const handleNextMonth = () => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1));
 
+  // Hoisted out of getDayStatus — previously this was recreated 30+ times
+  // per render (once per day of the month). Hoisting the snapshot here is
+  // strictly cheaper and gives deterministic behaviour for the whole pass.
+  const todayMidnightMs = new Date().setHours(0, 0, 0, 0);
+
   const getDayStatus = (day: number): DayStatus => {
     const d = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day);
     // Weekend check first — always weekend regardless of records
@@ -81,9 +90,7 @@ const AttendancePage = () => {
 
     if (logs.length === 0) {
       // No records for this day — check if it's a past weekday (teacher forgot)
-      const todayMidnight = new Date();
-      todayMidnight.setHours(0, 0, 0, 0);
-      if (d.getTime() < todayMidnight.getTime()) return "forgotten";
+      if (d.getTime() < todayMidnightMs) return "forgotten";
       return "empty"; // today or future
     }
 
@@ -118,18 +125,33 @@ const AttendancePage = () => {
     const ringCirc = 2 * Math.PI * ringR;
     const ringOffset = ringCirc - (Math.min(stats.percentage, 100) / 100) * ringCirc;
 
-    // Current week's daily attendance bars (Mon–Fri)
+    // Real bar percentages for this-month stat cards. Previously "Present"
+    // was hardcoded to 100, so a student with 2 present days in a 20-day
+    // month got the same full-width bar as a student with 20 — visually
+    // lying about coverage. Now the bar is present-days ÷ total-marked-days.
+    const monthTotal = monthStats.present + monthStats.absent + monthStats.late;
+    const presentPct = monthTotal === 0 ? 0 : Math.round((monthStats.present / monthTotal) * 100);
+    const absentPct  = monthTotal === 0 ? 0 : Math.round((monthStats.absent  / monthTotal) * 100);
+    const latePct    = monthTotal === 0 ? 0 : Math.round((monthStats.late    / monthTotal) * 100);
+
+    // Current week's daily attendance bars (Mon–Fri).
+    // Note: we use a dedicated midnight snapshot `todayMidnightMs` for
+    // future-check so we don't mutate `now` inside the loop (the old code
+    // called `now.setHours(0,0,0,0)` on every iteration, which mutated the
+    // shared date object — worked by accident because setHours is idempotent
+    // after the first call, but unsafe if anyone reads `now` later).
     const now = new Date();
     const jsDow = now.getDay();
     const daysFromMonday = jsDow === 0 ? 6 : jsDow - 1;
     const monday = new Date(now);
     monday.setDate(now.getDate() - daysFromMonday);
     monday.setHours(0, 0, 0, 0);
+    const todayMidnightMs = new Date().setHours(0, 0, 0, 0);
     const weekBars = Array.from({ length: 5 }, (_, i) => {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
       const dateStr = d.toLocaleDateString("en-CA");
-      const isFuture = d.getTime() > now.setHours(0, 0, 0, 0);
+      const isFuture = d.getTime() > todayMidnightMs;
       const log = attendanceLogs.find(l => l.date === dateStr);
       const isToday = d.toDateString() === new Date().toDateString();
       const status = log?.status || (isFuture ? "future" : "none");
@@ -161,28 +183,39 @@ const AttendancePage = () => {
               icon: CheckCircle, iconColor: GREEN,
               bg: "rgba(0,200,83,0.12)", border: "rgba(0,200,83,0.22)", glow: "rgba(0,200,83,0.12)",
               label: "Overall", value: `${stats.percentage}%`, valColor: GREEN,
-              bar: `linear-gradient(90deg, ${GREEN}, #66EE99)`, barPct: Math.max(stats.percentage, 3)
+              bar: `linear-gradient(90deg, ${GREEN}, #66EE99)`, barPct: Math.max(stats.percentage, 3),
+              route: "/reports"
             },
             {
               icon: Users, iconColor: B1,
               bg: "rgba(0,85,255,0.10)", border: "rgba(0,85,255,0.18)", glow: "rgba(0,85,255,0.10)",
               label: "Present", value: monthStats.present.toString(), valColor: B1,
-              bar: `linear-gradient(90deg, ${B1}, ${B4})`, barPct: 100
+              bar: `linear-gradient(90deg, ${B1}, ${B4})`, barPct: presentPct,
+              route: "/reports"
             },
             {
               icon: XCircle, iconColor: RED,
               bg: "rgba(255,51,85,0.10)", border: "rgba(255,51,85,0.20)", glow: "rgba(255,51,85,0.10)",
               label: "Absent", value: monthStats.absent.toString(), valColor: RED,
-              bar: "rgba(255,51,85,0.15)", barPct: monthStats.absent > 0 ? Math.min(monthStats.absent * 15, 100) : 8
+              bar: `linear-gradient(90deg, ${RED}, #FF8899)`, barPct: absentPct,
+              route: "/alerts"
             },
             {
               icon: Clock, iconColor: ORANGE,
               bg: "rgba(255,136,0,0.10)", border: "rgba(255,136,0,0.20)", glow: "rgba(255,136,0,0.10)",
               label: "Late", value: monthStats.late.toString(), valColor: ORANGE,
-              bar: "rgba(255,136,0,0.15)", barPct: monthStats.late > 0 ? Math.min(monthStats.late * 15, 100) : 8
+              bar: `linear-gradient(90deg, ${ORANGE}, #FFB366)`, barPct: latePct,
+              route: "/alerts"
             },
-          ].map(({ icon: Icon, iconColor, bg, border, glow, label, value, valColor, bar, barPct }) => (
-            <div key={label} className="bg-white rounded-[22px] px-4 py-[18px] relative overflow-hidden active:scale-[0.96] transition-transform"
+          ].map(({ icon: Icon, iconColor, bg, border, glow, label, value, valColor, bar, barPct, route }) => (
+            <div
+              key={label}
+              role="button"
+              tabIndex={0}
+              aria-label={`Open ${route === "/alerts" ? "alerts" : "reports"} page for ${label}`}
+              onClick={() => navigate(route)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(route); } }}
+              className="bg-white rounded-[22px] px-4 py-[18px] relative overflow-hidden cursor-pointer active:scale-[0.96] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
               style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)", transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
               <div className="absolute -top-[18px] -right-[18px] w-[70px] h-[70px] rounded-full pointer-events-none"
                 style={{ background: `radial-gradient(circle, ${glow} 0%, transparent 70%)`, opacity: 0.5 }} />
@@ -202,7 +235,13 @@ const AttendancePage = () => {
         </div>
 
         {/* ── This Month Ring Summary ── */}
-        <div className="mx-5 mt-3 bg-white rounded-[24px] p-5 flex items-center gap-5"
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="Open reports page for monthly attendance"
+          onClick={() => navigate("/reports")}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
+          className="mx-5 mt-3 bg-white rounded-[24px] p-5 flex items-center gap-5 cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
           style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
           <div className="flex-1">
             <div className="text-[16px] font-bold mb-1" style={{ color: T1, letterSpacing: "-0.3px" }}>This Month</div>
@@ -248,9 +287,16 @@ const AttendancePage = () => {
         </div>
 
         {/* ── Calendar ── */}
-        <div className="mx-5 mt-3 bg-white rounded-[24px] p-5" style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="Open reports page for attendance detail"
+          onClick={() => navigate("/reports")}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
+          className="mx-5 mt-3 bg-white rounded-[24px] p-5 cursor-pointer transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+          style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
           <div className="flex items-center justify-between mb-4">
-            <button onClick={handlePrevMonth} aria-label="Previous month"
+            <button onClick={(e) => { e.stopPropagation(); handlePrevMonth(); }} aria-label="Previous month"
               className="w-[34px] h-[34px] rounded-[11px] flex items-center justify-center active:scale-[0.88] transition-transform"
               style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.12)", transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
               <ChevronLeft className="w-[14px] h-[14px]" style={{ color: "rgba(0,85,255,0.7)" }} strokeWidth={2.5} />
@@ -262,7 +308,7 @@ const AttendancePage = () => {
               </div>
               <span className="text-[16px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>{monthName}</span>
             </div>
-            <button onClick={handleNextMonth} aria-label="Next month"
+            <button onClick={(e) => { e.stopPropagation(); handleNextMonth(); }} aria-label="Next month"
               className="w-[34px] h-[34px] rounded-[11px] flex items-center justify-center active:scale-[0.88] transition-transform"
               style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.12)", transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
               <ChevronRight className="w-[14px] h-[14px]" style={{ color: "rgba(0,85,255,0.7)" }} strokeWidth={2.5} />
@@ -351,7 +397,14 @@ const AttendancePage = () => {
 
         {/* ── Weekly Attendance Bars ── */}
         {!loading && (
-          <div className="mx-5 mt-3 bg-white rounded-[22px] px-5 py-[18px]" style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="Open reports page for weekly attendance"
+            onClick={() => navigate("/reports")}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
+            className="mx-5 mt-3 bg-white rounded-[22px] px-5 py-[18px] cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+            style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
             <div className="text-[14px] font-bold mb-[14px]" style={{ color: T1, letterSpacing: "-0.2px" }}>Weekly Attendance</div>
             <div className="flex items-end justify-between gap-[6px] h-[52px] mb-2">
               {weekBars.map((b, i) => {
@@ -388,7 +441,14 @@ const AttendancePage = () => {
         )}
 
         {/* ── Recent Absences ── */}
-        <div className="mx-5 mt-3 bg-white rounded-[24px] p-5" style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="Open alerts page"
+          onClick={() => navigate("/alerts")}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/alerts"); } }}
+          className="mx-5 mt-3 bg-white rounded-[24px] p-5 cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+          style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
           <div className="text-[16px] font-bold mb-4" style={{ color: T1, letterSpacing: "-0.3px" }}>Recent Absences</div>
 
           {recentAbsences.length === 0 ? (
@@ -428,7 +488,13 @@ const AttendancePage = () => {
                 : new Date(a.date);
               const dateStr = dateObj.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
               return (
-                <div key={i} className="flex items-center gap-[13px] py-3"
+                <div key={i}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open alerts page for ${dateStr} ${isAbsent ? "absence" : "late"}`}
+                  onClick={() => navigate("/alerts")}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/alerts"); } }}
+                  className="flex items-center gap-[13px] py-3 cursor-pointer active:bg-[#EEF4FF] transition-colors rounded-[12px] -mx-2 px-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
                   style={{ borderBottom: i < arr.length - 1 ? `0.5px solid ${SEP}` : "none" }}>
                   <div className="w-10 h-10 rounded-[13px] flex items-center justify-center shrink-0"
                     style={{
@@ -460,7 +526,13 @@ const AttendancePage = () => {
         </div>
 
         {/* ── Policy Card (blue gradient) ── */}
-        <div className="mx-5 mt-3 rounded-[22px] px-5 py-[18px] relative overflow-hidden"
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="Open settings to view attendance policy"
+          onClick={() => navigate("/settings")}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/settings"); } }}
+          className="mx-5 mt-3 rounded-[22px] px-5 py-[18px] relative overflow-hidden cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
           style={{
             background: `linear-gradient(135deg, ${B1} 0%, ${B2} 100%)`,
             boxShadow: SH_BTN,
@@ -495,7 +567,14 @@ const AttendancePage = () => {
         </div>
 
         {/* ── Exam Eligibility Threshold Bar ── */}
-        <div className="mx-5 mt-3 bg-white rounded-[22px] px-5 py-[18px]" style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="Open settings to view attendance threshold"
+          onClick={() => navigate("/settings")}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/settings"); } }}
+          className="mx-5 mt-3 bg-white rounded-[22px] px-5 py-[18px] cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+          style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
           <div className="flex items-end justify-between mb-[10px]">
             <div>
               <div className="text-[13px] font-bold" style={{ color: T1, letterSpacing: "-0.2px", marginBottom: 2 }}>Exam Eligibility</div>
@@ -547,6 +626,12 @@ const AttendancePage = () => {
   const ringCirc = 2 * Math.PI * ringR;
   const ringOffset = ringCirc - (Math.min(stats.percentage, 100) / 100) * ringCirc;
 
+  // Real bar percentages for this-month stat cards (see mobile comment above).
+  const monthTotalD = monthStats.present + monthStats.absent + monthStats.late;
+  const presentPctD = monthTotalD === 0 ? 0 : Math.round((monthStats.present / monthTotalD) * 100);
+  const absentPctD  = monthTotalD === 0 ? 0 : Math.round((monthStats.absent  / monthTotalD) * 100);
+  const latePctD    = monthTotalD === 0 ? 0 : Math.round((monthStats.late    / monthTotalD) * 100);
+
   // Current week bars
   const nowD = new Date();
   const jsDowD = nowD.getDay();
@@ -588,12 +673,19 @@ const AttendancePage = () => {
         {/* ── 4 Stat Cards ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
           {[
-            { icon: CheckCircle, iconColor: GREEN, bg: "rgba(0,200,83,0.12)", border: "rgba(0,200,83,0.22)", glow: "rgba(0,200,83,0.12)", label: "Overall", value: `${stats.percentage}%`, valColor: GREEN, bar: `linear-gradient(90deg, ${GREEN}, #66EE99)`, barPct: Math.max(stats.percentage, 3) },
-            { icon: Users, iconColor: B1, bg: "rgba(0,85,255,0.10)", border: "rgba(0,85,255,0.18)", glow: "rgba(0,85,255,0.10)", label: "Present", value: monthStats.present.toString(), valColor: B1, bar: `linear-gradient(90deg, ${B1}, ${B4})`, barPct: 100 },
-            { icon: XCircle, iconColor: RED, bg: "rgba(255,51,85,0.10)", border: "rgba(255,51,85,0.20)", glow: "rgba(255,51,85,0.10)", label: "Absent", value: monthStats.absent.toString(), valColor: RED, bar: "rgba(255,51,85,0.15)", barPct: monthStats.absent > 0 ? Math.min(monthStats.absent * 15, 100) : 8 },
-            { icon: Clock, iconColor: ORANGE, bg: "rgba(255,136,0,0.10)", border: "rgba(255,136,0,0.20)", glow: "rgba(255,136,0,0.10)", label: "Late", value: monthStats.late.toString(), valColor: ORANGE, bar: "rgba(255,136,0,0.15)", barPct: monthStats.late > 0 ? Math.min(monthStats.late * 15, 100) : 8 },
-          ].map(({ icon: Icon, iconColor, bg, border, glow, label, value, valColor, bar, barPct }) => (
-            <div key={label} className="bg-white rounded-[22px] px-5 py-5 relative overflow-hidden transition-transform hover:-translate-y-0.5"
+            { icon: CheckCircle, iconColor: GREEN, bg: "rgba(0,200,83,0.12)", border: "rgba(0,200,83,0.22)", glow: "rgba(0,200,83,0.12)", label: "Overall", value: `${stats.percentage}%`, valColor: GREEN, bar: `linear-gradient(90deg, ${GREEN}, #66EE99)`, barPct: Math.max(stats.percentage, 3), route: "/reports" },
+            { icon: Users, iconColor: B1, bg: "rgba(0,85,255,0.10)", border: "rgba(0,85,255,0.18)", glow: "rgba(0,85,255,0.10)", label: "Present", value: monthStats.present.toString(), valColor: B1, bar: `linear-gradient(90deg, ${B1}, ${B4})`, barPct: presentPctD, route: "/reports" },
+            { icon: XCircle, iconColor: RED, bg: "rgba(255,51,85,0.10)", border: "rgba(255,51,85,0.20)", glow: "rgba(255,51,85,0.10)", label: "Absent", value: monthStats.absent.toString(), valColor: RED, bar: `linear-gradient(90deg, ${RED}, #FF8899)`, barPct: absentPctD, route: "/alerts" },
+            { icon: Clock, iconColor: ORANGE, bg: "rgba(255,136,0,0.10)", border: "rgba(255,136,0,0.20)", glow: "rgba(255,136,0,0.10)", label: "Late", value: monthStats.late.toString(), valColor: ORANGE, bar: `linear-gradient(90deg, ${ORANGE}, #FFB366)`, barPct: latePctD, route: "/alerts" },
+          ].map(({ icon: Icon, iconColor, bg, border, glow, label, value, valColor, bar, barPct, route }) => (
+            <div
+              key={label}
+              role="button"
+              tabIndex={0}
+              aria-label={`Open ${route === "/alerts" ? "alerts" : "reports"} page for ${label}`}
+              onClick={() => navigate(route)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(route); } }}
+              className="bg-white rounded-[22px] px-5 py-5 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
               style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
               <div className="absolute -top-[18px] -right-[18px] w-[90px] h-[90px] rounded-full pointer-events-none"
                 style={{ background: `radial-gradient(circle, ${glow} 0%, transparent 70%)`, opacity: 0.5 }} />
@@ -616,11 +708,17 @@ const AttendancePage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
 
           {/* Calendar (lg:col-span-3) */}
-          <div className="lg:col-span-3 bg-white rounded-[24px] p-6"
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="Open reports page for attendance detail"
+            onClick={() => navigate("/reports")}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
+            className="lg:col-span-3 bg-white rounded-[24px] p-6 cursor-pointer transition-all hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
             style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
             <div className="flex items-center justify-between gap-4 mb-5 flex-wrap">
               <div className="flex items-center gap-2">
-                <button onClick={handlePrevMonth} aria-label="Previous month"
+                <button onClick={(e) => { e.stopPropagation(); handlePrevMonth(); }} aria-label="Previous month"
                   className="w-10 h-10 rounded-[12px] flex items-center justify-center transition-transform hover:scale-[1.05]"
                   style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.12)" }}>
                   <ChevronLeft className="w-[16px] h-[16px]" style={{ color: "rgba(0,85,255,0.7)" }} strokeWidth={2.5} />
@@ -633,7 +731,7 @@ const AttendancePage = () => {
                   </div>
                   <span className="text-[15px] font-bold min-w-[160px] text-center" style={{ color: T1, letterSpacing: "-0.3px" }}>{monthName}</span>
                 </div>
-                <button onClick={handleNextMonth} aria-label="Next month"
+                <button onClick={(e) => { e.stopPropagation(); handleNextMonth(); }} aria-label="Next month"
                   className="w-10 h-10 rounded-[12px] flex items-center justify-center transition-transform hover:scale-[1.05]"
                   style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.12)" }}>
                   <ChevronRight className="w-[16px] h-[16px]" style={{ color: "rgba(0,85,255,0.7)" }} strokeWidth={2.5} />
@@ -722,7 +820,13 @@ const AttendancePage = () => {
           <div className="lg:col-span-2 flex flex-col gap-4">
 
             {/* This Month Ring */}
-            <div className="bg-white rounded-[24px] p-5 flex items-center gap-5"
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label="Open reports page for monthly attendance"
+              onClick={() => navigate("/reports")}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
+              className="bg-white rounded-[24px] p-5 flex items-center gap-5 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
               style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
               <div className="flex-1">
                 <div className="text-[17px] font-bold mb-1" style={{ color: T1, letterSpacing: "-0.3px" }}>This Month</div>
@@ -769,7 +873,13 @@ const AttendancePage = () => {
 
             {/* Weekly Bars */}
             {!loading && (
-              <div className="bg-white rounded-[22px] px-5 py-5"
+              <div
+                role="button"
+                tabIndex={0}
+                aria-label="Open reports page for weekly attendance"
+                onClick={() => navigate("/reports")}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
+                className="bg-white rounded-[22px] px-5 py-5 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
                 style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
                 <div className="text-[15px] font-bold mb-4" style={{ color: T1, letterSpacing: "-0.2px" }}>Weekly Attendance</div>
                 <div className="flex items-end justify-between gap-[8px] h-[70px] mb-2">
@@ -812,7 +922,14 @@ const AttendancePage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mt-5">
 
           {/* Recent Absences */}
-          <div className="bg-white rounded-[24px] p-6" style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="Open alerts page"
+            onClick={() => navigate("/alerts")}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/alerts"); } }}
+            className="bg-white rounded-[24px] p-6 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+            style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
             <div className="text-[17px] font-bold mb-4" style={{ color: T1, letterSpacing: "-0.3px" }}>Recent Absences</div>
 
             {recentAbsences.length === 0 ? (
@@ -849,7 +966,13 @@ const AttendancePage = () => {
                     : new Date(a.date);
                   const dateStr = dateObj.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
                   return (
-                    <div key={i} className="flex items-center gap-[13px] py-3"
+                    <div key={i}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Open alerts page for ${dateStr} ${isAbsent ? "absence" : "late"}`}
+                      onClick={() => navigate("/alerts")}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/alerts"); } }}
+                      className="flex items-center gap-[13px] py-3 cursor-pointer transition-colors hover:bg-[#F5F9FF] rounded-[12px] -mx-2 px-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
                       style={{ borderBottom: i < arr.length - 1 ? `0.5px solid ${SEP}` : "none" }}>
                       <div className="w-10 h-10 rounded-[13px] flex items-center justify-center shrink-0"
                         style={{
@@ -882,7 +1005,13 @@ const AttendancePage = () => {
           </div>
 
           {/* Policy gradient card */}
-          <div className="rounded-[24px] px-6 py-6 relative overflow-hidden"
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="Open settings to view attendance policy"
+            onClick={() => navigate("/settings")}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/settings"); } }}
+            className="rounded-[24px] px-6 py-6 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
             style={{
               background: `linear-gradient(135deg, ${B1} 0%, ${B2} 100%)`,
               boxShadow: SH_BTN,
@@ -917,7 +1046,14 @@ const AttendancePage = () => {
           </div>
 
           {/* Exam Eligibility */}
-          <div className="bg-white rounded-[22px] px-6 py-6" style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="Open settings to view attendance threshold"
+            onClick={() => navigate("/settings")}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/settings"); } }}
+            className="bg-white rounded-[22px] px-6 py-6 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+            style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
             <div className="flex items-end justify-between mb-3">
               <div>
                 <div className="text-[15px] font-bold" style={{ color: T1, letterSpacing: "-0.2px", marginBottom: 3 }}>Exam Eligibility</div>

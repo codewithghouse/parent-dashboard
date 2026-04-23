@@ -1,13 +1,13 @@
 import { useEffect, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   ArrowUp, ArrowDown, Minus, Loader2,
   Calculator, FlaskConical, Languages, Globe, Monitor, Palette, BookOpen,
   Sparkles, Target, Trophy
 } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart } from "recharts";
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
 import { SubjectPerformanceDetail } from "@/components/performance/SubjectPerformanceDetail";
 import { useAuth } from "@/lib/AuthContext";
-import { PageHeader } from "@/components/ui/PageHeader";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, getDocs } from "firebase/firestore";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -27,6 +27,7 @@ const CHART_COLORS = ["#1e3a8a", "#10b981", "#f59e0b", "#6366f1", "#ef4444", "#0
 
 const PerformancePage = () => {
   const { studentData } = useAuth();
+  const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -420,7 +421,13 @@ const PerformancePage = () => {
         </div>
 
         {/* ── Overall Performance ── */}
-        <div className="mx-5 mt-4 bg-white rounded-[24px] p-5 relative overflow-hidden"
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="Open reports page"
+          onClick={() => navigate("/reports")}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
+          className="mx-5 mt-4 bg-white rounded-[24px] p-5 relative overflow-hidden cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
           style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
           <div className="absolute -top-[50px] -right-[30px] w-[160px] h-[160px] rounded-full pointer-events-none"
             style={{ background: "radial-gradient(circle, rgba(0,85,255,0.06) 0%, transparent 70%)" }} />
@@ -525,7 +532,13 @@ const PerformancePage = () => {
 
         {/* ── Performance Trend Chart ── */}
         {!loading && overallTrend.length > 1 && (
-          <div className="mx-5 mt-3 bg-white rounded-[24px] px-5 pt-5 pb-4"
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="Open reports page for detailed trend"
+            onClick={() => navigate("/reports")}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
+            className="mx-5 mt-3 bg-white rounded-[24px] px-5 pt-5 pb-4 cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
             style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
             <div className="text-[16px] font-bold" style={{ color: T1, letterSpacing: "-0.3px", marginBottom: 4 }}>Performance Trend</div>
             <div className="text-[11px] mb-4" style={{ color: T3 }}>Score progression across months</div>
@@ -559,7 +572,13 @@ const PerformancePage = () => {
 
         {/* ── AI Narrative Analysis ── */}
         {!loading && subjects.length > 0 && (
-          <div className="mx-5 mt-3 rounded-[24px] px-5 py-[18px] relative overflow-hidden"
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="Open reports page for full narrative"
+            onClick={() => navigate("/reports")}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
+            className="mx-5 mt-3 rounded-[24px] px-5 py-[18px] relative overflow-hidden cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
             style={{
               background: "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)",
               boxShadow: "0 8px 30px rgba(0,51,204,0.34), 0 0 0 0.5px rgba(255,255,255,0.14)",
@@ -841,7 +860,13 @@ const PerformancePage = () => {
         </div>
 
         {/* ── Overall Performance Hero ── */}
-        <div className="bg-white rounded-[24px] p-7 relative overflow-hidden mb-5"
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="Open reports page"
+          onClick={() => navigate("/reports")}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
+          className="bg-white rounded-[24px] p-7 relative overflow-hidden mb-5 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
           style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
           <div className="absolute -top-[60px] -right-[40px] w-[240px] h-[240px] rounded-full pointer-events-none"
             style={{ background: "radial-gradient(circle, rgba(0,85,255,0.06) 0%, transparent 70%)" }} />
@@ -960,7 +985,13 @@ const PerformancePage = () => {
 
             {/* Performance Trend chart (lg:col-span-3) */}
             {overallTrend.length > 1 ? (
-              <div className="lg:col-span-3 bg-white rounded-[24px] px-6 pt-6 pb-5"
+              <div
+                role="button"
+                tabIndex={0}
+                aria-label="Open reports page for detailed trend"
+                onClick={() => navigate("/reports")}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
+                className="lg:col-span-3 bg-white rounded-[24px] px-6 pt-6 pb-5 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
                 style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
                 <div className="text-[18px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Performance Trend</div>
                 <div className="text-[12px] mt-1 mb-4" style={{ color: T3 }}>Score progression across months</div>
@@ -995,7 +1026,13 @@ const PerformancePage = () => {
             )}
 
             {/* AI Narrative (lg:col-span-2) */}
-            <div className="lg:col-span-2 rounded-[24px] px-6 py-6 relative overflow-hidden"
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label="Open reports page for full narrative"
+              onClick={() => navigate("/reports")}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
+              className="lg:col-span-2 rounded-[24px] px-6 py-6 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
               style={{
                 background: "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)",
                 boxShadow: "0 8px 30px rgba(0,51,204,0.34), 0 0 0 0.5px rgba(255,255,255,0.14)",

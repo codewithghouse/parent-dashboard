@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { User, Clock, CheckCircle2, Loader2, Upload, FileCheck, X, FileText, Book, FlaskConical, Calculator, BarChart3, Target, Trophy, Send, Lightbulb, Sparkles, ChevronDown } from "lucide-react";
+import { User, Clock, CheckCircle2, Loader2, Upload, FileCheck, X, FileText, BarChart3, Target, Trophy, Send, Lightbulb, Sparkles, ChevronDown } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { db, storage } from "@/lib/firebase";
 import { collection, where, onSnapshot, addDoc, serverTimestamp, Unsubscribe } from "firebase/firestore";
@@ -7,13 +7,10 @@ import { scopedQuery } from "@/lib/scopedQuery";
 import { subscribeEnrollments } from "@/lib/enrollmentQuery";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { toast } from "sonner";
-import { PageHeader } from "@/components/ui/PageHeader";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 import { callAI } from "../ai/utils/callAI";
-
-const tabs = ["Pending", "Completed", "Overdue"];
 
 const AssignmentsPage = () => {
   const { studentData } = useAuth();
@@ -226,25 +223,73 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
     }
   };
 
-  const getSub = (aId: string) => submissions.find(s => 
+  const getSub = (aId: string) => submissions.find(s =>
     s.homeworkId === aId ||    // Parent dashboard saves here
     s.assignmentId === aId     // Fallback for older records
   );
 
-  const filteredAssignments = assignments.filter(a => {
-    const sub = getSub(a.id);
-    if (activeTab === 1) return !!sub;
-    if (activeTab === 2) return false; 
-    return !sub;
-  });
-
-  const getSubjectIcon = (title: string) => {
-     const t = title.toLowerCase();
-     if (t.includes('sci') || t.includes('chem')) return <FlaskConical className="w-8 h-8 text-amber-500" />;
-     if (t.includes('math') || t.includes('calc')) return <Calculator className="w-8 h-8 text-blue-500" />;
-     if (t.includes('eng') || t.includes('hist')) return <Book className="w-8 h-8 text-indigo-500" />;
-     return <FileText className="w-8 h-8 text-slate-400" />;
+  // ── Real term stats ────────────────────────────────────────────────────────
+  // Previously this page displayed hardcoded "93% Completion / 96% On-Time /
+  // 82% Avg Score" to every parent regardless of actual submissions — a
+  // materially misleading bug for a page parents trust. These are now derived
+  // from the live submissions list.
+  const parseDueForStats = (a: any): Date | null => {
+    const v = a?.dueDate || a?.due_date || a?.deadline || a?.due || a?.dueOn;
+    if (!v) return null;
+    if (typeof v?.toDate === "function") return v.toDate();
+    if (v?.seconds) return new Date(v.seconds * 1000);
+    if (typeof v === "string" || typeof v === "number") {
+      const d = new Date(v);
+      if (!isNaN(d.getTime())) return d;
+    }
+    return null;
   };
+  const toDateSafe = (v: any): Date | null => {
+    if (!v) return null;
+    if (typeof v?.toDate === "function") return v.toDate();
+    if (v?.seconds) return new Date(v.seconds * 1000);
+    if (typeof v === "string" || typeof v === "number") {
+      const d = new Date(v); return isNaN(d.getTime()) ? null : d;
+    }
+    return null;
+  };
+
+  const totalAssignments = assignments.length;
+  const completedAssignmentsCount = assignments.filter(a => !!getSub(a.id)).length;
+  const completionPct = totalAssignments === 0 ? null : Math.round((completedAssignmentsCount / totalAssignments) * 100);
+
+  // On-Time: fraction of completed submissions handed in on or before the
+  // assignment's due date. Only counts submissions whose assignment HAS a
+  // due date — assignments without deadlines can't be "on-time".
+  const datedCompletions = assignments
+    .map(a => ({ a, sub: getSub(a.id), due: parseDueForStats(a) }))
+    .filter(x => x.sub && x.due);
+  const onTimeCompletions = datedCompletions.filter(x => {
+    const subTime = toDateSafe(x.sub.timestamp || x.sub.submittedAt);
+    if (!subTime || !x.due) return false;
+    // end-of-day grace: a submission on the due date counts as on-time
+    const dueEod = new Date(x.due); dueEod.setHours(23, 59, 59, 999);
+    return subTime.getTime() <= dueEod.getTime();
+  }).length;
+  const onTimePct = datedCompletions.length === 0 ? null : Math.round((onTimeCompletions / datedCompletions.length) * 100);
+
+  // Avg Score: only when submissions carry a numeric grade/score. The current
+  // Cloud Firestore schema does NOT store grades on submissions, so this will
+  // almost always be null — we render "—" rather than fabricating "82%".
+  const gradedSubs = submissions.filter(s => {
+    const g = typeof s.grade === "number" ? s.grade : typeof s.score === "number" ? s.score : null;
+    return g != null && isFinite(g);
+  });
+  const avgScorePct = gradedSubs.length === 0
+    ? null
+    : Math.round(gradedSubs.reduce((acc, s) => acc + (typeof s.grade === "number" ? s.grade : s.score), 0) / gradedSubs.length);
+
+  // Display helpers — show "—" (honest empty) rather than 0%/NaN% when the
+  // dataset is empty, matching the rest of the parent dashboard's null-state
+  // conventions.
+  const completionDisplay = completionPct == null ? "—" : `${completionPct}%`;
+  const onTimeDisplay = onTimePct == null ? "—" : `${onTimePct}%`;
+  const avgScoreDisplay = avgScorePct == null ? "—" : `${avgScorePct}%`;
 
   /* ═══════════════════════════════════════════════════════════════
      MOBILE — Bright Blue Apple UI
@@ -361,9 +406,9 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
           {/* ── Stats Scroll (Completion / On-Time / Avg Score) ── */}
           <div className="flex gap-[10px] px-[22px] pt-4 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
             {[
-              { label: "Completion", value: "93%", color: GREEN, iconBg: "rgba(0,200,83,0.12)", iconBorder: "rgba(0,200,83,0.22)", icon: Target, bar: "linear-gradient(90deg, #00C853, #66EE99)", barPct: 93, glow: "rgba(0,200,83,0.14)" },
-              { label: "On-Time",    value: "96%", color: B1,    iconBg: "rgba(0,85,255,0.10)",   iconBorder: "rgba(0,85,255,0.18)",   icon: BarChart3, bar: `linear-gradient(90deg, ${B1}, ${B4})`, barPct: 96, glow: "rgba(0,85,255,0.10)" },
-              { label: "Avg Score",  value: "82%", color: VIOLET, iconBg: "rgba(107,33,232,0.10)", iconBorder: "rgba(107,33,232,0.20)", icon: Trophy, bar: "linear-gradient(90deg, #6B21E8, #A87FF8)", barPct: 82, glow: "rgba(107,33,232,0.10)" },
+              { label: "Completion", value: completionDisplay, color: GREEN, iconBg: "rgba(0,200,83,0.12)", iconBorder: "rgba(0,200,83,0.22)", icon: Target, bar: "linear-gradient(90deg, #00C853, #66EE99)", barPct: completionPct ?? 0, glow: "rgba(0,200,83,0.14)" },
+              { label: "On-Time",    value: onTimeDisplay,    color: B1,    iconBg: "rgba(0,85,255,0.10)",   iconBorder: "rgba(0,85,255,0.18)",   icon: BarChart3, bar: `linear-gradient(90deg, ${B1}, ${B4})`, barPct: onTimePct ?? 0, glow: "rgba(0,85,255,0.10)" },
+              { label: "Avg Score",  value: avgScoreDisplay,  color: VIOLET, iconBg: "rgba(107,33,232,0.10)", iconBorder: "rgba(107,33,232,0.20)", icon: Trophy, bar: "linear-gradient(90deg, #6B21E8, #A87FF8)", barPct: avgScorePct ?? 0, glow: "rgba(107,33,232,0.10)" },
             ].map(({ label, value, color, iconBg, iconBorder, icon: Icon, bar, barPct, glow }) => (
               <div key={label} className="bg-white rounded-[22px] px-[18px] py-4 min-w-[110px] flex-shrink-0 relative overflow-hidden active:scale-[0.96] transition-transform"
                 style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)", transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
@@ -457,10 +502,21 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
                 const accent = getRowAccent(idx);
                 const tag = tagForAssignment(a);
                 const d = parseDue(a);
+                // For completed items, opening the submitted file gives the
+                // parent an immediate, meaningful action instead of a silent
+                // no-op. For open items, the tap starts the submission flow.
+                const handleRowClick = () => {
+                  if (mySub?.fileUrl) { window.open(mySub.fileUrl, "_blank", "noopener,noreferrer"); return; }
+                  if (!mySub) openSubmit(a);
+                };
                 return (
                   <div key={a.id}
-                    onClick={() => !mySub && openSubmit(a)}
-                    className="bg-white rounded-[20px] p-4 flex items-center gap-[14px] relative overflow-hidden active:scale-[0.97] transition-transform cursor-pointer"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={mySub ? `View submission for ${a.title || "assignment"}` : `Submit ${a.title || "assignment"}`}
+                    onClick={handleRowClick}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleRowClick(); } }}
+                    className="bg-white rounded-[20px] p-4 flex items-center gap-[14px] relative overflow-hidden active:scale-[0.97] transition-transform cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
                     style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)", transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
                     <div className="absolute left-0 top-0 bottom-0 w-[3.5px] rounded-l-[2px]" style={{ background: accentBar(accent.cls) }} />
                     <div className="w-[42px] h-[42px] rounded-[14px] flex items-center justify-center shrink-0"
@@ -519,9 +575,13 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
                 const urgent = days <= 3;
                 return (
                   <div key={a.id}
-                    className="flex items-center gap-3 py-3 cursor-pointer"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Submit ${a.title || "assignment"}, due in ${days} days`}
+                    className="flex items-center gap-3 py-3 cursor-pointer active:bg-[#EEF4FF] transition-colors rounded-[12px] -mx-2 px-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
                     style={{ borderBottom: i < arr.length - 1 ? `0.5px solid ${SEP}` : "none" }}
-                    onClick={() => openSubmit(a)}>
+                    onClick={() => openSubmit(a)}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openSubmit(a); } }}>
                     <div className="w-[42px] h-[42px] rounded-[13px] flex flex-col items-center justify-center gap-[1px] shrink-0"
                       style={{
                         background: urgent ? "linear-gradient(135deg, #FF6600, #FFAA33)" : `linear-gradient(135deg, ${B1}, ${B2})`,
@@ -687,7 +747,7 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
                     onClick={() => fileInputRef.current?.click()}
                     className="w-full p-12 border-2 border-dashed border-slate-100 rounded-[2.5rem] bg-slate-50/50 hover:bg-slate-100 transition-all cursor-pointer flex flex-col items-center justify-center text-center group"
                   >
-                    <input type="file" ref={fileInputRef} className="hidden" accept=".pdf,.jpg,.png" onChange={(e) => {
+                    <input type="file" ref={fileInputRef} className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.txt" onChange={(e) => {
                       const file = e.target.files?.[0] || null;
                       setUploadFile(file);
                       if (file && selectedTask) generateInstantFeedback(selectedTask);
@@ -884,10 +944,12 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
         {/* ── Stats Row (4-col) ── */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
           {[
-            { label: "Completion", value: "93%", color: GREEN, iconBg: "rgba(0,200,83,0.12)", iconBdr: "rgba(0,200,83,0.22)", icon: Target, bar: "linear-gradient(90deg, #00C853, #66EE99)", barPct: 93, glow: "rgba(0,200,83,0.14)" },
-            { label: "On-Time",    value: "96%", color: B1,    iconBg: "rgba(0,85,255,0.10)",   iconBdr: "rgba(0,85,255,0.18)",   icon: BarChart3, bar: `linear-gradient(90deg, ${B1}, ${B4})`, barPct: 96, glow: "rgba(0,85,255,0.10)" },
-            { label: "Avg Score",  value: "82%", color: VIOLET, iconBg: "rgba(107,33,232,0.10)", iconBdr: "rgba(107,33,232,0.20)", icon: Trophy, bar: "linear-gradient(90deg, #6B21E8, #A87FF8)", barPct: 82, glow: "rgba(107,33,232,0.10)" },
-            { label: "Pending",    value: `${pendingListD.length}`, color: ORANGE, iconBg: "rgba(255,136,0,0.10)", iconBdr: "rgba(255,136,0,0.22)", icon: Clock, bar: "linear-gradient(90deg, #FF8800, #FFCC44)", barPct: 60, glow: "rgba(255,136,0,0.14)" },
+            { label: "Completion", value: completionDisplay, color: GREEN, iconBg: "rgba(0,200,83,0.12)", iconBdr: "rgba(0,200,83,0.22)", icon: Target, bar: "linear-gradient(90deg, #00C853, #66EE99)", barPct: completionPct ?? 0, glow: "rgba(0,200,83,0.14)" },
+            { label: "On-Time",    value: onTimeDisplay,    color: B1,    iconBg: "rgba(0,85,255,0.10)",   iconBdr: "rgba(0,85,255,0.18)",   icon: BarChart3, bar: `linear-gradient(90deg, ${B1}, ${B4})`, barPct: onTimePct ?? 0, glow: "rgba(0,85,255,0.10)" },
+            { label: "Avg Score",  value: avgScoreDisplay,  color: VIOLET, iconBg: "rgba(107,33,232,0.10)", iconBdr: "rgba(107,33,232,0.20)", icon: Trophy, bar: "linear-gradient(90deg, #6B21E8, #A87FF8)", barPct: avgScorePct ?? 0, glow: "rgba(107,33,232,0.10)" },
+            // Pending bar: share of total assignments still pending. Previously
+            // hardcoded to 60% regardless of real data.
+            { label: "Pending",    value: `${pendingListD.length}`, color: ORANGE, iconBg: "rgba(255,136,0,0.10)", iconBdr: "rgba(255,136,0,0.22)", icon: Clock, bar: "linear-gradient(90deg, #FF8800, #FFCC44)", barPct: totalAssignments === 0 ? 0 : Math.round((pendingListD.length / totalAssignments) * 100), glow: "rgba(255,136,0,0.14)" },
           ].map(({ label, value, color, iconBg, iconBdr, icon: Icon, bar, barPct, glow }) => (
             <div key={label} className="bg-white rounded-[22px] px-6 py-5 relative overflow-hidden"
               style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
@@ -973,9 +1035,21 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
                 const accent = getRowAccentD(idx);
                 const tag = tagForD(a);
                 const d = parseDueD(a);
+                // Whole-row activation: completed → opens uploaded file; open
+                // → starts submission. Inner buttons stopPropagation so they
+                // keep working independently.
+                const handleRowClick = () => {
+                  if (mySub?.fileUrl) { window.open(mySub.fileUrl, "_blank", "noopener,noreferrer"); return; }
+                  if (!mySub) { setSelectedTask(a); setInstantFeedback(null); setUploadFile(null); setStudentNote(""); setIsSubmitOpen(true); }
+                };
                 return (
                   <div key={a.id}
-                    className="bg-white rounded-[20px] p-5 flex items-center gap-5 relative overflow-hidden transition-transform hover:-translate-y-[1px]"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={mySub ? `View submission for ${a.title || "assignment"}` : `Submit ${a.title || "assignment"}`}
+                    onClick={handleRowClick}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleRowClick(); } }}
+                    className="bg-white rounded-[20px] p-5 flex items-center gap-5 relative overflow-hidden transition-all hover:-translate-y-[1px] hover:shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
                     style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
                     <div className="absolute left-0 top-0 bottom-0 w-[4px] rounded-l-[2px]" style={{ background: accent.bar }} />
 
@@ -1021,15 +1095,16 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
                       ) : (
                         <>
                           <button
-                            onClick={() => { setHintsTask(a); setHintDoubt(""); setHints([]); setHintIndex(0); setIsHintsOpen(true); }}
+                            onClick={(e) => { e.stopPropagation(); setHintsTask(a); setHintDoubt(""); setHints([]); setHintIndex(0); setIsHintsOpen(true); }}
                             className="w-10 h-10 rounded-[12px] flex items-center justify-center shrink-0 transition-transform hover:scale-105"
                             style={{ background: "rgba(255,136,0,0.10)", border: "0.5px solid rgba(255,136,0,0.22)" }}
                             title="Get AI Hints"
+                            aria-label="Get AI Hints"
                           >
                             <Lightbulb className="w-4 h-4" style={{ color: ORANGE }} strokeWidth={2.2} />
                           </button>
                           <button
-                            onClick={() => { setSelectedTask(a); setInstantFeedback(null); setUploadFile(null); setStudentNote(""); setIsSubmitOpen(true); }}
+                            onClick={(e) => { e.stopPropagation(); setSelectedTask(a); setInstantFeedback(null); setUploadFile(null); setStudentNote(""); setIsSubmitOpen(true); }}
                             className="h-10 px-5 rounded-[12px] flex items-center gap-2 text-[13px] font-bold text-white transition-transform hover:scale-[1.02]"
                             style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: SH_BTN, letterSpacing: "-0.1px" }}
                           >
@@ -1060,11 +1135,16 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
                   const d: Date = x.d;
                   const days = daysUntilD(d);
                   const urgent = days <= 3;
+                  const openSubmitDesktop = () => { setSelectedTask(a); setInstantFeedback(null); setUploadFile(null); setStudentNote(""); setIsSubmitOpen(true); };
                   return (
                     <div key={a.id}
-                      className="flex items-center gap-3 py-3 cursor-pointer"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Submit ${a.title || "assignment"}, due in ${days} days`}
+                      className="flex items-center gap-3 py-3 cursor-pointer transition-colors hover:bg-[#F5F9FF] rounded-[12px] -mx-2 px-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
                       style={{ borderBottom: i < arr.length - 1 ? `0.5px solid ${SEP}` : "none" }}
-                      onClick={() => { setSelectedTask(a); setInstantFeedback(null); setUploadFile(null); setStudentNote(""); setIsSubmitOpen(true); }}>
+                      onClick={openSubmitDesktop}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openSubmitDesktop(); } }}>
                       <div className="w-[46px] h-[46px] rounded-[14px] flex flex-col items-center justify-center gap-[1px] shrink-0"
                         style={{
                           background: urgent ? "linear-gradient(135deg, #FF6600, #FFAA33)" : `linear-gradient(135deg, ${B1}, ${B2})`,
@@ -1253,7 +1333,7 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
                          onClick={() => fileInputRef.current?.click()}
                          className="w-full p-12 border-2 border-dashed border-slate-100 rounded-[2.5rem] bg-slate-50/50 hover:bg-slate-100 transition-all cursor-pointer flex flex-col items-center justify-center text-center group"
                        >
-                          <input type="file" ref={fileInputRef} className="hidden" accept=".pdf,.jpg,.png" onChange={(e) => {
+                          <input type="file" ref={fileInputRef} className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.txt" onChange={(e) => {
                             const file = e.target.files?.[0] || null;
                             setUploadFile(file);
                             if (file && selectedTask) generateInstantFeedback(selectedTask);
