@@ -616,8 +616,8 @@ const DashboardPage = () => {
     const ROSE = "#FF3355";
     const ROSE_S = "rgba(255,51,85,0.10)";
     const IND_DARK_GRAD = "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)";
-    const DK = IND_DARK_GRAD;
-    const DK_CELL = "rgba(0,12,48,0.42)";
+    const DK = "linear-gradient(140deg, #0A0A0F 0%, #16161F 48%, #1F1F2A 100%)";
+    const DK_CELL = "rgba(255,255,255,0.03)";
     const SH = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.09), 0 10px 28px rgba(0,85,255,0.11)";
     const SH_LG = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 20px 48px rgba(0,85,255,0.14)";
     const SH_BTN = "0 4px 14px rgba(0,85,255,0.32), 0 1px 4px rgba(0,85,255,0.18)";
@@ -773,15 +773,15 @@ const DashboardPage = () => {
                   aria-label="Open attendance page"
                   onClick={() => navigate("/attendance")}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/attendance"); } }}
-                  className="p-[18px] flex flex-col gap-[10px] cursor-pointer active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50" style={{ background: DK_CELL }}>
+                  className="p-[14px] flex flex-col gap-[8px] cursor-pointer active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50" style={{ background: DK_CELL }}>
                   <span className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Attendance</span>
-                  <div className="flex items-center gap-[10px]">
-                    <DonutRing pct={liveStats.attendance ?? 0} color={attOnTrack ? GREEN : ORANGE} size={56} stroke={5} />
+                  <div className="flex items-center gap-[8px]">
+                    <DonutRing pct={liveStats.attendance ?? 0} color={attOnTrack ? GREEN : "#FF453A"} size={50} stroke={5} />
                     <div className="flex flex-col gap-[3px]">
                       <span className="text-[9px]" style={{ color: "rgba(255,255,255,0.28)" }}>Target</span>
                       <span className="text-[11px] font-semibold" style={{ color: "rgba(255,255,255,0.58)" }}>85%</span>
                       <div className="w-[52px] h-[3px] rounded-full mt-[2px] overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
-                        <div className="h-full rounded-full" style={{ width: `${Math.min(liveStats.attendance ?? 0, 100)}%`, background: attOnTrack ? GREEN : ORANGE }} />
+                        <div className="h-full rounded-full" style={{ width: `${Math.min(liveStats.attendance ?? 0, 100)}%`, background: attOnTrack ? GREEN : "#FF453A" }} />
                       </div>
                       <div className="inline-flex items-center gap-[3px] px-[9px] py-[3px] rounded-full mt-1 w-fit text-[10px] font-bold"
                         style={{
@@ -802,10 +802,10 @@ const DashboardPage = () => {
                   aria-label="Open performance page"
                   onClick={() => navigate("/performance")}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/performance"); } }}
-                  className="p-[18px] flex flex-col gap-[10px] cursor-pointer active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50" style={{ background: DK_CELL }}>
+                  className="p-[14px] flex flex-col gap-[8px] cursor-pointer active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50" style={{ background: DK_CELL }}>
                   <span className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Avg Score</span>
-                  <div className="flex items-center gap-[10px]">
-                    <DonutRing pct={liveStats.avgScore} color={liveStats.avgScore >= 80 ? GREEN : liveStats.avgScore >= 60 ? IND3 : "#FF6961"} size={56} stroke={5} />
+                  <div className="flex items-center gap-[8px]">
+                    <DonutRing pct={liveStats.avgScore} color={liveStats.avgScore >= 80 ? GREEN : liveStats.avgScore >= 60 ? IND3 : "#FF6961"} size={50} stroke={5} />
                     <div>
                       <div className="inline-flex items-center px-[9px] py-[3px] rounded-full text-[10px] font-bold"
                         style={{
@@ -819,8 +819,8 @@ const DashboardPage = () => {
                         {["C", "B", "A", "A+"].map(g => {
                           const active = liveStats.avgScore >= (g === "A+" ? 90 : g === "A" ? 80 : g === "B" ? 60 : 0);
                           return (
-                            <div key={g} className="w-[26px] h-[26px] rounded-[7px] flex items-center justify-center text-[11px] font-bold"
-                              style={{ background: active ? "rgba(232,51,74,0.22)" : "rgba(255,255,255,0.05)", color: active ? "#FF85AA" : "rgba(255,255,255,0.18)" }}>
+                            <div key={g} className="w-[22px] h-[22px] rounded-[6px] flex items-center justify-center text-[10px] font-bold"
+                              style={{ background: active ? "rgba(0,85,255,0.20)" : "rgba(255,255,255,0.05)", color: active ? "#7FAEFF" : "rgba(255,255,255,0.18)" }}>
                               {g}
                             </div>
                           );
@@ -837,17 +837,17 @@ const DashboardPage = () => {
                   aria-label="Open assignments page"
                   onClick={() => navigate("/assignments")}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/assignments"); } }}
-                  className="p-[18px] flex flex-col gap-[10px] cursor-pointer active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50" style={{ background: DK_CELL }}>
+                  className="p-[14px] flex flex-col gap-[8px] cursor-pointer active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50" style={{ background: DK_CELL }}>
                   <span className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Assignments</span>
-                  <div className="text-[34px] font-bold leading-none text-white" style={{ letterSpacing: "-1.2px" }}>{pendingDisplay}</div>
+                  <div className="text-[28px] font-bold leading-none text-white" style={{ letterSpacing: "-1px" }}>{pendingDisplay}</div>
                   <div className="text-[11px]" style={{ color: "rgba(255,255,255,0.32)", letterSpacing: "-0.1px" }}>
                     {liveStats.pending === null ? "no data" : "pending"}
                   </div>
                   <div className="inline-flex items-center gap-[3px] px-[9px] py-[3px] rounded-full w-fit text-[10px] font-bold"
                     style={{
-                      background: liveStats.pending === null ? "rgba(255,255,255,0.05)" : noPending ? "rgba(18,192,78,0.15)" : "rgba(245,160,0,0.15)",
-                      color: liveStats.pending === null ? "rgba(180,180,230,0.5)" : noPending ? "#38DC78" : "#F5A000",
-                      border: `0.5px solid ${liveStats.pending === null ? "rgba(180,180,230,0.10)" : noPending ? "rgba(18,192,78,0.20)" : "rgba(245,160,0,0.20)"}`
+                      background: liveStats.pending === null ? "rgba(255,255,255,0.05)" : noPending ? "rgba(18,192,78,0.15)" : "rgba(0,85,255,0.15)",
+                      color: liveStats.pending === null ? "rgba(180,180,230,0.5)" : noPending ? "#38DC78" : "#7FAEFF",
+                      border: `0.5px solid ${liveStats.pending === null ? "rgba(180,180,230,0.10)" : noPending ? "rgba(18,192,78,0.20)" : "rgba(0,85,255,0.25)"}`
                     }}>
                     {liveStats.pending === null ? "No assignments yet" : noPending ? "✓ All Done" : `${liveStats.pending} to complete`}
                   </div>
@@ -860,9 +860,9 @@ const DashboardPage = () => {
                   aria-label="Open tests page"
                   onClick={() => navigate("/tests")}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/tests"); } }}
-                  className="p-[18px] flex flex-col gap-[10px] cursor-pointer active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50" style={{ background: DK_CELL }}>
+                  className="p-[14px] flex flex-col gap-[8px] cursor-pointer active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50" style={{ background: DK_CELL }}>
                   <span className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Recent Test</span>
-                  <div className="text-[34px] font-bold leading-none text-white" style={{ letterSpacing: "-1.2px" }}>
+                  <div className="text-[28px] font-bold leading-none text-white" style={{ letterSpacing: "-1px" }}>
                     {liveStats.recentGrade !== "N/A" ? liveStats.recentGrade : "—"}
                   </div>
                   <div className="text-[11px] truncate" style={{ color: "rgba(255,255,255,0.32)", letterSpacing: "-0.1px" }}>{liveStats.recentSubject}</div>
@@ -874,8 +874,8 @@ const DashboardPage = () => {
                       const chipIdx = chipMap[g];
                       const active = gradeIdx >= 0 && chipIdx <= gradeIdx;
                       return (
-                        <div key={g} className="w-[26px] h-[26px] rounded-[7px] flex items-center justify-center text-[11px] font-bold"
-                          style={{ background: active ? "rgba(232,51,74,0.22)" : "rgba(255,255,255,0.05)", color: active ? "#FF85AA" : "rgba(255,255,255,0.18)" }}>
+                        <div key={g} className="w-[22px] h-[22px] rounded-[6px] flex items-center justify-center text-[10px] font-bold"
+                          style={{ background: active ? "rgba(0,85,255,0.20)" : "rgba(255,255,255,0.05)", color: active ? "#7FAEFF" : "rgba(255,255,255,0.18)" }}>
                           {g}
                         </div>
                       );
@@ -1248,8 +1248,8 @@ const DashboardPage = () => {
     const ROSE = "#FF3355";
     const ROSE_S = "rgba(255,51,85,0.10)";
     const IND_DARK_GRAD = "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)";
-    const DK = IND_DARK_GRAD;
-    const DK_CELL = "rgba(0,12,48,0.42)";
+    const DK = "linear-gradient(140deg, #0A0A0F 0%, #16161F 48%, #1F1F2A 100%)";
+    const DK_CELL = "rgba(255,255,255,0.03)";
     const SH = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.09), 0 10px 28px rgba(0,85,255,0.11)";
     const SH_LG = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 20px 48px rgba(0,85,255,0.14)";
     const SH_BTN = "0 4px 14px rgba(0,85,255,0.32), 0 1px 4px rgba(0,85,255,0.18)";
@@ -1306,7 +1306,7 @@ const DashboardPage = () => {
               aria-label="Open performance page"
               onClick={() => navigate("/performance")}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/performance"); } }}
-              className="lg:col-span-3 bg-white rounded-[28px] p-8 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+              className="lg:col-span-3 bg-white rounded-[28px] p-8 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-1 hover:scale-[1.02] hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
               style={{ boxShadow: SH_LG, border: `0.5px solid ${IND_BDR}` }}>
               <div className="absolute -top-[80px] -right-[60px] w-[260px] h-[260px] rounded-full pointer-events-none"
                 style={{ background: "radial-gradient(circle, rgba(0,85,255,0.05) 0%, transparent 70%)" }} />
@@ -1366,7 +1366,7 @@ const DashboardPage = () => {
               aria-label="Open my child profile"
               onClick={() => navigate("/my-child")}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/my-child"); } }}
-              className="lg:col-span-2 rounded-[28px] p-7 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+              className="lg:col-span-2 rounded-[28px] p-7 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-1 hover:scale-[1.02] hover:shadow-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
               style={{
                 background: IND_DARK_GRAD,
                 boxShadow: "0 10px 36px rgba(0,85,255,0.22), 0 0 0 0.5px rgba(255,255,255,0.18)",
@@ -1417,7 +1417,7 @@ const DashboardPage = () => {
                 aria-label={`Open ${label} page`}
                 onClick={() => navigate(route)}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(route); } }}
-                className="bg-white rounded-[22px] px-5 pt-5 pb-5 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+                className="bg-white rounded-[22px] px-5 pt-5 pb-5 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-1 hover:scale-[1.02] hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
                 style={{ boxShadow: SH, border: `0.5px solid ${IND_BDR}`, transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
                 <div className="absolute -top-[18px] -right-[18px] w-[90px] h-[90px] rounded-full pointer-events-none"
                   style={{ background: `radial-gradient(circle, ${glow} 0%, transparent 70%)`, opacity: 0.55 }} />
@@ -1478,7 +1478,7 @@ const DashboardPage = () => {
                         <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.28)" }}>Target</span>
                         <span className="text-[12px] font-semibold" style={{ color: "rgba(255,255,255,0.58)" }}>85%</span>
                         <div className="w-[60px] h-[3px] rounded-full mt-1 overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
-                          <div className="h-full rounded-full" style={{ width: `${Math.min(liveStats.attendance ?? 0, 100)}%`, background: attOnTrack ? GREEN : ORANGE }} />
+                          <div className="h-full rounded-full" style={{ width: `${Math.min(liveStats.attendance ?? 0, 100)}%`, background: attOnTrack ? GREEN : "#FF453A" }} />
                         </div>
                       </div>
                     </div>
@@ -1517,7 +1517,7 @@ const DashboardPage = () => {
                             const active = liveStats.avgScore >= (g === "A+" ? 90 : g === "A" ? 80 : g === "B" ? 60 : 0);
                             return (
                               <div key={g} className="w-[28px] h-[28px] rounded-[8px] flex items-center justify-center text-[11px] font-bold"
-                                style={{ background: active ? "rgba(232,51,74,0.22)" : "rgba(255,255,255,0.05)", color: active ? "#FF85AA" : "rgba(255,255,255,0.18)" }}>
+                                style={{ background: active ? "rgba(0,85,255,0.20)" : "rgba(255,255,255,0.05)", color: active ? "#7FAEFF" : "rgba(255,255,255,0.18)" }}>
                                 {g}
                               </div>
                             );
@@ -1544,7 +1544,7 @@ const DashboardPage = () => {
                       style={{
                         background: liveStats.pending === null ? "rgba(255,255,255,0.05)" : noPending ? "rgba(18,192,78,0.15)" : "rgba(245,160,0,0.15)",
                         color: liveStats.pending === null ? "rgba(180,180,230,0.5)" : noPending ? "#38DC78" : "#F5A000",
-                        border: `0.5px solid ${liveStats.pending === null ? "rgba(180,180,230,0.10)" : noPending ? "rgba(18,192,78,0.20)" : "rgba(245,160,0,0.20)"}`
+                        border: `0.5px solid ${liveStats.pending === null ? "rgba(180,180,230,0.10)" : noPending ? "rgba(18,192,78,0.20)" : "rgba(0,85,255,0.25)"}`
                       }}>
                       {liveStats.pending === null ? "No assignments yet" : noPending ? "✓ All Done" : `${liveStats.pending} to complete`}
                     </div>
@@ -1572,7 +1572,7 @@ const DashboardPage = () => {
                         const active = gradeIdx >= 0 && chipIdx <= gradeIdx;
                         return (
                           <div key={g} className="w-[28px] h-[28px] rounded-[8px] flex items-center justify-center text-[11px] font-bold"
-                            style={{ background: active ? "rgba(232,51,74,0.22)" : "rgba(255,255,255,0.05)", color: active ? "#FF85AA" : "rgba(255,255,255,0.18)" }}>
+                            style={{ background: active ? "rgba(0,85,255,0.20)" : "rgba(255,255,255,0.05)", color: active ? "#7FAEFF" : "rgba(255,255,255,0.18)" }}>
                             {g}
                           </div>
                         );
@@ -1610,7 +1610,7 @@ const DashboardPage = () => {
               aria-label="Open alerts page"
               onClick={() => navigate("/alerts")}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/alerts"); } }}
-              className="bg-white rounded-[22px] p-6 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+              className="bg-white rounded-[22px] p-6 cursor-pointer transition-all hover:-translate-y-1 hover:scale-[1.02] hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
               style={{ boxShadow: SH, border: `0.5px solid ${IND_BDR}` }}>
               <h3 className="text-[18px] font-bold mb-5" style={{ color: T1, letterSpacing: "-0.4px" }}>Recent Alerts</h3>
               {recentAlerts.length > 0 ? (
@@ -1647,7 +1647,7 @@ const DashboardPage = () => {
               aria-label="Open reports page"
               onClick={() => navigate("/reports")}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
-              className="bg-white rounded-[22px] px-6 py-6 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+              className="bg-white rounded-[22px] px-6 py-6 cursor-pointer transition-all hover:-translate-y-1 hover:scale-[1.02] hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
               style={{ boxShadow: SH, border: `0.5px solid ${IND_BDR}` }}>
               <div className="flex items-center justify-between gap-3 mb-[14px]">
                 <div className="flex items-center gap-3">
@@ -1810,7 +1810,7 @@ const DashboardPage = () => {
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 {weeklyReport.improvement_tips.map((t: { tip: string; reason: string }, i: number) => (
-                  <div key={i} className="bg-white rounded-[20px] px-5 py-5 flex items-start gap-4 transition-transform hover:-translate-y-0.5"
+                  <div key={i} className="bg-white rounded-[20px] px-5 py-5 flex items-start gap-4 transition-transform hover:-translate-y-1 hover:scale-[1.02]"
                     style={{ boxShadow: SH, border: `0.5px solid ${IND_BDR}` }}>
                     <div className="w-[46px] h-[46px] rounded-[14px] flex items-center justify-center shrink-0 text-[22px]"
                       style={{

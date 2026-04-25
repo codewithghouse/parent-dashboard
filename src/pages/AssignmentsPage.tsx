@@ -737,97 +737,130 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
           </SheetContent>
         </Sheet>
 
-        {/* ── SUBMISSION SHEET (shared) ── */}
+        {/* ── SUBMISSION SHEET (Bright Blue Apple UI) ── */}
         <Sheet open={isSubmitOpen} onOpenChange={setIsSubmitOpen}>
-          <SheetContent side="right" className="w-full sm:max-w-xl p-0 border-l border-slate-100 bg-white">
-            <div className="h-full flex flex-col">
-              <div className="bg-slate-900 p-10 text-white text-left">
-                <SheetHeader className="text-left">
-                  <SheetTitle className="text-white text-3xl font-black tracking-tight leading-none mb-2">Subject Submission</SheetTitle>
-                  <SheetDescription className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Portal Identification: {studentData?.id?.substring(0,10)}</SheetDescription>
+          <SheetContent side="right" className="w-full sm:max-w-xl p-0 border-0" style={{ background: BG }}>
+            <div className="h-full flex flex-col" style={{ fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif" }}>
+              {/* Hero header — dark navy gradient */}
+              <div className="px-6 pt-7 pb-6 text-white text-left relative overflow-hidden"
+                style={{ background: "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)" }}>
+                <div className="absolute -top-10 -right-7 w-[200px] h-[200px] rounded-full pointer-events-none"
+                  style={{ background: "radial-gradient(circle, rgba(255,255,255,0.14) 0%, transparent 65%)" }} />
+                <div className="absolute inset-0 pointer-events-none" style={{
+                  backgroundImage: "linear-gradient(rgba(255,255,255,0.014) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.014) 1px, transparent 1px)",
+                  backgroundSize: "24px 24px"
+                }} />
+                <SheetHeader className="text-left relative z-10">
+                  <SheetTitle className="text-white text-[26px] font-bold tracking-tight leading-none mb-2" style={{ letterSpacing: "-0.6px" }}>
+                    Submit Assignment
+                  </SheetTitle>
+                  <SheetDescription className="font-bold uppercase tracking-[0.10em] text-[10px]" style={{ color: "rgba(255,255,255,0.55)" }}>
+                    ID: {studentData?.id?.substring(0, 10)}
+                  </SheetDescription>
                 </SheetHeader>
               </div>
 
-              <div className="flex-1 p-10 space-y-10 overflow-y-auto">
-                <div className="space-y-4 text-left">
-                  <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Target Task</p>
-                    <h4 className="text-xl font-black text-slate-800">{selectedTask?.title}</h4>
-                  </div>
+              <div className="flex-1 px-5 py-5 space-y-5 overflow-y-auto" style={{ background: BG }}>
+                {/* Target task card */}
+                <div className="bg-white rounded-[22px] px-5 py-[18px]"
+                  style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.10em] mb-2" style={{ color: T4 }}>Target Task</p>
+                  <h4 className="text-[17px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>{selectedTask?.title}</h4>
                 </div>
 
-                <div className="space-y-6 text-left">
-                  <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Academic Artifact (PDF/JPG)</label>
+                {/* File upload */}
+                <div className="space-y-3 text-left">
+                  <label className="text-[10px] font-bold uppercase tracking-[0.10em] ml-1 block" style={{ color: T4 }}>
+                    Academic Artifact (PDF/JPG)
+                  </label>
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-full p-12 border-2 border-dashed border-slate-100 rounded-[2.5rem] bg-slate-50/50 hover:bg-slate-100 transition-all cursor-pointer flex flex-col items-center justify-center text-center group"
-                  >
+                    className="w-full px-5 py-8 rounded-[24px] cursor-pointer flex flex-col items-center justify-center text-center transition-all active:scale-[0.98]"
+                    style={{
+                      background: "white",
+                      border: "1.5px dashed rgba(0,85,255,0.25)",
+                      boxShadow: SH,
+                      transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)"
+                    }}>
                     <input type="file" ref={fileInputRef} className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.txt" onChange={(e) => {
                       const file = e.target.files?.[0] || null;
                       setUploadFile(file);
                       if (file && selectedTask) generateInstantFeedback(selectedTask);
                     }} />
                     {uploadFile ? (
-                      <div className="flex items-center gap-4 bg-white p-4 rounded-2xl shadow-xl border border-slate-50 animate-in zoom-in-95">
-                        <FileText className="w-10 h-10 text-indigo-600" />
-                        <div className="text-left"><p className="text-xs font-black text-slate-800">{uploadFile.name}</p></div>
-                        <button onClick={(e) => { e.stopPropagation(); setUploadFile(null); }} className="p-2 text-rose-400"><X className="w-4 h-4" /></button>
+                      <div className="flex items-center gap-3 px-3 py-3 rounded-[14px] animate-in zoom-in-95 w-full"
+                        style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.12)" }}>
+                        <div className="w-11 h-11 rounded-[12px] flex items-center justify-center shrink-0"
+                          style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: "0 2px 8px rgba(0,85,255,0.30)" }}>
+                          <FileText className="w-5 h-5 text-white" />
+                        </div>
+                        <p className="text-[13px] font-bold flex-1 truncate text-left" style={{ color: T1 }}>{uploadFile.name}</p>
+                        <button onClick={(e) => { e.stopPropagation(); setUploadFile(null); }} className="p-2" style={{ color: RED }} aria-label="Remove file">
+                          <X className="w-4 h-4" />
+                        </button>
                       </div>
                     ) : (
-                      <div className="flex flex-col items-center">
-                        <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center mb-4 shadow-sm border border-slate-50"><Upload className="w-8 h-8 text-slate-300" /></div>
-                        <p className="text-sm font-black text-slate-400 group-hover:text-slate-600 transition-colors">Select Submission File</p>
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="w-14 h-14 rounded-[16px] flex items-center justify-center"
+                          style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: "0 3px 12px rgba(0,85,255,0.32)" }}>
+                          <Upload className="w-6 h-6 text-white" strokeWidth={2.2} />
+                        </div>
+                        <p className="text-[14px] font-bold" style={{ color: T2, letterSpacing: "-0.2px" }}>Tap to choose file</p>
+                        <p className="text-[11px]" style={{ color: T3 }}>PDF, JPG, PNG, DOC up to 10 MB</p>
                       </div>
                     )}
                   </div>
                 </div>
 
+                {/* AI Pre-Submission Feedback */}
                 {(generatingFeedback || instantFeedback) && (
-                  <div className="rounded-3xl overflow-hidden border border-indigo-100">
-                    <div className="bg-gradient-to-r from-indigo-500 to-violet-500 px-5 py-3 flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-white" />
-                      <span className="text-[10px] font-black text-white uppercase tracking-widest">AI Pre-Submission Feedback</span>
+                  <div className="rounded-[22px] overflow-hidden"
+                    style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                    <div className="px-5 py-3 flex items-center gap-2 relative overflow-hidden"
+                      style={{ background: "linear-gradient(135deg, #001888 0%, #0033CC 50%, #0055FF 100%)" }}>
+                      <Sparkles className="w-4 h-4 text-white relative z-10" />
+                      <span className="text-[10px] font-bold text-white uppercase tracking-[0.12em] relative z-10">AI Pre-Submission Feedback</span>
                     </div>
                     {generatingFeedback ? (
-                      <div className="p-5 flex items-center gap-3 bg-indigo-50">
-                        <Loader2 className="w-4 h-4 text-indigo-500 animate-spin flex-shrink-0" />
-                        <p className="text-xs text-indigo-600 font-semibold">Analysing your submission...</p>
+                      <div className="p-5 flex items-center gap-3 bg-white">
+                        <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" style={{ color: B1 }} />
+                        <p className="text-[12px] font-semibold" style={{ color: T2 }}>Analysing your submission...</p>
                       </div>
                     ) : instantFeedback?.error ? (
-                      <div className="p-5 bg-rose-50 flex items-start gap-3">
-                        <Sparkles className="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5" />
-                        <p className="text-xs text-rose-700 font-semibold">{instantFeedback.error}</p>
+                      <div className="p-5 flex items-start gap-3 bg-white">
+                        <Sparkles className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: RED }} />
+                        <p className="text-[12px] font-semibold" style={{ color: RED }}>{instantFeedback.error}</p>
                       </div>
                     ) : instantFeedback && (
                       <div className="p-5 space-y-4 bg-white">
                         <div className="flex items-center gap-3">
                           <span className="text-2xl">{instantFeedback.emoji || "✨"}</span>
-                          <p className="text-sm font-bold text-slate-800">{instantFeedback.overall}</p>
+                          <p className="text-[14px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>{instantFeedback.overall}</p>
                         </div>
                         <div className="grid grid-cols-1 gap-3">
-                          <div className="bg-emerald-50 rounded-2xl p-4">
-                            <p className="text-[9px] font-black text-emerald-700 uppercase tracking-widest mb-2">Strengths</p>
+                          <div className="rounded-[16px] p-4" style={{ background: "rgba(0,200,83,0.08)", border: "0.5px solid rgba(0,200,83,0.20)" }}>
+                            <p className="text-[9px] font-bold uppercase tracking-[0.12em] mb-2" style={{ color: "#007830" }}>Strengths</p>
                             {(instantFeedback.strengths || []).map((s: string, i: number) => (
                               <div key={i} className="flex items-start gap-2 mb-1">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" />
-                                <p className="text-xs text-slate-600">{s}</p>
+                                <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: GREEN }} />
+                                <p className="text-[12px]" style={{ color: T2 }}>{s}</p>
                               </div>
                             ))}
                           </div>
-                          <div className="bg-amber-50 rounded-2xl p-4">
-                            <p className="text-[9px] font-black text-amber-700 uppercase tracking-widest mb-2">Room to Improve</p>
+                          <div className="rounded-[16px] p-4" style={{ background: "rgba(255,136,0,0.08)", border: "0.5px solid rgba(255,136,0,0.22)" }}>
+                            <p className="text-[9px] font-bold uppercase tracking-[0.12em] mb-2" style={{ color: "#AA5500" }}>Room to Improve</p>
                             {(instantFeedback.improvements || []).map((s: string, i: number) => (
                               <div key={i} className="flex items-start gap-2 mb-1">
-                                <ChevronDown className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
-                                <p className="text-xs text-slate-600">{s}</p>
+                                <ChevronDown className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: ORANGE }} />
+                                <p className="text-[12px]" style={{ color: T2 }}>{s}</p>
                               </div>
                             ))}
                           </div>
                         </div>
                         {instantFeedback.tip && (
-                          <div className="flex items-start gap-2 bg-slate-50 rounded-2xl p-3">
-                            <Lightbulb className="w-3.5 h-3.5 text-slate-500 flex-shrink-0 mt-0.5" />
-                            <p className="text-xs text-slate-500 italic">{instantFeedback.tip}</p>
+                          <div className="flex items-start gap-2 rounded-[14px] p-3" style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                            <Lightbulb className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: B1 }} />
+                            <p className="text-[12px] italic" style={{ color: T3 }}>{instantFeedback.tip}</p>
                           </div>
                         )}
                       </div>
@@ -835,25 +868,41 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
                   </div>
                 )}
 
-                <div className="space-y-4 text-left">
-                  <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Teacher Notes (Optional)</label>
+                {/* Teacher notes */}
+                <div className="space-y-3 text-left">
+                  <label className="text-[10px] font-bold uppercase tracking-[0.10em] ml-1 block" style={{ color: T4 }}>
+                    Teacher Notes (Optional)
+                  </label>
                   <textarea
                     rows={4}
                     value={studentNote}
                     onChange={(e) => setStudentNote(e.target.value)}
-                    className="w-full p-6 bg-slate-50 border border-slate-100 rounded-3xl text-sm font-medium text-slate-600 focus:bg-white focus:ring-4 focus:ring-slate-100 outline-none transition-all resize-none placeholder:text-slate-300"
+                    className="w-full p-4 rounded-[18px] text-[13px] font-medium outline-none transition-all resize-none focus:ring-2 focus:ring-[#0055FF]/30"
+                    style={{
+                      background: "white",
+                      color: T1,
+                      border: "0.5px solid rgba(0,85,255,0.12)",
+                      boxShadow: SH,
+                    }}
                     placeholder="Add any specific details for your teacher here..."
                   />
                 </div>
               </div>
 
-              <div className="p-10 border-t border-slate-100">
+              {/* Submit button */}
+              <div className="px-5 pt-3 pb-5" style={{ background: BG, borderTop: "0.5px solid rgba(0,85,255,0.07)" }}>
                 <button
                   onClick={handleOfficialSubmission}
                   disabled={submittingFile || !uploadFile}
-                  className="w-full py-6 bg-slate-900 text-white rounded-[2rem] text-[11px] font-black uppercase tracking-[0.3em] hover:bg-slate-800 shadow-2xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-4"
-                >
-                  {submittingFile ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Send className="w-5 h-5" /> Confirm Academic Hand-in</>}
+                  className="w-full py-[18px] rounded-[20px] text-[13px] font-bold uppercase tracking-[0.16em] transition-all active:scale-[0.97] disabled:opacity-40 flex items-center justify-center gap-3 text-white relative overflow-hidden">
+                  <span className="absolute inset-0" style={{
+                    background: "linear-gradient(135deg, #001888 0%, #0033CC 50%, #0055FF 100%)",
+                    boxShadow: "0 6px 22px rgba(0,85,255,0.42), 0 2px 6px rgba(0,85,255,0.22)"
+                  }} />
+                  <span className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.13) 0%, transparent 52%)" }} />
+                  <span className="relative z-10 flex items-center gap-3">
+                    {submittingFile ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Send className="w-4 h-4" /> Submit Assignment</>}
+                  </span>
                 </button>
               </div>
             </div>
@@ -1336,128 +1385,176 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
           </SheetContent>
         </Sheet>
 
-        {/* SUBMISSION CENTER PANEL */}
+        {/* SUBMISSION CENTER PANEL — Bright Blue Apple UI */}
         <Sheet open={isSubmitOpen} onOpenChange={setIsSubmitOpen}>
-           <SheetContent side="right" className="w-full sm:max-w-xl p-0 border-l border-slate-100 bg-white">
-              <div className="h-full flex flex-col">
-                 <div className="bg-slate-900 p-10 text-white text-left">
-                    <SheetHeader className="text-left">
-                       <SheetTitle className="text-white text-3xl font-black tracking-tight leading-none mb-2">Subject Submission</SheetTitle>
-                       <SheetDescription className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Portal Identification: {studentData?.id?.substring(0,10)}</SheetDescription>
-                    </SheetHeader>
-                 </div>
+          <SheetContent side="right" className="w-full sm:max-w-xl p-0 border-0" style={{ background: BG }}>
+            <div className="h-full flex flex-col" style={{ fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif" }}>
+              {/* Hero header */}
+              <div className="px-8 pt-8 pb-7 text-white text-left relative overflow-hidden"
+                style={{ background: "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)" }}>
+                <div className="absolute -top-12 -right-8 w-[240px] h-[240px] rounded-full pointer-events-none"
+                  style={{ background: "radial-gradient(circle, rgba(255,255,255,0.14) 0%, transparent 65%)" }} />
+                <div className="absolute inset-0 pointer-events-none" style={{
+                  backgroundImage: "linear-gradient(rgba(255,255,255,0.014) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.014) 1px, transparent 1px)",
+                  backgroundSize: "24px 24px"
+                }} />
+                <SheetHeader className="text-left relative z-10">
+                  <SheetTitle className="text-white text-[30px] font-bold tracking-tight leading-none mb-2" style={{ letterSpacing: "-0.7px" }}>
+                    Submit Assignment
+                  </SheetTitle>
+                  <SheetDescription className="font-bold uppercase tracking-[0.10em] text-[10px]" style={{ color: "rgba(255,255,255,0.55)" }}>
+                    ID: {studentData?.id?.substring(0, 10)}
+                  </SheetDescription>
+                </SheetHeader>
+              </div>
 
-                 <div className="flex-1 p-10 space-y-10">
-                    <div className="space-y-4 text-left">
-                       <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Target Task</p>
-                          <h4 className="text-xl font-black text-slate-800">{selectedTask?.title}</h4>
-                       </div>
-                    </div>
+              <div className="flex-1 px-7 py-7 space-y-6 overflow-y-auto" style={{ background: BG }}>
+                {/* Target task */}
+                <div className="bg-white rounded-[24px] px-6 py-5"
+                  style={{ boxShadow: SH, border: `0.5px solid ${BLUE_BDR}` }}>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.10em] mb-2" style={{ color: T4 }}>Target Task</p>
+                  <h4 className="text-[19px] font-bold" style={{ color: T1, letterSpacing: "-0.4px" }}>{selectedTask?.title}</h4>
+                </div>
 
-                    <div className="space-y-6 text-left">
-                       <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Academic Artifact (PDF/JPG)</label>
-                       <div 
-                         onClick={() => fileInputRef.current?.click()}
-                         className="w-full p-12 border-2 border-dashed border-slate-100 rounded-[2.5rem] bg-slate-50/50 hover:bg-slate-100 transition-all cursor-pointer flex flex-col items-center justify-center text-center group"
-                       >
-                          <input type="file" ref={fileInputRef} className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.txt" onChange={(e) => {
-                            const file = e.target.files?.[0] || null;
-                            setUploadFile(file);
-                            if (file && selectedTask) generateInstantFeedback(selectedTask);
-                          }} />
-                          {uploadFile ? (
-                             <div className="flex items-center gap-4 bg-white p-4 rounded-2xl shadow-xl border border-slate-50 animate-in zoom-in-95">
-                                <FileText className="w-10 h-10 text-indigo-600" />
-                                <div className="text-left"><p className="text-xs font-black text-slate-800">{uploadFile.name}</p></div>
-                                <button onClick={(e) => { e.stopPropagation(); setUploadFile(null); }} className="p-2 text-rose-400"><X className="w-4 h-4" /></button>
-                             </div>
-                          ) : (
-                             <div className="flex flex-col items-center">
-                                <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center mb-4 shadow-sm border border-slate-50"><Upload className="w-8 h-8 text-slate-300" /></div>
-                                <p className="text-sm font-black text-slate-400 group-hover:text-slate-600 transition-colors">Select Submission File</p>
-                             </div>
-                          )}
-                       </div>
-                    </div>
-
-                    {/* ── AI Instant Feedback ── */}
-                    {(generatingFeedback || instantFeedback) && (
-                      <div className="rounded-3xl overflow-hidden border border-indigo-100">
-                        <div className="bg-gradient-to-r from-indigo-500 to-violet-500 px-5 py-3 flex items-center gap-2">
-                          <Sparkles className="w-4 h-4 text-white" />
-                          <span className="text-[10px] font-black text-white uppercase tracking-widest">AI Pre-Submission Feedback</span>
+                {/* File upload */}
+                <div className="space-y-3 text-left">
+                  <label className="text-[10px] font-bold uppercase tracking-[0.10em] ml-1 block" style={{ color: T4 }}>
+                    Academic Artifact (PDF/JPG)
+                  </label>
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full px-6 py-10 rounded-[26px] cursor-pointer flex flex-col items-center justify-center text-center transition-all hover:-translate-y-0.5 hover:shadow-lg"
+                    style={{
+                      background: "white",
+                      border: "1.5px dashed rgba(0,85,255,0.25)",
+                      boxShadow: SH,
+                      transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)"
+                    }}>
+                    <input type="file" ref={fileInputRef} className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.txt" onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      setUploadFile(file);
+                      if (file && selectedTask) generateInstantFeedback(selectedTask);
+                    }} />
+                    {uploadFile ? (
+                      <div className="flex items-center gap-3 px-4 py-3 rounded-[14px] animate-in zoom-in-95 w-full"
+                        style={{ background: BG, border: `0.5px solid ${BLUE_BDR}` }}>
+                        <div className="w-12 h-12 rounded-[14px] flex items-center justify-center shrink-0"
+                          style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: "0 2px 8px rgba(0,85,255,0.30)" }}>
+                          <FileText className="w-5 h-5 text-white" />
                         </div>
-                        {generatingFeedback ? (
-                          <div className="p-5 flex items-center gap-3 bg-indigo-50">
-                            <Loader2 className="w-4 h-4 text-indigo-500 animate-spin flex-shrink-0" />
-                            <p className="text-xs text-indigo-600 font-semibold">Analysing your submission...</p>
+                        <p className="text-[14px] font-bold flex-1 truncate text-left" style={{ color: T1 }}>{uploadFile.name}</p>
+                        <button onClick={(e) => { e.stopPropagation(); setUploadFile(null); }} className="p-2" style={{ color: RED }} aria-label="Remove file">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="w-16 h-16 rounded-[18px] flex items-center justify-center"
+                          style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: "0 4px 14px rgba(0,85,255,0.34)" }}>
+                          <Upload className="w-7 h-7 text-white" strokeWidth={2.2} />
+                        </div>
+                        <p className="text-[15px] font-bold" style={{ color: T2, letterSpacing: "-0.2px" }}>Click to choose file</p>
+                        <p className="text-[12px]" style={{ color: T3 }}>PDF, JPG, PNG, DOC up to 10 MB</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* AI Pre-Submission Feedback */}
+                {(generatingFeedback || instantFeedback) && (
+                  <div className="rounded-[24px] overflow-hidden"
+                    style={{ boxShadow: SH, border: `0.5px solid ${BLUE_BDR}` }}>
+                    <div className="px-6 py-3 flex items-center gap-2"
+                      style={{ background: "linear-gradient(135deg, #001888 0%, #0033CC 50%, #0055FF 100%)" }}>
+                      <Sparkles className="w-4 h-4 text-white" />
+                      <span className="text-[10px] font-bold text-white uppercase tracking-[0.12em]">AI Pre-Submission Feedback</span>
+                    </div>
+                    {generatingFeedback ? (
+                      <div className="p-5 flex items-center gap-3 bg-white">
+                        <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" style={{ color: B1 }} />
+                        <p className="text-[12px] font-semibold" style={{ color: T2 }}>Analysing your submission...</p>
+                      </div>
+                    ) : instantFeedback?.error ? (
+                      <div className="p-5 bg-white flex items-start gap-3">
+                        <Sparkles className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: RED }} />
+                        <p className="text-[12px] font-semibold" style={{ color: RED }}>{instantFeedback.error}</p>
+                      </div>
+                    ) : instantFeedback && (
+                      <div className="p-5 space-y-4 bg-white">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">{instantFeedback.emoji || "✨"}</span>
+                          <p className="text-[14px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>{instantFeedback.overall}</p>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3">
+                          <div className="rounded-[16px] p-4" style={{ background: "rgba(0,200,83,0.08)", border: "0.5px solid rgba(0,200,83,0.20)" }}>
+                            <p className="text-[9px] font-bold uppercase tracking-[0.12em] mb-2" style={{ color: "#007830" }}>Strengths</p>
+                            {(instantFeedback.strengths || []).map((s: string, i: number) => (
+                              <div key={i} className="flex items-start gap-2 mb-1">
+                                <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: GREEN }} />
+                                <p className="text-[12px]" style={{ color: T2 }}>{s}</p>
+                              </div>
+                            ))}
                           </div>
-                        ) : instantFeedback?.error ? (
-                          <div className="p-5 bg-rose-50 flex items-start gap-3">
-                            <Sparkles className="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5" />
-                            <p className="text-xs text-rose-700 font-semibold">{instantFeedback.error}</p>
+                          <div className="rounded-[16px] p-4" style={{ background: "rgba(255,136,0,0.08)", border: "0.5px solid rgba(255,136,0,0.22)" }}>
+                            <p className="text-[9px] font-bold uppercase tracking-[0.12em] mb-2" style={{ color: "#AA5500" }}>Room to Improve</p>
+                            {(instantFeedback.improvements || []).map((s: string, i: number) => (
+                              <div key={i} className="flex items-start gap-2 mb-1">
+                                <ChevronDown className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: ORANGE }} />
+                                <p className="text-[12px]" style={{ color: T2 }}>{s}</p>
+                              </div>
+                            ))}
                           </div>
-                        ) : instantFeedback && (
-                          <div className="p-5 space-y-4 bg-white">
-                            <div className="flex items-center gap-3">
-                              <span className="text-2xl">{instantFeedback.emoji || "✨"}</span>
-                              <p className="text-sm font-bold text-slate-800">{instantFeedback.overall}</p>
-                            </div>
-                            <div className="grid grid-cols-1 gap-3">
-                              <div className="bg-emerald-50 rounded-2xl p-4">
-                                <p className="text-[9px] font-black text-emerald-700 uppercase tracking-widest mb-2">Strengths</p>
-                                {(instantFeedback.strengths || []).map((s: string, i: number) => (
-                                  <div key={i} className="flex items-start gap-2 mb-1">
-                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" />
-                                    <p className="text-xs text-slate-600">{s}</p>
-                                  </div>
-                                ))}
-                              </div>
-                              <div className="bg-amber-50 rounded-2xl p-4">
-                                <p className="text-[9px] font-black text-amber-700 uppercase tracking-widest mb-2">Room to Improve</p>
-                                {(instantFeedback.improvements || []).map((s: string, i: number) => (
-                                  <div key={i} className="flex items-start gap-2 mb-1">
-                                    <ChevronDown className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
-                                    <p className="text-xs text-slate-600">{s}</p>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                            {instantFeedback.tip && (
-                              <div className="flex items-start gap-2 bg-slate-50 rounded-2xl p-3">
-                                <Lightbulb className="w-3.5 h-3.5 text-slate-500 flex-shrink-0 mt-0.5" />
-                                <p className="text-xs text-slate-500 italic">{instantFeedback.tip}</p>
-                              </div>
-                            )}
+                        </div>
+                        {instantFeedback.tip && (
+                          <div className="flex items-start gap-2 rounded-[14px] p-3" style={{ background: BG, border: `0.5px solid ${BLUE_BDR}` }}>
+                            <Lightbulb className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: B1 }} />
+                            <p className="text-[12px] italic" style={{ color: T3 }}>{instantFeedback.tip}</p>
                           </div>
                         )}
                       </div>
                     )}
+                  </div>
+                )}
 
-                    <div className="space-y-4 text-left">
-                       <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Teacher Notes (Optional)</label>
-                       <textarea 
-                         rows={4}
-                         value={studentNote}
-                         onChange={(e) => setStudentNote(e.target.value)}
-                         className="w-full p-6 bg-slate-50 border border-slate-100 rounded-3xl text-sm font-medium text-slate-600 focus:bg-white focus:ring-4 focus:ring-slate-100 outline-none transition-all resize-none placeholder:text-slate-300"
-                         placeholder="Add any specific details for your teacher here..."
-                       />
-                    </div>
-                 </div>
-
-                 <div className="p-10 border-t border-slate-100">
-                    <button 
-                      onClick={handleOfficialSubmission}
-                      disabled={submittingFile || !uploadFile}
-                      className="w-full py-6 bg-slate-900 text-white rounded-[2rem] text-[11px] font-black uppercase tracking-[0.3em] hover:bg-slate-800 shadow-2xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-4"
-                    >
-                       {submittingFile ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Send className="w-5 h-5" /> Confirm Academic Hand-in</>}
-                    </button>
-                 </div>
+                {/* Teacher notes */}
+                <div className="space-y-3 text-left">
+                  <label className="text-[10px] font-bold uppercase tracking-[0.10em] ml-1 block" style={{ color: T4 }}>
+                    Teacher Notes (Optional)
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={studentNote}
+                    onChange={(e) => setStudentNote(e.target.value)}
+                    className="w-full p-5 rounded-[20px] text-[14px] font-medium outline-none transition-all resize-none focus:ring-2 focus:ring-[#0055FF]/30"
+                    style={{
+                      background: "white",
+                      color: T1,
+                      border: `0.5px solid ${BLUE_BDR}`,
+                      boxShadow: SH,
+                    }}
+                    placeholder="Add any specific details for your teacher here..."
+                  />
+                </div>
               </div>
-           </SheetContent>
+
+              {/* Submit button */}
+              <div className="px-7 pt-4 pb-6" style={{ background: BG, borderTop: `0.5px solid ${SEP}` }}>
+                <button
+                  onClick={handleOfficialSubmission}
+                  disabled={submittingFile || !uploadFile}
+                  className="w-full py-5 rounded-[22px] text-[13px] font-bold uppercase tracking-[0.16em] transition-all hover:scale-[1.01] active:scale-[0.97] disabled:opacity-40 flex items-center justify-center gap-3 text-white relative overflow-hidden">
+                  <span className="absolute inset-0" style={{
+                    background: "linear-gradient(135deg, #001888 0%, #0033CC 50%, #0055FF 100%)",
+                    boxShadow: SH_BTN
+                  }} />
+                  <span className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.13) 0%, transparent 52%)" }} />
+                  <span className="relative z-10 flex items-center gap-3">
+                    {submittingFile ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Send className="w-4 h-4" /> Submit Assignment</>}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </SheetContent>
         </Sheet>
       </div>
   );

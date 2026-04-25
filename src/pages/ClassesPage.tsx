@@ -495,7 +495,7 @@ const ClassesPage = () => {
                     aria-label={`Open ${subject || "class"} teacher notes`}
                     onClick={() => navigate("/teacher-notes", { state: { teacherId: en.teacherId } })}
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/teacher-notes", { state: { teacherId: en.teacherId } }); } }}
-                    className="rounded-[26px] overflow-hidden bg-white flex flex-col cursor-pointer transition-all hover:-translate-y-1 hover:shadow-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/50"
+                    className="rounded-[26px] overflow-hidden bg-white flex flex-col cursor-pointer transition-all hover:-translate-y-1 hover:scale-[1.02] hover:shadow-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/50"
                     style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
 
                     {/* Hero */}
@@ -617,7 +617,7 @@ const ClassesPage = () => {
                 aria-label="Open my child profile"
                 onClick={() => navigate("/my-child")}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/my-child"); } }}
-                className="lg:col-span-2 rounded-[24px] p-7 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-1 hover:shadow-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                className="lg:col-span-2 rounded-[24px] p-7 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-1 hover:scale-[1.02] hover:shadow-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                 style={{
                   background: "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)",
                   boxShadow: "0 10px 36px rgba(0,51,204,0.38), 0 0 0 0.5px rgba(255,255,255,0.16)",
