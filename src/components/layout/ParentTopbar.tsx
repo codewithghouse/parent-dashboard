@@ -26,7 +26,7 @@ export const ParentTopbar = ({ onMenuClick }: ParentTopbarProps) => {
           paddingTop: "env(safe-area-inset-top)",
           height: "calc(56px + env(safe-area-inset-top))",
           fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif",
-          background: "rgba(238,238,243,0.82)",
+          background: "rgba(238,244,255,0.82)",
           WebkitBackdropFilter: "saturate(220%) blur(24px)",
           backdropFilter: "saturate(220%) blur(24px)",
           borderBottom: "0.5px solid rgba(48,48,110,0.08)",
@@ -101,7 +101,7 @@ export const ParentTopbar = ({ onMenuClick }: ParentTopbarProps) => {
   // DESKTOP — unchanged
   // ══════════════════════════════
   return (
-    <header className="h-16 bg-white/70 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-4 md:px-8 sticky top-0 z-[60]">
+    <header className="h-16 bg-[#EEF4FF]/80 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-4 md:px-8 sticky top-0 z-[60]">
       <div className="flex items-center gap-3 min-w-0">
         <button
           onClick={onMenuClick}
