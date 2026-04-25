@@ -6,6 +6,7 @@ import { doc, getDoc, collection, query, where, getDocs, onSnapshot, updateDoc }
 import { db } from "../lib/firebase";
 import { useAuth } from "../lib/AuthContext";
 import { toast } from "sonner";
+import { useIsMobile } from "../hooks/use-mobile";
 
 // ── Tokens ───────────────────────────────────────────────────────────────────
 const T = {
@@ -82,6 +83,7 @@ const DetailLink = () => <span style={{ fontSize: 11, color: T.blue, fontWeight:
 const MyChildPage = () => {
   const { studentData } = useAuth();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   const [loading, setLoading] = useState(true);
   const [masterProfile, setMasterProfile] = useState<any>(null);
@@ -280,25 +282,25 @@ const MyChildPage = () => {
   }));
 
   return (
-    <div style={{ minHeight: "100vh", background: T.bg, padding: "20px 24px 60px", fontFamily: "'Inter','Plus Jakarta Sans',-apple-system,sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: T.bg, padding: isMobile ? "12px 12px 60px" : "20px 24px 60px", fontFamily: "'Inter','Plus Jakarta Sans',-apple-system,sans-serif" }}>
 
       {/* ═══ TOP BAR ══════════════════════════════════════════════════════════ */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <button onClick={() => navigate("/")} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: `1px solid ${T.bdr}`, background: T.white, color: T.ink2, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
-          <ArrowLeft size={14} /> RETURN
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: isMobile ? 14 : 24, gap: 8, flexWrap: "wrap" }}>
+        <button onClick={() => navigate("/")} style={{ display: "flex", alignItems: "center", gap: 6, padding: isMobile ? "7px 12px" : "8px 16px", borderRadius: 10, border: `1px solid ${T.bdr}`, background: T.white, color: T.ink2, fontSize: isMobile ? 12 : 13, fontWeight: 500, cursor: "pointer", flexShrink: 0 }}>
+          <ArrowLeft size={14} /> {isMobile ? "BACK" : "RETURN"}
         </button>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => window.print()} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: `1px solid ${T.bdr}`, background: T.white, color: T.ink2, fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
-            <Printer size={13} /> EXPORT
+          <button onClick={() => window.print()} style={{ display: "flex", alignItems: "center", gap: 6, padding: isMobile ? "7px 12px" : "8px 16px", borderRadius: 10, border: `1px solid ${T.bdr}`, background: T.white, color: T.ink2, fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
+            <Printer size={13} /> {isMobile ? "PDF" : "EXPORT"}
           </button>
-          <button onClick={() => navigate("/teacher-notes")} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: "none", background: T.blue, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-            <MessageSquare size={13} /> CONTACT
+          <button onClick={() => navigate("/teacher-notes")} style={{ display: "flex", alignItems: "center", gap: 6, padding: isMobile ? "7px 12px" : "8px 16px", borderRadius: 10, border: "none", background: T.blue, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+            <MessageSquare size={13} /> {isMobile ? "MSG" : "CONTACT"}
           </button>
         </div>
       </div>
 
-      {/* ═══ HERO: 3-COLUMN ═══ */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 280px 1fr", gap: 20, marginBottom: 20 }}>
+      {/* ═══ HERO: 3-COLUMN (mobile: stacked, profile first) ═══ */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 280px 1fr", gap: isMobile ? 14 : 20, marginBottom: isMobile ? 14 : 20 }}>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <Card title="Academic Performance">
@@ -377,8 +379,8 @@ const MyChildPage = () => {
           </Card>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 20 }}>
-          <div style={{ width: 140, height: 140, borderRadius: "50%", border: `4px solid ${T.blue}`, background: T.blBg, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16, boxShadow: "0 8px 30px rgba(59,91,219,0.15)" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: isMobile ? 16 : 20, order: isMobile ? -1 : 0, padding: isMobile ? "20px 16px 18px" : undefined, background: isMobile ? T.white : "transparent", borderRadius: isMobile ? 16 : 0, border: isMobile ? `1px solid ${T.bdr}` : "none" }}>
+          <div style={{ width: isMobile ? 110 : 140, height: isMobile ? 110 : 140, borderRadius: "50%", border: `4px solid ${T.blue}`, background: T.blBg, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: isMobile ? 12 : 16, boxShadow: "0 8px 30px rgba(59,91,219,0.15)" }}>
             <span style={{ fontSize: 42, fontWeight: 800, color: T.blue }}>{initials}</span>
           </div>
           <h2 style={{ fontSize: 20, fontWeight: 700, color: T.ink, textAlign: "center", marginBottom: 4 }}>{sName}</h2>
@@ -450,8 +452,8 @@ const MyChildPage = () => {
       </div>
 
       {/* ═══ PERFORMANCE TIMELINE ═══ */}
-      <Card title="Performance Timeline" action={<DetailLink />} style={{ marginBottom: 20 }}>
-        <div style={{ height: 200 }}>
+      <Card title="Performance Timeline" action={<DetailLink />} style={{ marginBottom: isMobile ? 14 : 20 }}>
+        <div style={{ height: isMobile ? 160 : 200 }}>
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={m.monthly}>
               <defs>
@@ -470,7 +472,7 @@ const MyChildPage = () => {
       </Card>
 
       {/* ═══ ASSIGNMENTS + RISK ═══ */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 14 : 20, marginBottom: isMobile ? 14 : 20 }}>
         <Card title={`Assignments · ${m.subCount}/${m.asgCount}`} action={<span style={{ fontSize: 11, color: T.blue, fontWeight: 500, cursor: "pointer" }}>View All →</span>}>
           {[...assignments].sort((a, b) => (toDate(b.dueDate)?.getTime() || 0) - (toDate(a.dueDate)?.getTime() || 0)).slice(0, 5).map(a => {
             const sub = submissions.find((s: any) => s.assignmentId === a.id);
@@ -504,7 +506,7 @@ const MyChildPage = () => {
       </div>
 
       {/* ═══ CALENDAR + SUPPORT ═══ */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 14 : 20, marginBottom: isMobile ? 14 : 20 }}>
         <Card title="Attendance Calendar" action={<span style={{ fontSize: 11, color: T.ink3 }}>Daily attendance record</span>}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginBottom: 14 }}>
             <button onClick={() => setCalMonth(new Date(calYear, calMon - 1))} style={{ background: "none", border: "none", cursor: "pointer", color: T.ink3 }}><ChevronLeft size={16} /></button>
@@ -544,7 +546,7 @@ const MyChildPage = () => {
               );
             })}
           </div>
-          <div style={{ display: "flex", gap: 14, marginTop: 12, justifyContent: "center" }}>
+          <div style={{ display: "flex", gap: isMobile ? 10 : 14, marginTop: 12, justifyContent: "center", flexWrap: "wrap", rowGap: 8 }}>
             {[{ c: T.grn, l: "Present" }, { c: T.amb, l: "Late" }, { c: T.red, l: "Absent" }, { c: T.s2, l: "Weekend" }, { c: "transparent", l: "No Data" }].map(x => (
               <div key={x.l} style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <div style={{ width: 8, height: 8, borderRadius: 2, background: x.c, border: x.c === "transparent" ? `1px solid ${T.s2}` : "none" }} />
@@ -575,7 +577,7 @@ const MyChildPage = () => {
       </div>
 
       {/* ═══ INCIDENTS + OVERVIEW ═══ */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 14 : 20, marginBottom: isMobile ? 14 : 20 }}>
         <Card title="Incidents" action={<DetailLink />}>
           {incidents.length === 0 ? (
             <div style={{ textAlign: "center", padding: "20px 0" }}>
@@ -619,7 +621,7 @@ const MyChildPage = () => {
       </div>
 
       {/* ═══ COMMS + SCORE HISTORY ═══ */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 14 : 20, marginBottom: isMobile ? 14 : 20 }}>
         <Card title={`Communications · ${parentNotes.length} entries`} action={<span style={{ fontSize: 11, color: T.blue, cursor: "pointer" }}>View All →</span>}>
           {parentNotes.slice(0, 3).map(n => (
             <div key={n.id} style={{ padding: "12px 0", borderBottom: `1px solid ${T.s2}` }}>
@@ -648,7 +650,8 @@ const MyChildPage = () => {
               </ResponsiveContainer>
             </div>
           )}
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 280 }}>
             <thead>
               <tr>{["SUBJECT", "DATE", "SCORE"].map(h => <th key={h} style={{ textAlign: "left", padding: "6px 8px", fontSize: 10, color: T.ink3, fontWeight: 600, borderBottom: `1px solid ${T.s2}` }}>{h}</th>)}</tr>
             </thead>
@@ -665,16 +668,17 @@ const MyChildPage = () => {
               })}
             </tbody>
           </table>
+          </div>
         </Card>
       </div>
 
       {/* ═══ BOTTOM STATUS BAR ═══ */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 20px", background: T.white, border: `1px solid ${T.bdr}`, borderRadius: 12, fontSize: 10, color: T.ink3 }}>
-        <span>★ PARENT ENGAGEMENT: {Math.min(100, parentNotes.length * 20)}%</span>
-        <span>★ Status: Active</span>
-        <span>★ Data: Live</span>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "10px 14px" : "10px 20px", background: T.white, border: `1px solid ${T.bdr}`, borderRadius: 12, fontSize: 10, color: T.ink3, flexWrap: "wrap", gap: isMobile ? 8 : 0, rowGap: 6 }}>
+        <span>★ ENGAGE: {Math.min(100, parentNotes.length * 20)}%</span>
+        {!isMobile && <span>★ Status: Active</span>}
+        {!isMobile && <span>★ Data: Live</span>}
         <span>★ Secured</span>
-        <span>★ STUDENT ID: {sid.slice(0, 8).toUpperCase()}</span>
+        <span>★ ID: {sid.slice(0, 8).toUpperCase()}</span>
         <span style={{ color: T.blue, fontWeight: 600 }}>{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
       </div>
 
