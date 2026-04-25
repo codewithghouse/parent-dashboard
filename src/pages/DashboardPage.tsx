@@ -594,31 +594,34 @@ const DashboardPage = () => {
      MOBILE — Edullent Indigo Apple UI
      ═══════════════════════════════════════════════════════════════ */
   if (isMobile) {
-    // ── Indigo theme tokens ──
-    const IND = "#30306E";
-    const IND2 = "#4444A0";
-    const IND3 = "#6666C0";
+    // ── Bright Blue Apple UI tokens (matches Performance page) ──
+    const IND = "#0055FF";
+    const IND2 = "#1166FF";
+    const IND3 = "#4499FF";
     const BG = "#EEF4FF";
-    const T1 = "rgba(48,48,110,0.90)";
-    const T2 = "rgba(48,48,110,0.70)";
-    const T3 = "rgba(48,48,110,0.42)";
-    const T4 = "rgba(48,48,110,0.25)";
-    const SEP = "rgba(48,48,110,0.06)";
-    const IND_BDR = "rgba(48,48,110,0.12)";
-    const IND_SOFT = "rgba(48,48,110,0.07)";
-    const GREEN = "#12C04E";
-    const GREEN_S = "rgba(18,192,78,0.10)";
-    const GREEN_B = "rgba(18,192,78,0.22)";
-    const ORANGE = "#F5A000";
-    const ORANGE_S = "rgba(245,160,0,0.10)";
-    const ORANGE_B = "rgba(245,160,0,0.22)";
-    const ROSE = "#FF6EA8";
-    const ROSE_S = "rgba(255,110,168,0.10)";
-    const DK = "#09092A";
-    const DK_CELL = "rgba(9,9,42,0.58)";
-    const SH = "0 0 0 0.5px rgba(48,48,110,0.06), 0 1px 3px rgba(48,48,110,0.04), 0 8px 20px rgba(48,48,110,0.07)";
-    const SH_LG = "0 0 0 0.5px rgba(48,48,110,0.08), 0 2px 8px rgba(48,48,110,0.06), 0 16px 36px rgba(48,48,110,0.10), 0 32px 56px rgba(48,48,110,0.06)";
-    const SH_BTN = "0 4px 14px rgba(48,48,110,0.28), 0 1px 4px rgba(48,48,110,0.18)";
+    const BG2 = "#E0ECFF";
+    const T1 = "#001040";
+    const T2 = "#002080";
+    const T3 = "#5070B0";
+    const T4 = "#99AACC";
+    const SEP = "rgba(0,85,255,0.07)";
+    const IND_BDR = "rgba(0,85,255,0.10)";
+    const IND_SOFT = "rgba(0,85,255,0.05)";
+    const GREEN = "#00C853";
+    const GREEN_S = "rgba(0,200,83,0.12)";
+    const GREEN_B = "rgba(0,200,83,0.25)";
+    const ORANGE = "#FF8800";
+    const ORANGE_S = "rgba(255,136,0,0.12)";
+    const ORANGE_B = "rgba(255,136,0,0.25)";
+    const ROSE = "#FF3355";
+    const ROSE_S = "rgba(255,51,85,0.10)";
+    const IND_DARK_GRAD = "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)";
+    const DK = IND_DARK_GRAD;
+    const DK_CELL = "rgba(0,12,48,0.42)";
+    const SH = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.09), 0 10px 28px rgba(0,85,255,0.11)";
+    const SH_LG = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 20px 48px rgba(0,85,255,0.14)";
+    const SH_BTN = "0 4px 14px rgba(0,85,255,0.32), 0 1px 4px rgba(0,85,255,0.18)";
+    void BG2;
     // Academic Health ring
     const scorePct = Math.min(liveStats.avgScore, 100);
     const ringR = 40, ringCirc = 2 * Math.PI * ringR;
@@ -651,12 +654,12 @@ const DashboardPage = () => {
           aria-label="Open performance page"
           onClick={() => navigate("/performance")}
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/performance"); } }}
-          className="mx-5 mt-[22px] bg-white rounded-[28px] p-6 relative overflow-hidden cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#30306E]/40"
+          className="mx-5 mt-[22px] bg-white rounded-[28px] p-6 relative overflow-hidden cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
           style={{ boxShadow: SH_LG, border: `0.5px solid ${IND_BDR}` }}>
           <div className="absolute -top-[70px] -right-[50px] w-[220px] h-[220px] rounded-full pointer-events-none"
-            style={{ background: "radial-gradient(circle, rgba(48,48,110,0.05) 0%, transparent 70%)" }} />
+            style={{ background: "radial-gradient(circle, rgba(0,85,255,0.05) 0%, transparent 70%)" }} />
           <div className="absolute -bottom-[50px] left-5 w-[160px] h-[160px] rounded-full pointer-events-none"
-            style={{ background: "radial-gradient(circle, rgba(48,48,110,0.03) 0%, transparent 70%)" }} />
+            style={{ background: "radial-gradient(circle, rgba(0,85,255,0.03) 0%, transparent 70%)" }} />
           <div className="relative z-10">
             <h3 className="text-[18px] font-bold" style={{ color: T1, letterSpacing: "-0.4px" }}>Academic Health</h3>
             <p className="text-[13px] mt-0.5" style={{ color: T3 }}>Overall performance indicator</p>
@@ -687,7 +690,7 @@ const DashboardPage = () => {
                       <stop offset="100%" stopColor={IND} />
                     </linearGradient>
                   </defs>
-                  <circle cx="48" cy="48" r={ringR} fill="none" stroke="rgba(48,48,110,0.09)" strokeWidth="7" />
+                  <circle cx="48" cy="48" r={ringR} fill="none" stroke="rgba(0,85,255,0.09)" strokeWidth="7" />
                   <circle cx="48" cy="48" r={ringR} fill="none" stroke="url(#indGradMobile)" strokeWidth="7" strokeLinecap="round"
                     strokeDasharray={ringCirc} strokeDashoffset={ringOffset}
                     style={{ transition: "stroke-dashoffset 1s cubic-bezier(0.4,0,0.2,1)" }} />
@@ -705,7 +708,7 @@ const DashboardPage = () => {
           {[
             { icon: CheckCircle, iconColor: GREEN, bg: GREEN_S, border: "rgba(18,192,78,0.20)", glow: "rgba(18,192,78,0.14)", label: "Attendance", value: attDisplay, status: liveStats.attendance === null ? "No records yet" : attOnTrack ? "On track ✓" : "Below target", statusColor: liveStats.attendance === null ? T4 : attOnTrack ? GREEN : ORANGE, route: "/attendance" },
             { icon: AlertCircle, iconColor: ORANGE, bg: ORANGE_S, border: "rgba(245,160,0,0.20)", glow: "rgba(245,160,0,0.14)", label: "Pending Work", value: pendingDisplay, status: liveStats.pending === null ? "No assignments yet" : noPending ? "All clear ✓" : "Due this week", statusColor: liveStats.pending === null ? T4 : noPending ? GREEN : ORANGE, route: "/assignments" },
-            { icon: Calendar, iconColor: IND, bg: IND_SOFT, border: IND_BDR, glow: "rgba(48,48,110,0.09)", label: "Upcoming Tests", value: testsDisplay, status: liveStats.tests === null ? "No tests scheduled" : "Next 7 days", statusColor: T4, route: "/tests" },
+            { icon: Calendar, iconColor: IND, bg: IND_SOFT, border: IND_BDR, glow: "rgba(0,85,255,0.09)", label: "Upcoming Tests", value: testsDisplay, status: liveStats.tests === null ? "No tests scheduled" : "Next 7 days", statusColor: T4, route: "/tests" },
             { icon: Star, iconColor: ROSE, bg: ROSE_S, border: "rgba(255,110,168,0.20)", glow: "rgba(255,110,168,0.14)", label: "Recent Grade", value: liveStats.recentGrade !== "N/A" ? liveStats.recentGrade : "—", status: liveStats.recentSubject, statusColor: T4, route: "/tests" },
           ].map(({ icon: Icon, iconColor, bg, border, glow, label, value, status, statusColor, route }) => (
             <div
@@ -715,8 +718,8 @@ const DashboardPage = () => {
               aria-label={`Open ${label} page`}
               onClick={() => navigate(route)}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(route); } }}
-              className="bg-white rounded-[22px] px-4 pt-[18px] pb-[18px] relative overflow-hidden cursor-pointer active:scale-[0.96] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#30306E]/40"
-              style={{ boxShadow: SH, border: `0.5px solid ${IND_BDR}` }}>
+              className="bg-white rounded-[22px] px-4 pt-[18px] pb-[18px] relative overflow-hidden cursor-pointer active:scale-[0.96] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+              style={{ boxShadow: SH, border: `0.5px solid ${IND_BDR}`, transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
               <div className="absolute -top-[18px] -right-[18px] w-[72px] h-[72px] rounded-full pointer-events-none"
                 style={{ background: `radial-gradient(circle, ${glow} 0%, transparent 70%)`, opacity: 0.55 }} />
               <div className="w-[34px] h-[34px] rounded-[11px] flex items-center justify-center mb-[14px] relative"
@@ -732,10 +735,10 @@ const DashboardPage = () => {
 
         {/* ── AI Live Dark Card ── */}
         <div className="mx-5 mt-4 rounded-[28px] overflow-hidden relative"
-          style={{ background: DK, boxShadow: "0 0 0 0.5px rgba(48,48,110,0.16), 0 12px 44px rgba(0,0,0,0.22), 0 4px 12px rgba(0,0,0,0.14)" }}>
+          style={{ background: DK, boxShadow: "0 0 0 0.5px rgba(0,85,255,0.16), 0 12px 44px rgba(0,0,0,0.22), 0 4px 12px rgba(0,0,0,0.14)" }}>
           {/* Indigo ambient glow overlays */}
           <div className="absolute inset-0 pointer-events-none" style={{
-            background: "radial-gradient(ellipse 300px 200px at 85% 0%, rgba(48,48,110,0.32) 0%, transparent 60%), radial-gradient(ellipse 220px 220px at -20% 85%, rgba(102,102,192,0.12) 0%, transparent 60%), radial-gradient(ellipse 180px 180px at 50% 52%, rgba(48,48,110,0.06) 0%, transparent 60%)"
+            background: "radial-gradient(ellipse 300px 200px at 85% 0%, rgba(255,255,255,0.18) 0%, transparent 60%), radial-gradient(ellipse 220px 220px at -20% 85%, rgba(255,255,255,0.10) 0%, transparent 60%), radial-gradient(ellipse 180px 180px at 50% 52%, rgba(255,255,255,0.06) 0%, transparent 60%)"
           }} />
           <div className="absolute inset-0 pointer-events-none" style={{
             backgroundImage: "linear-gradient(rgba(180,180,230,0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(180,180,230,0.018) 1px, transparent 1px)",
@@ -770,7 +773,7 @@ const DashboardPage = () => {
                   aria-label="Open attendance page"
                   onClick={() => navigate("/attendance")}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/attendance"); } }}
-                  className="p-[18px] flex flex-col gap-[10px] cursor-pointer active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6666C0]/60" style={{ background: DK_CELL }}>
+                  className="p-[18px] flex flex-col gap-[10px] cursor-pointer active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50" style={{ background: DK_CELL }}>
                   <span className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Attendance</span>
                   <div className="flex items-center gap-[10px]">
                     <DonutRing pct={liveStats.attendance ?? 0} color={attOnTrack ? GREEN : ORANGE} size={56} stroke={5} />
@@ -799,7 +802,7 @@ const DashboardPage = () => {
                   aria-label="Open performance page"
                   onClick={() => navigate("/performance")}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/performance"); } }}
-                  className="p-[18px] flex flex-col gap-[10px] cursor-pointer active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6666C0]/60" style={{ background: DK_CELL }}>
+                  className="p-[18px] flex flex-col gap-[10px] cursor-pointer active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50" style={{ background: DK_CELL }}>
                   <span className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Avg Score</span>
                   <div className="flex items-center gap-[10px]">
                     <DonutRing pct={liveStats.avgScore} color={liveStats.avgScore >= 80 ? GREEN : liveStats.avgScore >= 60 ? IND3 : "#FF6961"} size={56} stroke={5} />
@@ -834,7 +837,7 @@ const DashboardPage = () => {
                   aria-label="Open assignments page"
                   onClick={() => navigate("/assignments")}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/assignments"); } }}
-                  className="p-[18px] flex flex-col gap-[10px] cursor-pointer active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6666C0]/60" style={{ background: DK_CELL }}>
+                  className="p-[18px] flex flex-col gap-[10px] cursor-pointer active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50" style={{ background: DK_CELL }}>
                   <span className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Assignments</span>
                   <div className="text-[34px] font-bold leading-none text-white" style={{ letterSpacing: "-1.2px" }}>{pendingDisplay}</div>
                   <div className="text-[11px]" style={{ color: "rgba(255,255,255,0.32)", letterSpacing: "-0.1px" }}>
@@ -857,7 +860,7 @@ const DashboardPage = () => {
                   aria-label="Open tests page"
                   onClick={() => navigate("/tests")}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/tests"); } }}
-                  className="p-[18px] flex flex-col gap-[10px] cursor-pointer active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6666C0]/60" style={{ background: DK_CELL }}>
+                  className="p-[18px] flex flex-col gap-[10px] cursor-pointer active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50" style={{ background: DK_CELL }}>
                   <span className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Recent Test</span>
                   <div className="text-[34px] font-bold leading-none text-white" style={{ letterSpacing: "-1.2px" }}>
                     {liveStats.recentGrade !== "N/A" ? liveStats.recentGrade : "—"}
@@ -909,8 +912,8 @@ const DashboardPage = () => {
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/my-child"); } }}
           className="mx-5 mt-5 rounded-[28px] p-6 relative overflow-hidden cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
           style={{
-            background: `linear-gradient(140deg, ${IND} 0%, ${IND2} 100%)`,
-            boxShadow: "0 10px 36px rgba(48,48,110,0.22), 0 0 0 0.5px rgba(255,255,255,0.18)",
+            background: IND_DARK_GRAD,
+            boxShadow: "0 10px 36px rgba(0,85,255,0.22), 0 0 0 0.5px rgba(255,255,255,0.18)",
             border: "0.5px solid rgba(255,255,255,0.18)"
           }}>
           <div className="absolute -top-[55px] -right-[35px] w-[210px] h-[210px] rounded-full pointer-events-none"
@@ -950,7 +953,7 @@ const DashboardPage = () => {
           aria-label="Open alerts page"
           onClick={() => navigate("/alerts")}
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/alerts"); } }}
-          className="mx-5 mt-[14px] bg-white rounded-[22px] p-5 cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#30306E]/40"
+          className="mx-5 mt-[14px] bg-white rounded-[22px] p-5 cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
           style={{ boxShadow: SH, border: `0.5px solid ${IND_BDR}` }}>
           <h3 className="text-[18px] font-bold mb-5" style={{ color: T1, letterSpacing: "-0.4px" }}>Recent Alerts</h3>
           {recentAlerts.length > 0 ? (
@@ -972,7 +975,7 @@ const DashboardPage = () => {
           ) : (
             <div className="flex flex-col items-center gap-[10px] p-4">
               <div className="w-[54px] h-[54px] rounded-[17px] flex items-center justify-center"
-                style={{ background: IND_SOFT, border: `0.5px solid ${IND_BDR}`, boxShadow: "0 0 0 5px rgba(48,48,110,0.03)" }}>
+                style={{ background: IND_SOFT, border: `0.5px solid ${IND_BDR}`, boxShadow: "0 0 0 5px rgba(0,85,255,0.03)" }}>
                 <ShieldCheck className="w-6 h-6" style={{ color: T4 }} />
               </div>
               <p className="text-[14px]" style={{ color: T3 }}>No alerts right now</p>
@@ -987,7 +990,7 @@ const DashboardPage = () => {
           aria-label="Open reports page"
           onClick={() => navigate("/reports")}
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
-          className="mx-5 mt-[14px] bg-white rounded-[22px] px-5 py-[18px] cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#30306E]/40"
+          className="mx-5 mt-[14px] bg-white rounded-[22px] px-5 py-[18px] cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
           style={{ boxShadow: SH, border: `0.5px solid ${IND_BDR}` }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -1005,7 +1008,7 @@ const DashboardPage = () => {
             {weekConfig.canGenerate && !weeklyReport ? (
               <button onClick={(e) => { e.stopPropagation(); handleGenerateWeeklyReport(); }} disabled={weeklyLoading || dataLoading}
                 className="flex items-center gap-2 px-3 py-2 rounded-[12px] text-[12px] font-semibold text-white disabled:opacity-50"
-                style={{ background: IND, boxShadow: "0 2px 8px rgba(48,48,110,0.28)" }}>
+                style={{ background: IND, boxShadow: "0 2px 8px rgba(0,85,255,0.28)" }}>
                 {weeklyLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                 {weeklyLoading ? "..." : "Generate"}
               </button>
@@ -1050,9 +1053,9 @@ const DashboardPage = () => {
         {weeklyReport && !weeklyLoading && (
           <div className="mx-5 mt-3 rounded-[24px] px-[22px] py-5 relative overflow-hidden"
             style={{
-              background: `linear-gradient(138deg, ${IND} 0%, ${IND2} 100%)`,
-              border: "0.5px solid rgba(48,48,110,0.22)",
-              boxShadow: "0 6px 28px rgba(48,48,110,0.22), 0 2px 8px rgba(48,48,110,0.14)"
+              background: IND_DARK_GRAD,
+              border: "0.5px solid rgba(0,85,255,0.22)",
+              boxShadow: "0 6px 28px rgba(0,85,255,0.22), 0 2px 8px rgba(0,85,255,0.14)"
             }}>
             <div className="absolute -top-8 -right-5 w-[160px] h-[160px] rounded-full pointer-events-none"
               style={{ background: "radial-gradient(circle, rgba(255,255,255,0.10) 0%, transparent 65%)" }} />
@@ -1142,7 +1145,7 @@ const DashboardPage = () => {
         {weeklyReport && !weeklyLoading && (
           <button onClick={handleDownloadPDF} disabled={pdfDownloading}
             className="mx-5 mt-5 w-[calc(100%-40px)] rounded-[18px] py-[17px] flex items-center justify-center gap-[9px] text-[16px] font-bold text-white disabled:opacity-50 active:scale-[0.97] transition-transform relative overflow-hidden"
-            style={{ background: `linear-gradient(135deg, ${IND} 0%, #1C1C4A 100%)`, boxShadow: SH_BTN, letterSpacing: "-0.2px" }}>
+            style={{ background: `linear-gradient(135deg, #001888 0%, #0033CC 50%, #0055FF 100%)`, boxShadow: SH_BTN, letterSpacing: "-0.2px" }}>
             <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.13) 0%, transparent 52%)" }} />
             <span className="relative z-10 flex items-center gap-[9px]">
               {pdfDownloading ? (
@@ -1158,7 +1161,7 @@ const DashboardPage = () => {
         <div className="mx-5 mt-5 mb-2 bg-white rounded-[22px] overflow-hidden" style={{ boxShadow: SH, border: `0.5px solid ${IND_BDR}` }}>
           {/* Indigo-gradient header */}
           <div className="flex items-center gap-3 px-5 py-4 relative overflow-hidden"
-            style={{ background: `linear-gradient(135deg, ${IND} 0%, ${IND2} 100%)`, borderBottom: `0.5px solid ${IND_BDR}` }}>
+            style={{ background: IND_DARK_GRAD, borderBottom: `0.5px solid ${IND_BDR}` }}>
             <div className="absolute -top-7 -right-4 w-[120px] h-[120px] rounded-full pointer-events-none"
               style={{ background: "radial-gradient(circle, rgba(255,255,255,0.09) 0%, transparent 65%)" }} />
             <div className="absolute inset-0 pointer-events-none" style={{
@@ -1223,31 +1226,34 @@ const DashboardPage = () => {
      DESKTOP — Edullent Indigo Apple UI (matches mobile language)
      ═══════════════════════════════════════════════════════════════ */
   {
-    // Indigo tokens (same as mobile)
-    const IND = "#30306E";
-    const IND2 = "#4444A0";
-    const IND3 = "#6666C0";
+    // Bright Blue Apple UI tokens (matches Performance page)
+    const IND = "#0055FF";
+    const IND2 = "#1166FF";
+    const IND3 = "#4499FF";
     const BG = "#EEF4FF";
-    const T1 = "rgba(48,48,110,0.90)";
-    const T2 = "rgba(48,48,110,0.70)";
-    const T3 = "rgba(48,48,110,0.42)";
-    const T4 = "rgba(48,48,110,0.25)";
-    const SEP = "rgba(48,48,110,0.06)";
-    const IND_BDR = "rgba(48,48,110,0.12)";
-    const IND_SOFT = "rgba(48,48,110,0.07)";
-    const GREEN = "#12C04E";
-    const GREEN_S = "rgba(18,192,78,0.10)";
-    const GREEN_B = "rgba(18,192,78,0.22)";
-    const ORANGE = "#F5A000";
-    const ORANGE_S = "rgba(245,160,0,0.10)";
-    const ORANGE_B = "rgba(245,160,0,0.22)";
-    const ROSE = "#FF6EA8";
-    const ROSE_S = "rgba(255,110,168,0.10)";
-    const DK = "#09092A";
-    const DK_CELL = "rgba(9,9,42,0.58)";
-    const SH = "0 0 0 0.5px rgba(48,48,110,0.06), 0 1px 3px rgba(48,48,110,0.04), 0 8px 20px rgba(48,48,110,0.07)";
-    const SH_LG = "0 0 0 0.5px rgba(48,48,110,0.08), 0 2px 8px rgba(48,48,110,0.06), 0 16px 36px rgba(48,48,110,0.10), 0 32px 56px rgba(48,48,110,0.06)";
-    const SH_BTN = "0 4px 14px rgba(48,48,110,0.28), 0 1px 4px rgba(48,48,110,0.18)";
+    const BG2 = "#E0ECFF";
+    const T1 = "#001040";
+    const T2 = "#002080";
+    const T3 = "#5070B0";
+    const T4 = "#99AACC";
+    const SEP = "rgba(0,85,255,0.07)";
+    const IND_BDR = "rgba(0,85,255,0.10)";
+    const IND_SOFT = "rgba(0,85,255,0.05)";
+    const GREEN = "#00C853";
+    const GREEN_S = "rgba(0,200,83,0.12)";
+    const GREEN_B = "rgba(0,200,83,0.25)";
+    const ORANGE = "#FF8800";
+    const ORANGE_S = "rgba(255,136,0,0.12)";
+    const ORANGE_B = "rgba(255,136,0,0.25)";
+    const ROSE = "#FF3355";
+    const ROSE_S = "rgba(255,51,85,0.10)";
+    const IND_DARK_GRAD = "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)";
+    const DK = IND_DARK_GRAD;
+    const DK_CELL = "rgba(0,12,48,0.42)";
+    const SH = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.09), 0 10px 28px rgba(0,85,255,0.11)";
+    const SH_LG = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 20px 48px rgba(0,85,255,0.14)";
+    const SH_BTN = "0 4px 14px rgba(0,85,255,0.32), 0 1px 4px rgba(0,85,255,0.18)";
+    void BG2;
 
     const scorePct = Math.min(liveStats.avgScore, 100);
     const ringR = 56, ringCirc = 2 * Math.PI * ringR;
@@ -1284,7 +1290,7 @@ const DashboardPage = () => {
                 </span>
               </div>
               <div className="w-12 h-12 rounded-[14px] flex items-center justify-center text-[14px] font-bold text-white"
-                style={{ background: `linear-gradient(140deg, ${IND} 0%, ${IND2} 100%)`, boxShadow: "0 4px 14px rgba(48,48,110,0.28)" }}>
+                style={{ background: `linear-gradient(140deg, ${IND} 0%, ${IND2} 100%)`, boxShadow: "0 4px 14px rgba(0,85,255,0.28)" }}>
                 {userInitials}
               </div>
             </div>
@@ -1300,12 +1306,12 @@ const DashboardPage = () => {
               aria-label="Open performance page"
               onClick={() => navigate("/performance")}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/performance"); } }}
-              className="lg:col-span-3 bg-white rounded-[28px] p-8 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#30306E]/40"
+              className="lg:col-span-3 bg-white rounded-[28px] p-8 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
               style={{ boxShadow: SH_LG, border: `0.5px solid ${IND_BDR}` }}>
               <div className="absolute -top-[80px] -right-[60px] w-[260px] h-[260px] rounded-full pointer-events-none"
-                style={{ background: "radial-gradient(circle, rgba(48,48,110,0.05) 0%, transparent 70%)" }} />
+                style={{ background: "radial-gradient(circle, rgba(0,85,255,0.05) 0%, transparent 70%)" }} />
               <div className="absolute -bottom-[60px] left-6 w-[200px] h-[200px] rounded-full pointer-events-none"
-                style={{ background: "radial-gradient(circle, rgba(48,48,110,0.03) 0%, transparent 70%)" }} />
+                style={{ background: "radial-gradient(circle, rgba(0,85,255,0.03) 0%, transparent 70%)" }} />
               <div className="relative z-10">
                 <div className="flex items-start justify-between gap-4 mb-6">
                   <div>
@@ -1340,7 +1346,7 @@ const DashboardPage = () => {
                           <stop offset="100%" stopColor={IND} />
                         </linearGradient>
                       </defs>
-                      <circle cx="70" cy="70" r={ringR} fill="none" stroke="rgba(48,48,110,0.09)" strokeWidth="10" />
+                      <circle cx="70" cy="70" r={ringR} fill="none" stroke="rgba(0,85,255,0.09)" strokeWidth="10" />
                       <circle cx="70" cy="70" r={ringR} fill="none" stroke="url(#indGradDesk)" strokeWidth="10" strokeLinecap="round"
                         strokeDasharray={ringCirc} strokeDashoffset={ringOffset}
                         style={{ transition: "stroke-dashoffset 1s cubic-bezier(0.4,0,0.2,1)" }} />
@@ -1362,8 +1368,8 @@ const DashboardPage = () => {
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/my-child"); } }}
               className="lg:col-span-2 rounded-[28px] p-7 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
               style={{
-                background: `linear-gradient(140deg, ${IND} 0%, ${IND2} 100%)`,
-                boxShadow: "0 10px 36px rgba(48,48,110,0.22), 0 0 0 0.5px rgba(255,255,255,0.18)",
+                background: IND_DARK_GRAD,
+                boxShadow: "0 10px 36px rgba(0,85,255,0.22), 0 0 0 0.5px rgba(255,255,255,0.18)",
                 border: "0.5px solid rgba(255,255,255,0.18)"
               }}>
               <div className="absolute -top-[55px] -right-[35px] w-[210px] h-[210px] rounded-full pointer-events-none"
@@ -1401,7 +1407,7 @@ const DashboardPage = () => {
             {[
               { icon: CheckCircle, iconColor: GREEN, bg: GREEN_S, border: "rgba(18,192,78,0.20)", glow: "rgba(18,192,78,0.14)", label: "Attendance", value: attDisplay, status: liveStats.attendance === null ? "No records yet" : attOnTrack ? "On track ✓" : "Below target", statusColor: liveStats.attendance === null ? T4 : attOnTrack ? GREEN : ORANGE, route: "/attendance" },
               { icon: AlertCircle, iconColor: ORANGE, bg: ORANGE_S, border: "rgba(245,160,0,0.20)", glow: "rgba(245,160,0,0.14)", label: "Pending Work", value: pendingDisplay, status: liveStats.pending === null ? "No assignments yet" : noPending ? "All clear ✓" : "Due this week", statusColor: liveStats.pending === null ? T4 : noPending ? GREEN : ORANGE, route: "/assignments" },
-              { icon: Calendar, iconColor: IND, bg: IND_SOFT, border: IND_BDR, glow: "rgba(48,48,110,0.09)", label: "Upcoming Tests", value: testsDisplay, status: liveStats.tests === null ? "No tests scheduled" : "Next 7 days", statusColor: T4, route: "/tests" },
+              { icon: Calendar, iconColor: IND, bg: IND_SOFT, border: IND_BDR, glow: "rgba(0,85,255,0.09)", label: "Upcoming Tests", value: testsDisplay, status: liveStats.tests === null ? "No tests scheduled" : "Next 7 days", statusColor: T4, route: "/tests" },
               { icon: Star, iconColor: ROSE, bg: ROSE_S, border: "rgba(255,110,168,0.20)", glow: "rgba(255,110,168,0.14)", label: "Recent Grade", value: liveStats.recentGrade !== "N/A" ? liveStats.recentGrade : "—", status: liveStats.recentSubject, statusColor: T4, route: "/tests" },
             ].map(({ icon: Icon, iconColor, bg, border, glow, label, value, status, statusColor, route }) => (
               <div
@@ -1411,8 +1417,8 @@ const DashboardPage = () => {
                 aria-label={`Open ${label} page`}
                 onClick={() => navigate(route)}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(route); } }}
-                className="bg-white rounded-[22px] px-5 pt-5 pb-5 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#30306E]/40"
-                style={{ boxShadow: SH, border: `0.5px solid ${IND_BDR}` }}>
+                className="bg-white rounded-[22px] px-5 pt-5 pb-5 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+                style={{ boxShadow: SH, border: `0.5px solid ${IND_BDR}`, transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
                 <div className="absolute -top-[18px] -right-[18px] w-[90px] h-[90px] rounded-full pointer-events-none"
                   style={{ background: `radial-gradient(circle, ${glow} 0%, transparent 70%)`, opacity: 0.55 }} />
                 <div className="w-[38px] h-[38px] rounded-[12px] flex items-center justify-center mb-4 relative"
@@ -1428,9 +1434,9 @@ const DashboardPage = () => {
 
           {/* ── AI Live Dark Card ── */}
           <div className="rounded-[28px] overflow-hidden relative mb-5"
-            style={{ background: DK, boxShadow: "0 0 0 0.5px rgba(48,48,110,0.16), 0 12px 44px rgba(0,0,0,0.22), 0 4px 12px rgba(0,0,0,0.14)" }}>
+            style={{ background: DK, boxShadow: "0 0 0 0.5px rgba(0,85,255,0.16), 0 12px 44px rgba(0,0,0,0.22), 0 4px 12px rgba(0,0,0,0.14)" }}>
             <div className="absolute inset-0 pointer-events-none" style={{
-              background: "radial-gradient(ellipse 500px 300px at 85% 0%, rgba(48,48,110,0.32) 0%, transparent 60%), radial-gradient(ellipse 360px 360px at -10% 85%, rgba(102,102,192,0.12) 0%, transparent 60%), radial-gradient(ellipse 300px 300px at 50% 52%, rgba(48,48,110,0.06) 0%, transparent 60%)"
+              background: "radial-gradient(ellipse 500px 300px at 85% 0%, rgba(255,255,255,0.18) 0%, transparent 60%), radial-gradient(ellipse 360px 360px at -10% 85%, rgba(255,255,255,0.10) 0%, transparent 60%), radial-gradient(ellipse 300px 300px at 50% 52%, rgba(255,255,255,0.06) 0%, transparent 60%)"
             }} />
             <div className="absolute inset-0 pointer-events-none" style={{
               backgroundImage: "linear-gradient(rgba(180,180,230,0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(180,180,230,0.018) 1px, transparent 1px)",
@@ -1464,7 +1470,7 @@ const DashboardPage = () => {
                     aria-label="Open attendance page"
                     onClick={() => navigate("/attendance")}
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/attendance"); } }}
-                    className="p-5 flex flex-col gap-3 cursor-pointer transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6666C0]/60" style={{ background: DK_CELL }}>
+                    className="p-5 flex flex-col gap-3 cursor-pointer transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50" style={{ background: DK_CELL }}>
                     <span className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Attendance</span>
                     <div className="flex items-center gap-3">
                       <DonutRing pct={liveStats.attendance ?? 0} color={attOnTrack ? GREEN : ORANGE} size={72} stroke={6} />
@@ -1493,7 +1499,7 @@ const DashboardPage = () => {
                     aria-label="Open performance page"
                     onClick={() => navigate("/performance")}
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/performance"); } }}
-                    className="p-5 flex flex-col gap-3 cursor-pointer transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6666C0]/60" style={{ background: DK_CELL }}>
+                    className="p-5 flex flex-col gap-3 cursor-pointer transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50" style={{ background: DK_CELL }}>
                     <span className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Avg Score</span>
                     <div className="flex items-center gap-3">
                       <DonutRing pct={liveStats.avgScore} color={liveStats.avgScore >= 80 ? GREEN : liveStats.avgScore >= 60 ? IND3 : "#FF6961"} size={72} stroke={6} />
@@ -1528,7 +1534,7 @@ const DashboardPage = () => {
                     aria-label="Open assignments page"
                     onClick={() => navigate("/assignments")}
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/assignments"); } }}
-                    className="p-5 flex flex-col gap-3 cursor-pointer transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6666C0]/60" style={{ background: DK_CELL }}>
+                    className="p-5 flex flex-col gap-3 cursor-pointer transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50" style={{ background: DK_CELL }}>
                     <span className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Assignments</span>
                     <div className="text-[42px] font-bold leading-none text-white" style={{ letterSpacing: "-1.4px" }}>{pendingDisplay}</div>
                     <div className="text-[12px]" style={{ color: "rgba(255,255,255,0.32)", letterSpacing: "-0.1px" }}>
@@ -1551,7 +1557,7 @@ const DashboardPage = () => {
                     aria-label="Open tests page"
                     onClick={() => navigate("/tests")}
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/tests"); } }}
-                    className="p-5 flex flex-col gap-3 cursor-pointer transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6666C0]/60" style={{ background: DK_CELL }}>
+                    className="p-5 flex flex-col gap-3 cursor-pointer transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50" style={{ background: DK_CELL }}>
                     <span className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Recent Test</span>
                     <div className="text-[42px] font-bold leading-none text-white" style={{ letterSpacing: "-1.4px" }}>
                       {liveStats.recentGrade !== "N/A" ? liveStats.recentGrade : "—"}
@@ -1604,7 +1610,7 @@ const DashboardPage = () => {
               aria-label="Open alerts page"
               onClick={() => navigate("/alerts")}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/alerts"); } }}
-              className="bg-white rounded-[22px] p-6 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#30306E]/40"
+              className="bg-white rounded-[22px] p-6 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
               style={{ boxShadow: SH, border: `0.5px solid ${IND_BDR}` }}>
               <h3 className="text-[18px] font-bold mb-5" style={{ color: T1, letterSpacing: "-0.4px" }}>Recent Alerts</h3>
               {recentAlerts.length > 0 ? (
@@ -1626,7 +1632,7 @@ const DashboardPage = () => {
               ) : (
                 <div className="flex flex-col items-center gap-3 py-10">
                   <div className="w-[60px] h-[60px] rounded-[18px] flex items-center justify-center"
-                    style={{ background: IND_SOFT, border: `0.5px solid ${IND_BDR}`, boxShadow: "0 0 0 5px rgba(48,48,110,0.03)" }}>
+                    style={{ background: IND_SOFT, border: `0.5px solid ${IND_BDR}`, boxShadow: "0 0 0 5px rgba(0,85,255,0.03)" }}>
                     <ShieldCheck className="w-7 h-7" style={{ color: T4 }} />
                   </div>
                   <p className="text-[14px]" style={{ color: T3 }}>No alerts right now</p>
@@ -1641,7 +1647,7 @@ const DashboardPage = () => {
               aria-label="Open reports page"
               onClick={() => navigate("/reports")}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
-              className="bg-white rounded-[22px] px-6 py-6 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#30306E]/40"
+              className="bg-white rounded-[22px] px-6 py-6 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
               style={{ boxShadow: SH, border: `0.5px solid ${IND_BDR}` }}>
               <div className="flex items-center justify-between gap-3 mb-[14px]">
                 <div className="flex items-center gap-3">
@@ -1659,7 +1665,7 @@ const DashboardPage = () => {
                 {weekConfig.canGenerate && !weeklyReport ? (
                   <button onClick={(e) => { e.stopPropagation(); handleGenerateWeeklyReport(); }} disabled={weeklyLoading || dataLoading}
                     className="flex items-center gap-2 px-4 py-[10px] rounded-[12px] text-[12px] font-semibold text-white disabled:opacity-50 transition-transform hover:scale-[1.02]"
-                    style={{ background: IND, boxShadow: "0 4px 14px rgba(48,48,110,0.28)" }}>
+                    style={{ background: IND, boxShadow: "0 4px 14px rgba(0,85,255,0.28)" }}>
                     {weeklyLoading ? <Loader2 className="w-[14px] h-[14px] animate-spin" /> : <Sparkles className="w-[14px] h-[14px]" />}
                     {weeklyLoading ? "Generating..." : "Generate"}
                   </button>
@@ -1711,9 +1717,9 @@ const DashboardPage = () => {
           {weeklyReport && !weeklyLoading && (
             <div className="rounded-[24px] px-7 py-6 relative overflow-hidden mb-5"
               style={{
-                background: `linear-gradient(138deg, ${IND} 0%, ${IND2} 100%)`,
-                border: "0.5px solid rgba(48,48,110,0.22)",
-                boxShadow: "0 6px 28px rgba(48,48,110,0.22), 0 2px 8px rgba(48,48,110,0.14)"
+                background: IND_DARK_GRAD,
+                border: "0.5px solid rgba(0,85,255,0.22)",
+                boxShadow: "0 6px 28px rgba(0,85,255,0.22), 0 2px 8px rgba(0,85,255,0.14)"
               }}>
               <div className="absolute -top-10 -right-8 w-[200px] h-[200px] rounded-full pointer-events-none"
                 style={{ background: "radial-gradient(circle, rgba(255,255,255,0.10) 0%, transparent 65%)" }} />
@@ -1783,7 +1789,7 @@ const DashboardPage = () => {
               {/* Download PDF button */}
               <button onClick={handleDownloadPDF} disabled={pdfDownloading}
                 className="rounded-[22px] py-[22px] px-6 flex items-center justify-center gap-3 text-[15px] font-bold text-white disabled:opacity-50 transition-transform hover:scale-[1.01] relative overflow-hidden"
-                style={{ background: `linear-gradient(135deg, ${IND} 0%, #1C1C4A 100%)`, boxShadow: SH_BTN, letterSpacing: "-0.2px" }}>
+                style={{ background: `linear-gradient(135deg, #001888 0%, #0033CC 50%, #0055FF 100%)`, boxShadow: SH_BTN, letterSpacing: "-0.2px" }}>
                 <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.13) 0%, transparent 52%)" }} />
                 <span className="relative z-10 flex items-center gap-3">
                   {pdfDownloading ? (
@@ -1826,7 +1832,7 @@ const DashboardPage = () => {
           {/* ── AI Parenting Tips ── */}
           <div className="bg-white rounded-[22px] overflow-hidden" style={{ boxShadow: SH, border: `0.5px solid ${IND_BDR}` }}>
             <div className="flex items-center gap-3 px-6 py-5 relative overflow-hidden"
-              style={{ background: `linear-gradient(135deg, ${IND} 0%, ${IND2} 100%)`, borderBottom: `0.5px solid ${IND_BDR}` }}>
+              style={{ background: IND_DARK_GRAD, borderBottom: `0.5px solid ${IND_BDR}` }}>
               <div className="absolute -top-7 -right-4 w-[140px] h-[140px] rounded-full pointer-events-none"
                 style={{ background: "radial-gradient(circle, rgba(255,255,255,0.09) 0%, transparent 65%)" }} />
               <div className="absolute inset-0 pointer-events-none" style={{
