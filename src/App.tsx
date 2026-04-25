@@ -31,6 +31,8 @@ const ClassesPage         = lazy(() => import("./pages/ClassesPage"));
 const TimetablePage       = lazy(() => import("./pages/TimetablePage"));
 const AIPracticePage      = lazy(() => import("./pages/AIPracticePage"));
 const SyllabusPage        = lazy(() => import("./pages/SyllabusPage"));
+const Leaderboard         = lazy(() => import("./pages/leaderboard/Leaderboard"));
+const Insights            = lazy(() => import("./pages/leaderboard/Insights"));
 const NotFound            = lazy(() => import("./pages/NotFound"));
 const Login               = lazy(() => import("./pages/Login"));
 
@@ -102,6 +104,8 @@ const AppRoutes = () => {
           <Route path="/alerts"        element={<AlertsPage />} />
           <Route path="/timetable"     element={<TimetablePage />} />
           <Route path="/ai-practice"   element={<AIPracticePage />} />
+          <Route path="/leaderboard"            element={<Leaderboard />} />
+          <Route path="/leaderboard/insights"   element={<Insights />} />
           <Route path="/settings"      element={<SettingsPage />} />
         </Route>
         <Route path="*" element={<NotFound />} />

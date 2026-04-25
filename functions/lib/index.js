@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.aggregateSchoolStats = exports.syncUserClaims = exports.parentAIProxy = exports.getParentAITutor = void 0;
+exports.seedSampleData = exports._processClassForTesting = exports.triggerLeaderboardManually = exports.updateActionProgress = exports.generateInsights = exports.calculateWeeklyLeaderboard = exports.aggregateSchoolStats = exports.syncUserClaims = exports.parentAIProxy = exports.getParentAITutor = void 0;
 const functions = require("firebase-functions");
 const params_1 = require("firebase-functions/params");
 const admin = require("firebase-admin");
@@ -8,6 +8,13 @@ const openai_1 = require("openai");
 const axios_1 = require("axios");
 const pdf = require('pdf-parse');
 admin.initializeApp();
+// Tell Firestore Admin SDK to silently drop fields whose value is undefined,
+// rather than throwing "Cannot use undefined as a Firestore value". The
+// leaderboard insights doc has optional fields (action.progress, action.targetSubject,
+// etc.) that the OpenAI response sometimes omits; without this setting EVERY
+// such write fails. Idiomatic production setup; .settings() must be called
+// before any other Firestore call. No-op for fields that ARE defined.
+admin.firestore().settings({ ignoreUndefinedProperties: true });
 // ── Secret Manager — key stored securely, never in source code ───────────────
 const openaiApiKey = (0, params_1.defineSecret)("OPENAI_API_KEY");
 // ── Shared constants ─────────────────────────────────────────────────────────
@@ -668,5 +675,103 @@ exports.aggregateSchoolStats = functions
         console.warn("[aggregate] cache write failed:", err);
     }
     return result;
+});
+// ─────────────────────────────────────────────────────────────────────────────
+// EDULLENT LEADERBOARD — Phase 4 Cloud Functions
+// All four functions live in asia-south1 (closer to the Indian student base)
+// while the existing functions stay in us-central1. Mixed-region is fine for
+// a single project.
+// ─────────────────────────────────────────────────────────────────────────────
+const cron_1 = require("./leaderboard/cron");
+Object.defineProperty(exports, "_processClassForTesting", { enumerable: true, get: function () { return cron_1.processClass; } });
+const insights_1 = require("./leaderboard/insights");
+const actions_1 = require("./leaderboard/actions");
+const manualTrigger_1 = require("./leaderboard/manualTrigger");
+const seedSampleData_1 = require("./leaderboard/seedSampleData");
+const constants_1 = require("./leaderboard/constants");
+// 1️⃣  Weekly leaderboard cron — Mon 02:00 IST
+exports.calculateWeeklyLeaderboard = functions
+    .region(constants_1.REGION)
+    .runWith({ memory: constants_1.RUNTIME.cron.memory, timeoutSeconds: constants_1.RUNTIME.cron.timeoutSeconds })
+    .pubsub.schedule(constants_1.SCHEDULE.leaderboardCron)
+    .timeZone(constants_1.TIMEZONE)
+    .onRun(async () => {
+    await (0, cron_1.runLeaderboardCron)();
+});
+// 2️⃣  Insights generator — fires when a leaderboard doc is written
+exports.generateInsights = functions
+    .region(constants_1.REGION)
+    .runWith({
+    secrets: [openaiApiKey],
+    memory: constants_1.RUNTIME.trigger.memory,
+    timeoutSeconds: constants_1.RUNTIME.trigger.timeoutSeconds,
+})
+    .firestore.document("leaderboards/{classKey}/weeks/{weekId}")
+    .onWrite(async (change) => {
+    // Skip delete events — nothing to generate insights from.
+    if (!change.after.exists)
+        return;
+    const lb = change.after.data();
+    if (!lb || !lb.rankings || lb.rankings.length === 0)
+        return;
+    await (0, insights_1.generateInsightsForLeaderboard)(lb, openaiApiKey.value());
+});
+// 3️⃣  Daily action progress auto-tracker — every 06:00 IST
+exports.updateActionProgress = functions
+    .region(constants_1.REGION)
+    .runWith({ memory: constants_1.RUNTIME.cron.memory, timeoutSeconds: constants_1.RUNTIME.cron.timeoutSeconds })
+    .pubsub.schedule(constants_1.SCHEDULE.actionCheckCron)
+    .timeZone(constants_1.TIMEZONE)
+    .onRun(async () => {
+    await (0, actions_1.runActionTrackerCron)();
+});
+// 4️⃣  Admin manual trigger — onCall HTTPS, owner/principal only
+exports.triggerLeaderboardManually = functions
+    .region(constants_1.REGION)
+    .runWith({
+    secrets: [openaiApiKey],
+    memory: constants_1.RUNTIME.callable.memory,
+    timeoutSeconds: constants_1.RUNTIME.callable.timeoutSeconds,
+})
+    .https.onCall(async (data, context) => {
+    requireAuth(context);
+    try {
+        return await (0, manualTrigger_1.manualTriggerImpl)(data, (context.auth?.token ?? {}), openaiApiKey.value());
+    }
+    catch (err) {
+        const msg = err?.message || String(err);
+        if (msg.startsWith("permission-denied")) {
+            throw new functions.https.HttpsError("permission-denied", msg);
+        }
+        if (msg.startsWith("invalid-argument")) {
+            throw new functions.https.HttpsError("invalid-argument", msg);
+        }
+        console.error("triggerLeaderboardManually error:", err);
+        throw new functions.https.HttpsError("internal", "manual trigger failed");
+    }
+});
+// 5️⃣  Seed realistic sample data into source collections (testing helper)
+exports.seedSampleData = functions
+    .region(constants_1.REGION)
+    .runWith({
+    memory: constants_1.RUNTIME.callable.memory,
+    timeoutSeconds: constants_1.RUNTIME.callable.timeoutSeconds,
+})
+    .https.onCall(async (data, context) => {
+    requireAuth(context);
+    try {
+        return await (0, seedSampleData_1.seedSampleDataImpl)(data, (context.auth?.token ?? {}));
+    }
+    catch (err) {
+        const msg = err?.message || String(err);
+        if (msg.startsWith("permission-denied")) {
+            throw new functions.https.HttpsError("permission-denied", msg);
+        }
+        if (msg.startsWith("invalid-argument")) {
+            throw new functions.https.HttpsError("invalid-argument", msg);
+        }
+        console.error("seedSampleData error:", err);
+        throw new functions.https.HttpsError("internal", msg);
+    }
 });
 //# sourceMappingURL=index.js.map

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
-import { CheckCircle, AlertCircle, Calendar, Star, Clock, Loader2, ShieldCheck, BrainCircuit, Sparkles, TrendingUp, BookOpen, Lightbulb, Download } from "lucide-react";
+import { CheckCircle, AlertCircle, Calendar, Star, Clock, Loader2, ShieldCheck, BrainCircuit, Sparkles, TrendingUp, BookOpen, Lightbulb, Download, Trophy, ArrowRight } from "lucide-react";
 import { ParentAIController } from "../ai/controller/ai-controller";
 import { generateWeeklyReport } from "../ai/engines/weekly-report-engine";
 import WeeklyReportPDF from "../components/WeeklyReportPDF";
@@ -733,6 +733,28 @@ const DashboardPage = () => {
           ))}
         </div>
 
+        {/* ── Class Leaderboard Card (Edullent leaderboard entry point) ── */}
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="Open class leaderboard"
+          onClick={() => navigate("/leaderboard")}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/leaderboard"); } }}
+          className="bg-white rounded-[22px] mx-5 mt-[14px] px-4 py-[16px] flex items-center gap-3 relative overflow-hidden cursor-pointer active:scale-[0.96] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+          style={{ boxShadow: SH, border: `0.5px solid ${IND_BDR}`, transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
+          <div className="absolute -top-[18px] -right-[18px] w-[72px] h-[72px] rounded-full pointer-events-none"
+            style={{ background: `radial-gradient(circle, rgba(255,170,0,0.16) 0%, transparent 70%)`, opacity: 0.7 }} />
+          <div className="w-[40px] h-[40px] rounded-[12px] flex items-center justify-center relative flex-shrink-0"
+            style={{ background: "linear-gradient(135deg, #FFD700 0%, #FFAA00 100%)", boxShadow: "0 4px 12px rgba(255,170,0,0.30)" }}>
+            <Trophy className="w-[19px] h-[19px] text-white" />
+          </div>
+          <div className="flex-1 min-w-0 relative">
+            <div className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: T4 }}>Class Leaderboard</div>
+            <div className="text-[15px] font-bold mt-[2px] truncate" style={{ color: T1, letterSpacing: "-0.3px" }}>See where you stand this week</div>
+          </div>
+          <ArrowRight className="w-[16px] h-[16px] flex-shrink-0 relative" style={{ color: IND }} />
+        </div>
+
         {/* ── AI Live Dark Card ── */}
         <div className="mx-5 mt-4 rounded-[28px] overflow-hidden relative"
           style={{ background: DK, boxShadow: "0 0 0 0.5px rgba(0,85,255,0.16), 0 12px 44px rgba(0,0,0,0.22), 0 4px 12px rgba(0,0,0,0.14)" }}>
@@ -1430,6 +1452,29 @@ const DashboardPage = () => {
                 <div className="text-[12px] font-medium mt-[6px] relative truncate" style={{ color: statusColor }}>{status}</div>
               </div>
             ))}
+          </div>
+
+          {/* ── Class Leaderboard Card (desktop) ── */}
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="Open class leaderboard"
+            onClick={() => navigate("/leaderboard")}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/leaderboard"); } }}
+            className="bg-white rounded-[22px] px-6 py-5 mb-5 flex items-center gap-4 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-1 hover:scale-[1.01] hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+            style={{ boxShadow: SH, border: `0.5px solid ${IND_BDR}`, transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
+            <div className="absolute -top-[24px] -right-[24px] w-[120px] h-[120px] rounded-full pointer-events-none"
+              style={{ background: `radial-gradient(circle, rgba(255,170,0,0.18) 0%, transparent 70%)`, opacity: 0.7 }} />
+            <div className="w-[48px] h-[48px] rounded-[14px] flex items-center justify-center relative flex-shrink-0"
+              style={{ background: "linear-gradient(135deg, #FFD700 0%, #FFAA00 100%)", boxShadow: "0 6px 16px rgba(255,170,0,0.32)" }}>
+              <Trophy className="w-[22px] h-[22px] text-white" />
+            </div>
+            <div className="flex-1 min-w-0 relative">
+              <div className="text-[11px] font-bold uppercase tracking-[0.10em]" style={{ color: T4 }}>Class Leaderboard</div>
+              <div className="text-[18px] font-bold mt-[2px]" style={{ color: T1, letterSpacing: "-0.4px" }}>See where you stand this week</div>
+              <div className="text-[12px] font-medium mt-[2px]" style={{ color: T3 }}>Weekly ranking · AI insights · personalised plan</div>
+            </div>
+            <ArrowRight className="w-[20px] h-[20px] flex-shrink-0 relative" style={{ color: IND }} />
           </div>
 
           {/* ── AI Live Dark Card ── */}

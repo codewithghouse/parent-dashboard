@@ -6,6 +6,13 @@ import axios from "axios";
 const pdf = require('pdf-parse');
 
 admin.initializeApp();
+// Tell Firestore Admin SDK to silently drop fields whose value is undefined,
+// rather than throwing "Cannot use undefined as a Firestore value". The
+// leaderboard insights doc has optional fields (action.progress, action.targetSubject,
+// etc.) that the OpenAI response sometimes omits; without this setting EVERY
+// such write fails. Idiomatic production setup; .settings() must be called
+// before any other Firestore call. No-op for fields that ARE defined.
+admin.firestore().settings({ ignoreUndefinedProperties: true });
 
 // ── Secret Manager — key stored securely, never in source code ───────────────
 const openaiApiKey = defineSecret("OPENAI_API_KEY");
@@ -792,4 +799,115 @@ export const aggregateSchoolStats = functions
     }
 
     return result;
+  });
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EDULLENT LEADERBOARD — Phase 4 Cloud Functions
+// All four functions live in asia-south1 (closer to the Indian student base)
+// while the existing functions stay in us-central1. Mixed-region is fine for
+// a single project.
+// ─────────────────────────────────────────────────────────────────────────────
+import { runLeaderboardCron, processClass } from "./leaderboard/cron";
+import { generateInsightsForLeaderboard } from "./leaderboard/insights";
+import { runActionTrackerCron } from "./leaderboard/actions";
+import { manualTriggerImpl } from "./leaderboard/manualTrigger";
+import { seedSampleDataImpl } from "./leaderboard/seedSampleData";
+import { REGION, SCHEDULE, TIMEZONE, RUNTIME } from "./leaderboard/constants";
+import type { LeaderboardDoc } from "./leaderboard/types";
+
+// 1️⃣  Weekly leaderboard cron — Mon 02:00 IST
+export const calculateWeeklyLeaderboard = functions
+  .region(REGION)
+  .runWith({ memory: RUNTIME.cron.memory, timeoutSeconds: RUNTIME.cron.timeoutSeconds })
+  .pubsub.schedule(SCHEDULE.leaderboardCron)
+  .timeZone(TIMEZONE)
+  .onRun(async () => {
+    await runLeaderboardCron();
+  });
+
+// 2️⃣  Insights generator — fires when a leaderboard doc is written
+export const generateInsights = functions
+  .region(REGION)
+  .runWith({
+    secrets: [openaiApiKey],
+    memory: RUNTIME.trigger.memory,
+    timeoutSeconds: RUNTIME.trigger.timeoutSeconds,
+  })
+  .firestore.document("leaderboards/{classKey}/weeks/{weekId}")
+  .onWrite(async (change) => {
+    // Skip delete events — nothing to generate insights from.
+    if (!change.after.exists) return;
+    const lb = change.after.data() as LeaderboardDoc | undefined;
+    if (!lb || !lb.rankings || lb.rankings.length === 0) return;
+    await generateInsightsForLeaderboard(lb, openaiApiKey.value());
+  });
+
+// 3️⃣  Daily action progress auto-tracker — every 06:00 IST
+export const updateActionProgress = functions
+  .region(REGION)
+  .runWith({ memory: RUNTIME.cron.memory, timeoutSeconds: RUNTIME.cron.timeoutSeconds })
+  .pubsub.schedule(SCHEDULE.actionCheckCron)
+  .timeZone(TIMEZONE)
+  .onRun(async () => {
+    await runActionTrackerCron();
+  });
+
+// 4️⃣  Admin manual trigger — onCall HTTPS, owner/principal only
+export const triggerLeaderboardManually = functions
+  .region(REGION)
+  .runWith({
+    secrets: [openaiApiKey],
+    memory: RUNTIME.callable.memory,
+    timeoutSeconds: RUNTIME.callable.timeoutSeconds,
+  })
+  .https.onCall(async (data, context) => {
+    requireAuth(context);
+    try {
+      return await manualTriggerImpl(
+        data,
+        (context.auth?.token ?? {}) as { role?: string },
+        openaiApiKey.value(),
+      );
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      if (msg.startsWith("permission-denied")) {
+        throw new functions.https.HttpsError("permission-denied", msg);
+      }
+      if (msg.startsWith("invalid-argument")) {
+        throw new functions.https.HttpsError("invalid-argument", msg);
+      }
+      console.error("triggerLeaderboardManually error:", err);
+      throw new functions.https.HttpsError("internal", "manual trigger failed");
+    }
+  });
+
+// Exposed so processClass can be called from a test harness if added later.
+export { processClass as _processClassForTesting };
+
+// 5️⃣  Seed realistic sample data into source collections (testing helper)
+export const seedSampleData = functions
+  .region(REGION)
+  .runWith({
+    memory: RUNTIME.callable.memory,
+    timeoutSeconds: RUNTIME.callable.timeoutSeconds,
+  })
+  .https.onCall(async (data, context) => {
+    requireAuth(context);
+    try {
+      return await seedSampleDataImpl(
+        data,
+        (context.auth?.token ?? {}) as { role?: string; schoolId?: string; uid?: string },
+      );
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      if (msg.startsWith("permission-denied")) {
+        throw new functions.https.HttpsError("permission-denied", msg);
+      }
+      if (msg.startsWith("invalid-argument")) {
+        throw new functions.https.HttpsError("invalid-argument", msg);
+      }
+      console.error("seedSampleData error:", err);
+      throw new functions.https.HttpsError("internal", msg);
+    }
   });
