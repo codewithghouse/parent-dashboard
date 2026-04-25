@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Printer, MessageSquare, AlertCircle, Loader2, ChevronLeft, ChevronRight, CheckCircle2, FileText, BookOpen, Calendar, TrendingUp, BarChart3, Activity } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, Radar } from "recharts";
@@ -21,47 +21,37 @@ const toDate = (v: any): Date | null => { if (!v) return null; if (v?.toDate) re
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 const timeAgo = (v: any) => { const d = toDate(v); if (!d) return ""; const s = (Date.now() - d.getTime()) / 1000; if (s < 60) return "just now"; if (s < 3600) return `${Math.floor(s / 60)}m ago`; if (s < 86400) return `${Math.floor(s / 3600)}h ago`; return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase(); };
 
-// ── 3D Card wrapper with hover tilt ──────────────────────────────────────────
-const Card = ({ children, title, action, style }: { children: React.ReactNode; title?: string; action?: React.ReactNode; style?: React.CSSProperties }) => {
-  const [tilt, setTilt] = useState({ x: 0, y: 0 });
-  const [hovered, setHovered] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+// ── Canonical blue-halo shadows (matches principal-dashboard tilt3D) ──────────
+const SH_REST = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 20px 48px rgba(0,85,255,0.14)";
+const SH_HOVER = "0 0 0 0.5px rgba(0,85,255,0.14), 0 8px 24px rgba(0,85,255,0.16), 0 20px 46px rgba(0,85,255,0.18)";
 
-  const handleMove = (e: React.MouseEvent) => {
-    if (!ref.current) return;
-    const rect = ref.current.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    const y = (e.clientY - rect.top) / rect.height;
-    setTilt({ x: (y - 0.5) * -8, y: (x - 0.5) * 8 });
-  };
-  const handleLeave = () => { setTilt({ x: 0, y: 0 }); setHovered(false); };
+// ── Card wrapper — hover lift + blue halo, no cursor-tracking rotation ────────
+// Mirrors principal-dashboard's tilt3D behavior: translate3d(-5px) + scale(1.02)
+// with a stronger blue halo. No rotateX/rotateY (those caused text blur).
+const Card = ({ children, title, action, style }: { children: React.ReactNode; title?: string; action?: React.ReactNode; style?: React.CSSProperties }) => {
+  const [hovered, setHovered] = useState(false);
 
   return (
     <div
-      ref={ref}
-      onMouseMove={handleMove}
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={handleLeave}
+      onMouseLeave={() => setHovered(false)}
       style={{
         background: T.white,
         border: `0.5px solid ${hovered ? "rgba(0,85,255,0.22)" : "rgba(0,85,255,0.10)"}`,
         borderRadius: 16,
         overflow: "hidden",
-        transform: `perspective(800px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) ${hovered ? "translateY(-4px) scale(1.01)" : "translateY(0) scale(1)"}`,
-        transition: "transform 0.2s ease, border-color 0.3s ease, box-shadow 0.3s ease",
-        boxShadow: "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 20px 48px rgba(0,85,255,0.14)",
+        transform: hovered ? "translate3d(0,-5px,0) scale(1.02)" : "translate3d(0,0,0) scale(1)",
+        transition: hovered
+          ? "transform 0.22s cubic-bezier(0.2,0.8,0.2,1), box-shadow 0.22s ease, border-color 0.22s ease"
+          : "transform 0.28s cubic-bezier(0.2,0.8,0.2,1), box-shadow 0.28s ease, border-color 0.28s ease",
+        boxShadow: hovered ? SH_HOVER : SH_REST,
+        backfaceVisibility: "hidden",
+        WebkitBackfaceVisibility: "hidden",
         willChange: "transform",
         position: "relative",
         ...style,
       }}
     >
-      {hovered && (
-        <div style={{
-          position: "absolute", inset: 0, pointerEvents: "none", zIndex: 1,
-          background: `radial-gradient(circle at ${(tilt.y / 8 + 0.5) * 100}% ${(-tilt.x / 8 + 0.5) * 100}%, rgba(59,91,219,0.06) 0%, transparent 60%)`,
-          borderRadius: 16,
-        }} />
-      )}
       {title && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: `1px solid ${T.s2}`, position: "relative", zIndex: 2 }}>
           <span style={{ fontSize: 14, fontWeight: 600, color: T.ink }}>{title}</span>
