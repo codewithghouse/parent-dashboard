@@ -9,7 +9,7 @@ import { toast } from "sonner";
 
 // ── Tokens ───────────────────────────────────────────────────────────────────
 const T = {
-  bg: "#f8fafc", white: "#ffffff", ink: "#0f172a", ink2: "#475569", ink3: "#94a3b8",
+  bg: "#EEF4FF", white: "#ffffff", ink: "#0f172a", ink2: "#475569", ink3: "#94a3b8",
   bdr: "#e2e8f0", s1: "#f1f5f9", s2: "#e2e8f0",
   blue: "#3B5BDB", blBg: "#EDF2FF", blBdr: "#BAC8FF",
   grn: "#16a34a", glBg: "#f0fdf4", red: "#dc2626", rlBg: "#fef2f2",

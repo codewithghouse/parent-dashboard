@@ -598,7 +598,7 @@ const DashboardPage = () => {
     const IND = "#30306E";
     const IND2 = "#4444A0";
     const IND3 = "#6666C0";
-    const BG = "#EEEEF3";
+    const BG = "#EEF4FF";
     const T1 = "rgba(48,48,110,0.90)";
     const T2 = "rgba(48,48,110,0.70)";
     const T3 = "rgba(48,48,110,0.42)";
@@ -1227,7 +1227,7 @@ const DashboardPage = () => {
     const IND = "#30306E";
     const IND2 = "#4444A0";
     const IND3 = "#6666C0";
-    const BG = "#EEEEF3";
+    const BG = "#EEF4FF";
     const T1 = "rgba(48,48,110,0.90)";
     const T2 = "rgba(48,48,110,0.70)";
     const T3 = "rgba(48,48,110,0.42)";
