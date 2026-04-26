@@ -621,6 +621,20 @@ service cloud.firestore {
       allow delete:    if signedIn() && inSameSchool() && hasAdminRole();
     }
 
+    // ── AI insight cache for branch + principal leaderboards (weekly TTL) ─
+    //   Doc ID format: {schoolId}_{type}_{id}_W{weekNumber}
+    //   Body stamps schoolId at top level so inSameSchool() can scope reads.
+    //   Only principals/owners can write — these power the network leaderboard.
+    match /leaderboard_ai_insights/{key} {
+      allow get:    if signedIn() && inSameSchool();
+      allow list:   if signedIn() && inSameSchool();
+      allow create: if signedIn() && hasSchoolId() && writingToOwnSchool()
+                       && claimRole() in ['owner', 'principal'];
+      allow update: if signedIn() && inSameSchool() && schoolIdImmutable()
+                       && claimRole() in ['owner', 'principal'];
+      allow delete: if signedIn() && inSameSchool() && hasAdminRole();
+    }
+
     // ── Syllabus / class documents ─────────────────────────────────────
     match /syllabi/{id} {
       allow get:  if signedIn() && inSameSchool();

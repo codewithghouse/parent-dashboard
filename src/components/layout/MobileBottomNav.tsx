@@ -77,18 +77,24 @@ export const MobileBottomNav = (_props: MobileBottomNavProps) => {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 lg:hidden z-[100]"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)", fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif" }}
+      className="fixed left-0 right-0 lg:hidden z-[100] flex justify-center px-3 pointer-events-none"
+      style={{
+        bottom: "calc(env(safe-area-inset-bottom) + 12px)",
+        fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+      }}
     >
       <div
-        className="flex items-start justify-around pt-3 px-1"
+        className="flex items-center justify-around w-full max-w-[440px] pointer-events-auto"
         style={{
-          height: 88,
-          background: "rgba(238,238,243,0.88)",
-          WebkitBackdropFilter: "saturate(220%) blur(32px)",
-          backdropFilter: "saturate(220%) blur(32px)",
-          borderTop: "0.5px solid rgba(48,48,110,0.09)",
-          boxShadow: "0 -2px 12px rgba(48,48,110,0.05)",
+          height: 68,
+          padding: "0 6px",
+          borderRadius: 28,
+          background: "rgba(255,255,255,0.62)",
+          WebkitBackdropFilter: "saturate(220%) blur(28px)",
+          backdropFilter: "saturate(220%) blur(28px)",
+          border: "0.5px solid rgba(255,255,255,0.85)",
+          boxShadow:
+            "0 0 0 0.5px rgba(48,48,110,0.06), 0 8px 24px rgba(48,48,110,0.10), 0 18px 48px rgba(48,48,110,0.14)",
         }}
       >
         {bottomNavItems.map(({ key, label, path }) => {
@@ -99,8 +105,11 @@ export const MobileBottomNav = (_props: MobileBottomNavProps) => {
             <Link
               key={path}
               to={path}
-              className="flex flex-col items-center gap-[3px] min-w-[56px] py-1 transition-transform active:scale-[0.88]"
-              style={{ transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}
+              className="flex flex-col items-center justify-center gap-[2px] flex-1 h-full rounded-[20px] transition-transform active:scale-[0.92]"
+              style={{
+                transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)",
+                background: isActive ? "rgba(48,48,110,0.06)" : "transparent",
+              }}
             >
               <div className="w-7 h-7 flex items-center justify-center relative">
                 <IconComp active={isActive} />
@@ -109,8 +118,8 @@ export const MobileBottomNav = (_props: MobileBottomNavProps) => {
                     className="absolute -top-[3px] -right-[6px] min-w-[16px] h-4 flex items-center justify-center px-[3px] text-[10px] font-bold text-white rounded-full"
                     style={{
                       background: "#E5304A",
-                      border: "1.5px solid rgba(238,238,243,0.88)",
-                      letterSpacing: "-0.2px"
+                      border: "1.5px solid rgba(255,255,255,0.95)",
+                      letterSpacing: "-0.2px",
                     }}
                   >
                     {alertsCount > 9 ? "9+" : alertsCount}
@@ -118,10 +127,10 @@ export const MobileBottomNav = (_props: MobileBottomNavProps) => {
                 )}
               </div>
               <span
-                className="text-[10px]"
+                className="text-[10px] leading-tight"
                 style={{
                   color: isActive ? IND : INACTIVE_LBL,
-                  fontWeight: isActive ? 600 : 500,
+                  fontWeight: isActive ? 700 : 500,
                 }}
               >
                 {label}
