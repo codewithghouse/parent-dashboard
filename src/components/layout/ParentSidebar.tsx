@@ -38,7 +38,7 @@ export const ParentSidebar = ({ open, onClose }: ParentSidebarProps) => {
 
   return (
     <aside
-      className={`fixed left-0 top-0 h-screen w-[280px] bg-primary flex flex-col z-[110] transition-transform duration-300 ease-in-out ${
+      className={`fixed left-0 top-0 h-screen w-[280px] bg-[#170C79] flex flex-col z-[110] transition-transform duration-300 ease-in-out ${
         open ? "translate-x-0" : "-translate-x-full"
       } lg:translate-x-0`}
     >
