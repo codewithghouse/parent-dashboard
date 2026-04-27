@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle, XCircle, Clock, ChevronLeft, ChevronRight, Loader2, Calendar as CalendarIcon, Users } from "lucide-react";
+import { CheckCircle, XCircle, Clock, ChevronLeft, ChevronRight, Loader2, Calendar as CalendarIcon, Users, TrendingUp, UserCheck, CalendarX, Hourglass } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { useSchoolSettings } from "@/hooks/useSchoolSettings";
 import { scopedQuery } from "@/lib/scopedQuery";
@@ -180,34 +180,38 @@ const AttendancePage = () => {
         <div className="grid grid-cols-2 gap-[10px] mx-5 mt-4">
           {[
             {
-              icon: CheckCircle, iconColor: GREEN,
-              bg: "rgba(0,200,83,0.12)", border: "rgba(0,200,83,0.22)", glow: "rgba(0,200,83,0.12)",
+              icon: CheckCircle, decorIcon: TrendingUp, iconColor: GREEN,
+              cardBg: "linear-gradient(135deg, rgba(0,200,83,0.13) 0%, rgba(0,200,83,0.04) 100%)", cardBdr: "rgba(0,200,83,0.20)",
+              iconBoxBg: "rgba(0,200,83,0.18)", iconBoxBdr: "rgba(0,200,83,0.30)",
               label: "Overall", value: `${stats.percentage}%`, valColor: GREEN,
               bar: `linear-gradient(90deg, ${GREEN}, #66EE99)`, barPct: Math.max(stats.percentage, 3),
               route: "/reports"
             },
             {
-              icon: Users, iconColor: B1,
-              bg: "rgba(0,85,255,0.10)", border: "rgba(0,85,255,0.18)", glow: "rgba(0,85,255,0.10)",
+              icon: Users, decorIcon: UserCheck, iconColor: B1,
+              cardBg: "linear-gradient(135deg, rgba(0,85,255,0.10) 0%, rgba(0,85,255,0.03) 100%)", cardBdr: "rgba(0,85,255,0.20)",
+              iconBoxBg: "rgba(0,85,255,0.14)", iconBoxBdr: "rgba(0,85,255,0.28)",
               label: "Present", value: monthStats.present.toString(), valColor: B1,
               bar: `linear-gradient(90deg, ${B1}, ${B4})`, barPct: presentPct,
               route: "/reports"
             },
             {
-              icon: XCircle, iconColor: RED,
-              bg: "rgba(255,51,85,0.10)", border: "rgba(255,51,85,0.20)", glow: "rgba(255,51,85,0.10)",
+              icon: XCircle, decorIcon: CalendarX, iconColor: RED,
+              cardBg: "linear-gradient(135deg, rgba(255,51,85,0.10) 0%, rgba(255,51,85,0.03) 100%)", cardBdr: "rgba(255,51,85,0.20)",
+              iconBoxBg: "rgba(255,51,85,0.14)", iconBoxBdr: "rgba(255,51,85,0.30)",
               label: "Absent", value: monthStats.absent.toString(), valColor: RED,
               bar: `linear-gradient(90deg, ${RED}, #FF8899)`, barPct: absentPct,
               route: "/alerts"
             },
             {
-              icon: Clock, iconColor: ORANGE,
-              bg: "rgba(255,136,0,0.10)", border: "rgba(255,136,0,0.20)", glow: "rgba(255,136,0,0.10)",
+              icon: Clock, decorIcon: Hourglass, iconColor: ORANGE,
+              cardBg: "linear-gradient(135deg, rgba(255,136,0,0.13) 0%, rgba(255,136,0,0.04) 100%)", cardBdr: "rgba(255,136,0,0.22)",
+              iconBoxBg: "rgba(255,136,0,0.18)", iconBoxBdr: "rgba(255,136,0,0.32)",
               label: "Late", value: monthStats.late.toString(), valColor: ORANGE,
               bar: `linear-gradient(90deg, ${ORANGE}, #FFB366)`, barPct: latePct,
               route: "/alerts"
             },
-          ].map(({ icon: Icon, iconColor, bg, border, glow, label, value, valColor, bar, barPct, route }) => (
+          ].map(({ icon: Icon, decorIcon: DecorIcon, iconColor, cardBg, cardBdr, iconBoxBg, iconBoxBdr, label, value, valColor, bar, barPct, route }) => (
             <div
               key={label}
               role="button"
@@ -215,21 +219,17 @@ const AttendancePage = () => {
               aria-label={`Open ${route === "/alerts" ? "alerts" : "reports"} page for ${label}`}
               onClick={() => navigate(route)}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(route); } }}
-              className="bg-white rounded-[22px] px-4 py-[18px] relative overflow-hidden cursor-pointer active:scale-[0.96] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
-              style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)", transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
-              <div className="absolute -top-[18px] -right-[18px] w-[70px] h-[70px] rounded-full pointer-events-none"
-                style={{ background: `radial-gradient(circle, ${glow} 0%, transparent 70%)`, opacity: 0.5 }} />
+              className="rounded-[22px] px-4 py-[18px] relative overflow-hidden cursor-pointer active:scale-[0.96] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+              style={{ background: cardBg, boxShadow: SH, border: `0.5px solid ${cardBdr}`, transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
+              <div className="absolute pointer-events-none" style={{ bottom: 10, right: 10 }}>
+                <DecorIcon style={{ width: 60, height: 60, color: iconColor, opacity: 0.20, strokeWidth: 1.6 }} />
+              </div>
               <div className="w-[34px] h-[34px] rounded-[11px] flex items-center justify-center mb-3 relative"
-                style={{ background: bg, border: `0.5px solid ${border}` }}>
+                style={{ background: iconBoxBg, border: `0.5px solid ${iconBoxBdr}` }}>
                 <Icon className="w-[17px] h-[17px]" style={{ color: iconColor }} strokeWidth={2.2} />
               </div>
               <div className="text-[26px] font-bold leading-none mb-[5px] relative" style={{ color: valColor, letterSpacing: "-0.6px" }}>{value}</div>
               <div className="text-[9px] font-bold uppercase tracking-[0.09em] relative" style={{ color: T4 }}>{label}</div>
-              <div className="h-[3.5px] rounded-[2px] mt-3 relative" style={{ background: bar === "rgba(255,51,85,0.15)" || bar === "rgba(255,136,0,0.15)" ? bar : "transparent" }}>
-                {(bar.startsWith("linear-gradient")) && (
-                  <div className="h-full rounded-[2px]" style={{ width: `${barPct}%`, background: bar }} />
-                )}
-              </div>
             </div>
           ))}
         </div>
@@ -673,11 +673,11 @@ const AttendancePage = () => {
         {/* ── 4 Stat Cards ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
           {[
-            { icon: CheckCircle, iconColor: GREEN, bg: "rgba(0,200,83,0.12)", border: "rgba(0,200,83,0.22)", glow: "rgba(0,200,83,0.12)", label: "Overall", value: `${stats.percentage}%`, valColor: GREEN, bar: `linear-gradient(90deg, ${GREEN}, #66EE99)`, barPct: Math.max(stats.percentage, 3), route: "/reports" },
-            { icon: Users, iconColor: B1, bg: "rgba(0,85,255,0.10)", border: "rgba(0,85,255,0.18)", glow: "rgba(0,85,255,0.10)", label: "Present", value: monthStats.present.toString(), valColor: B1, bar: `linear-gradient(90deg, ${B1}, ${B4})`, barPct: presentPctD, route: "/reports" },
-            { icon: XCircle, iconColor: RED, bg: "rgba(255,51,85,0.10)", border: "rgba(255,51,85,0.20)", glow: "rgba(255,51,85,0.10)", label: "Absent", value: monthStats.absent.toString(), valColor: RED, bar: `linear-gradient(90deg, ${RED}, #FF8899)`, barPct: absentPctD, route: "/alerts" },
-            { icon: Clock, iconColor: ORANGE, bg: "rgba(255,136,0,0.10)", border: "rgba(255,136,0,0.20)", glow: "rgba(255,136,0,0.10)", label: "Late", value: monthStats.late.toString(), valColor: ORANGE, bar: `linear-gradient(90deg, ${ORANGE}, #FFB366)`, barPct: latePctD, route: "/alerts" },
-          ].map(({ icon: Icon, iconColor, bg, border, glow, label, value, valColor, bar, barPct, route }) => (
+            { icon: CheckCircle, decorIcon: TrendingUp, iconColor: GREEN, cardBg: "linear-gradient(135deg, rgba(0,200,83,0.13) 0%, rgba(0,200,83,0.04) 100%)", cardBdr: "rgba(0,200,83,0.20)", iconBoxBg: "rgba(0,200,83,0.18)", iconBoxBdr: "rgba(0,200,83,0.30)", label: "Overall", value: `${stats.percentage}%`, valColor: GREEN, bar: `linear-gradient(90deg, ${GREEN}, #66EE99)`, barPct: Math.max(stats.percentage, 3), route: "/reports" },
+            { icon: Users, decorIcon: UserCheck, iconColor: B1, cardBg: "linear-gradient(135deg, rgba(0,85,255,0.10) 0%, rgba(0,85,255,0.03) 100%)", cardBdr: "rgba(0,85,255,0.20)", iconBoxBg: "rgba(0,85,255,0.14)", iconBoxBdr: "rgba(0,85,255,0.28)", label: "Present", value: monthStats.present.toString(), valColor: B1, bar: `linear-gradient(90deg, ${B1}, ${B4})`, barPct: presentPctD, route: "/reports" },
+            { icon: XCircle, decorIcon: CalendarX, iconColor: RED, cardBg: "linear-gradient(135deg, rgba(255,51,85,0.10) 0%, rgba(255,51,85,0.03) 100%)", cardBdr: "rgba(255,51,85,0.20)", iconBoxBg: "rgba(255,51,85,0.14)", iconBoxBdr: "rgba(255,51,85,0.30)", label: "Absent", value: monthStats.absent.toString(), valColor: RED, bar: `linear-gradient(90deg, ${RED}, #FF8899)`, barPct: absentPctD, route: "/alerts" },
+            { icon: Clock, decorIcon: Hourglass, iconColor: ORANGE, cardBg: "linear-gradient(135deg, rgba(255,136,0,0.13) 0%, rgba(255,136,0,0.04) 100%)", cardBdr: "rgba(255,136,0,0.22)", iconBoxBg: "rgba(255,136,0,0.18)", iconBoxBdr: "rgba(255,136,0,0.32)", label: "Late", value: monthStats.late.toString(), valColor: ORANGE, bar: `linear-gradient(90deg, ${ORANGE}, #FFB366)`, barPct: latePctD, route: "/alerts" },
+          ].map(({ icon: Icon, decorIcon: DecorIcon, iconColor, cardBg, cardBdr, iconBoxBg, iconBoxBdr, label, value, valColor, bar, barPct, route }) => (
             <div
               key={label}
               role="button"
@@ -685,21 +685,17 @@ const AttendancePage = () => {
               aria-label={`Open ${route === "/alerts" ? "alerts" : "reports"} page for ${label}`}
               onClick={() => navigate(route)}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(route); } }}
-              className="bg-white rounded-[22px] px-5 py-5 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
-              style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-              <div className="absolute -top-[18px] -right-[18px] w-[90px] h-[90px] rounded-full pointer-events-none"
-                style={{ background: `radial-gradient(circle, ${glow} 0%, transparent 70%)`, opacity: 0.5 }} />
+              className="rounded-[22px] px-5 py-5 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+              style={{ background: cardBg, boxShadow: SH, border: `0.5px solid ${cardBdr}` }}>
+              <div className="absolute pointer-events-none" style={{ bottom: 14, right: 14 }}>
+                <DecorIcon style={{ width: 80, height: 80, color: iconColor, opacity: 0.20, strokeWidth: 1.6 }} />
+              </div>
               <div className="w-[38px] h-[38px] rounded-[12px] flex items-center justify-center mb-4 relative"
-                style={{ background: bg, border: `0.5px solid ${border}` }}>
+                style={{ background: iconBoxBg, border: `0.5px solid ${iconBoxBdr}` }}>
                 <Icon className="w-[18px] h-[18px]" style={{ color: iconColor }} strokeWidth={2.2} />
               </div>
               <div className="text-[34px] font-bold leading-none mb-[5px] relative" style={{ color: valColor, letterSpacing: "-1px" }}>{value}</div>
               <div className="text-[10px] font-bold uppercase tracking-[0.10em] relative" style={{ color: T4 }}>{label}</div>
-              <div className="h-[3.5px] rounded-[2px] mt-3 relative" style={{ background: bar === "rgba(255,51,85,0.15)" || bar === "rgba(255,136,0,0.15)" ? bar : "transparent" }}>
-                {(bar.startsWith("linear-gradient")) && (
-                  <div className="h-full rounded-[2px]" style={{ width: `${barPct}%`, background: bar }} />
-                )}
-              </div>
             </div>
           ))}
         </div>

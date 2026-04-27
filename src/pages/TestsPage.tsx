@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Calendar, CheckCircle, Clock, Loader2, User,
-  GraduationCap
+  GraduationCap, Trophy, Medal, Target, TrendingDown
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { useSchoolSettings, resolveAcademicYear } from "@/hooks/useSchoolSettings";
@@ -451,16 +451,18 @@ const TestsPage = () => {
           </div>
           <div className="grid grid-cols-2 gap-[10px] mt-3 relative z-10">
             {[
-              { val: stats.aGrade, label: "A Grade", color: GREEN,  bg: "rgba(0,200,83,0.09)",  border: "rgba(0,200,83,0.20)", bar: "linear-gradient(90deg, #00C853, #66EE88)" },
-              { val: stats.bGrade, label: "B Grade", color: B1,     bg: "rgba(0,85,255,0.09)",  border: "rgba(0,85,255,0.18)", bar: `linear-gradient(90deg, ${B1}, ${B4})` },
-              { val: stats.cGrade, label: "C Grade", color: ORANGE, bg: "rgba(255,136,0,0.09)", border: "rgba(255,136,0,0.20)", bar: "linear-gradient(90deg, #FF8800, #FFCC44)" },
-              { val: stats.belowC, label: "Below C", color: RED,    bg: "rgba(255,51,85,0.09)", border: "rgba(255,51,85,0.18)", bar: "linear-gradient(90deg, #FF3355, #FF88AA)" },
-            ].map(({ val, label, color, bg, border, bar }) => (
-              <div key={label} className="rounded-[18px] px-4 py-[18px] flex flex-col items-center gap-[6px] active:scale-[0.96] transition-transform"
-                style={{ background: bg, border: `0.5px solid ${border}`, transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
-                <div className="text-[36px] font-bold leading-none" style={{ color, letterSpacing: "-1.2px" }}>{val}</div>
-                <div className="text-[11px] font-bold uppercase tracking-[0.06em]" style={{ color }}>{label}</div>
-                <div className="h-[3px] rounded-[2px] mt-[2px]" style={{ width: "80%", background: bar }} />
+              { val: stats.aGrade, label: "A Grade", color: GREEN,  decorIcon: Trophy,        cardBg: "linear-gradient(135deg, rgba(0,200,83,0.13) 0%, rgba(0,200,83,0.04) 100%)",   cardBdr: "rgba(0,200,83,0.20)" },
+              { val: stats.bGrade, label: "B Grade", color: B1,     decorIcon: Medal,         cardBg: "linear-gradient(135deg, rgba(0,85,255,0.10) 0%, rgba(0,85,255,0.03) 100%)",   cardBdr: "rgba(0,85,255,0.20)" },
+              { val: stats.cGrade, label: "C Grade", color: ORANGE, decorIcon: Target,        cardBg: "linear-gradient(135deg, rgba(255,136,0,0.13) 0%, rgba(255,136,0,0.04) 100%)", cardBdr: "rgba(255,136,0,0.22)" },
+              { val: stats.belowC, label: "Below C", color: RED,    decorIcon: TrendingDown,  cardBg: "linear-gradient(135deg, rgba(255,51,85,0.10) 0%, rgba(255,51,85,0.03) 100%)", cardBdr: "rgba(255,51,85,0.20)" },
+            ].map(({ val, label, color, decorIcon: DecorIcon, cardBg, cardBdr }) => (
+              <div key={label} className="rounded-[18px] px-4 py-[18px] relative overflow-hidden active:scale-[0.96] transition-transform"
+                style={{ background: cardBg, border: `0.5px solid ${cardBdr}`, transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
+                <div className="absolute pointer-events-none" style={{ bottom: 8, right: 8 }}>
+                  <DecorIcon style={{ width: 56, height: 56, color, opacity: 0.20, strokeWidth: 1.6 }} />
+                </div>
+                <div className="text-[36px] font-bold leading-none relative" style={{ color, letterSpacing: "-1.2px" }}>{val}</div>
+                <div className="text-[11px] font-bold uppercase tracking-[0.06em] mt-[6px] relative" style={{ color }}>{label}</div>
               </div>
             ))}
           </div>
@@ -852,16 +854,18 @@ const TestsPage = () => {
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4 relative z-10">
               {[
-                { val: stats.aGrade, label: "A Grade", color: GREEN,  bg: "rgba(0,200,83,0.09)",  border: "rgba(0,200,83,0.20)", bar: "linear-gradient(90deg, #00C853, #66EE88)" },
-                { val: stats.bGrade, label: "B Grade", color: B1,     bg: "rgba(0,85,255,0.09)",  border: "rgba(0,85,255,0.18)", bar: `linear-gradient(90deg, ${B1}, ${B4})` },
-                { val: stats.cGrade, label: "C Grade", color: ORANGE, bg: "rgba(255,136,0,0.09)", border: "rgba(255,136,0,0.20)", bar: "linear-gradient(90deg, #FF8800, #FFCC44)" },
-                { val: stats.belowC, label: "Below C", color: RED,    bg: "rgba(255,51,85,0.09)", border: "rgba(255,51,85,0.18)", bar: "linear-gradient(90deg, #FF3355, #FF88AA)" },
-              ].map(({ val, label, color, bg, border, bar }) => (
-                <div key={label} className="rounded-[20px] px-5 py-6 flex flex-col items-center gap-[8px] transition-transform hover:-translate-y-0.5"
-                  style={{ background: bg, border: `0.5px solid ${border}` }}>
-                  <div className="text-[42px] font-bold leading-none" style={{ color, letterSpacing: "-1.4px" }}>{val}</div>
-                  <div className="text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color }}>{label}</div>
-                  <div className="h-[3px] rounded-[2px] mt-1" style={{ width: "70%", background: bar }} />
+                { val: stats.aGrade, label: "A Grade", color: GREEN,  decorIcon: Trophy,        cardBg: "linear-gradient(135deg, rgba(0,200,83,0.13) 0%, rgba(0,200,83,0.04) 100%)",   cardBdr: "rgba(0,200,83,0.20)" },
+                { val: stats.bGrade, label: "B Grade", color: B1,     decorIcon: Medal,         cardBg: "linear-gradient(135deg, rgba(0,85,255,0.10) 0%, rgba(0,85,255,0.03) 100%)",   cardBdr: "rgba(0,85,255,0.20)" },
+                { val: stats.cGrade, label: "C Grade", color: ORANGE, decorIcon: Target,        cardBg: "linear-gradient(135deg, rgba(255,136,0,0.13) 0%, rgba(255,136,0,0.04) 100%)", cardBdr: "rgba(255,136,0,0.22)" },
+                { val: stats.belowC, label: "Below C", color: RED,    decorIcon: TrendingDown,  cardBg: "linear-gradient(135deg, rgba(255,51,85,0.10) 0%, rgba(255,51,85,0.03) 100%)", cardBdr: "rgba(255,51,85,0.20)" },
+              ].map(({ val, label, color, decorIcon: DecorIcon, cardBg, cardBdr }) => (
+                <div key={label} className="rounded-[20px] px-5 py-6 relative overflow-hidden transition-transform hover:-translate-y-0.5"
+                  style={{ background: cardBg, border: `0.5px solid ${cardBdr}` }}>
+                  <div className="absolute pointer-events-none" style={{ bottom: 12, right: 12 }}>
+                    <DecorIcon style={{ width: 72, height: 72, color, opacity: 0.20, strokeWidth: 1.6 }} />
+                  </div>
+                  <div className="text-[42px] font-bold leading-none relative" style={{ color, letterSpacing: "-1.4px" }}>{val}</div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.08em] mt-2 relative" style={{ color }}>{label}</div>
                 </div>
               ))}
             </div>

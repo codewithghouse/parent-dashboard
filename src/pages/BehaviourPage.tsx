@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import {
   Trophy, AlertTriangle, Star, StarHalf, Clock, Users,
-  BookOpen, HandHeart, Lightbulb, Loader2, CheckCircle
+  BookOpen, HandHeart, Lightbulb, Loader2, CheckCircle,
+  ShieldCheck, Hourglass, Activity
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useAuth } from "@/lib/AuthContext";
@@ -479,19 +480,22 @@ export default function BehaviourPage() {
             {/* ── Breakdown Grid 2×2 ── */}
             <div className="grid grid-cols-2 gap-2 mx-5 mt-3">
               {[
-                { val: conductGrade, label: "Conduct",      color: GREEN,  ico: CheckCircle, icoBg: `linear-gradient(135deg, ${GREEN}, #66EE88)`, icoSh: "0 2px 8px rgba(0,200,83,0.24)" },
-                { val: `${punctualityPct}%`, label: "Punctuality", color: B1,  ico: Clock,       icoBg: `linear-gradient(135deg, ${B1}, ${B3})`,      icoSh: "0 2px 8px rgba(0,85,255,0.24)" },
-                { val: respectScore, label: "Respect",      color: GOLD,   ico: Star,        icoBg: `linear-gradient(135deg, ${GOLD}, #FFDD44)`,  icoSh: "0 2px 8px rgba(255,170,0,0.24)" },
-                { val: participationScore, label: "Participation", color: VIOLET, ico: Users,      icoBg: "linear-gradient(135deg, #7B3FF4, #AA77FF)", icoSh: "0 2px 8px rgba(123,63,244,0.24)" },
-              ].map(({ val, label, color, ico: Icon, icoBg, icoSh }) => (
-                <div key={label} className="rounded-[16px] px-[14px] py-[13px] active:bg-[#E0ECFF] transition-colors cursor-pointer"
-                  style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-                  <div className="w-7 h-7 rounded-[9px] flex items-center justify-center mb-2"
-                    style={{ background: icoBg, boxShadow: icoSh }}>
-                    <Icon className="w-[14px] h-[14px] text-white" strokeWidth={2.5} />
+                { val: conductGrade,         label: "Conduct",       color: GREEN,  ico: CheckCircle, decorIcon: ShieldCheck, cardBg: "linear-gradient(135deg, rgba(0,200,83,0.13) 0%, rgba(0,200,83,0.04) 100%)",   cardBdr: "rgba(0,200,83,0.20)", iconBoxBg: "rgba(0,200,83,0.18)", iconBoxBdr: "rgba(0,200,83,0.30)" },
+                { val: `${punctualityPct}%`, label: "Punctuality",   color: B1,     ico: Clock,       decorIcon: Hourglass,   cardBg: "linear-gradient(135deg, rgba(0,85,255,0.10) 0%, rgba(0,85,255,0.03) 100%)",   cardBdr: "rgba(0,85,255,0.20)", iconBoxBg: "rgba(0,85,255,0.14)", iconBoxBdr: "rgba(0,85,255,0.28)" },
+                { val: respectScore,         label: "Respect",       color: GOLD,   ico: Star,        decorIcon: HandHeart,   cardBg: "linear-gradient(135deg, rgba(255,170,0,0.13) 0%, rgba(255,170,0,0.04) 100%)", cardBdr: "rgba(255,170,0,0.22)", iconBoxBg: "rgba(255,170,0,0.18)", iconBoxBdr: "rgba(255,170,0,0.32)" },
+                { val: participationScore,   label: "Participation", color: VIOLET, ico: Users,       decorIcon: Activity,    cardBg: "linear-gradient(135deg, rgba(123,63,244,0.12) 0%, rgba(123,63,244,0.04) 100%)", cardBdr: "rgba(123,63,244,0.22)", iconBoxBg: "rgba(123,63,244,0.16)", iconBoxBdr: "rgba(123,63,244,0.30)" },
+              ].map(({ val, label, color, ico: Icon, decorIcon: DecorIcon, cardBg, cardBdr, iconBoxBg, iconBoxBdr }) => (
+                <div key={label} className="rounded-[16px] px-[14px] py-[13px] relative overflow-hidden active:scale-[0.96] transition-transform cursor-pointer"
+                  style={{ background: cardBg, border: `0.5px solid ${cardBdr}`, transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
+                  <div className="absolute pointer-events-none" style={{ bottom: 6, right: 6 }}>
+                    <DecorIcon style={{ width: 50, height: 50, color, opacity: 0.20, strokeWidth: 1.6 }} />
                   </div>
-                  <div className="text-[20px] font-bold leading-none mb-[2px]" style={{ color, letterSpacing: "-0.5px" }}>{val}</div>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.07em]" style={{ color: T4 }}>{label}</div>
+                  <div className="w-7 h-7 rounded-[9px] flex items-center justify-center mb-2 relative"
+                    style={{ background: iconBoxBg, border: `0.5px solid ${iconBoxBdr}` }}>
+                    <Icon className="w-[14px] h-[14px]" style={{ color }} strokeWidth={2.5} />
+                  </div>
+                  <div className="text-[20px] font-bold leading-none mb-[2px] relative" style={{ color, letterSpacing: "-0.5px" }}>{val}</div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.07em] relative" style={{ color: T4 }}>{label}</div>
                 </div>
               ))}
             </div>
@@ -673,21 +677,22 @@ export default function BehaviourPage() {
               {/* Breakdown Grid — col-2 */}
               <div className="lg:col-span-2 grid grid-cols-2 gap-3">
                 {[
-                  { val: conductGradeD, label: "Conduct", color: GREEN, icon: CheckCircle, grad: `linear-gradient(135deg, ${GREEN}, #66EE88)`, sh: "0 3px 10px rgba(0,200,83,0.28)", glow: "rgba(0,200,83,0.08)" },
-                  { val: !hasBehaviourSignal ? "—" : `${punctualityPctD}%`, label: "Punctuality", color: B1, icon: Clock, grad: `linear-gradient(135deg, ${B1}, ${B3})`, sh: "0 3px 10px rgba(0,85,255,0.28)", glow: "rgba(0,85,255,0.08)" },
-                  { val: respectScoreD, label: "Respect", color: GOLD, icon: Star, grad: `linear-gradient(135deg, ${GOLD}, #FFDD44)`, sh: "0 3px 10px rgba(255,170,0,0.28)", glow: "rgba(255,170,0,0.08)" },
-                  { val: participationScoreD, label: "Participation", color: VIOLET, icon: Users, grad: `linear-gradient(135deg, ${VIOLET}, #AA77FF)`, sh: "0 3px 10px rgba(123,63,244,0.28)", glow: "rgba(123,63,244,0.08)" },
-                ].map(({ val, label, color, icon: Icon, grad, sh, glow }) => (
-                  <div key={label} className="bg-white rounded-[18px] px-5 py-5 relative overflow-hidden"
-                    style={{ boxShadow: SH_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-                    <div className="absolute -top-[20px] -right-[20px] w-[90px] h-[90px] rounded-full pointer-events-none"
-                      style={{ background: `radial-gradient(circle, ${glow} 0%, transparent 70%)` }} />
-                    <div className="w-10 h-10 rounded-[12px] flex items-center justify-center mb-3 relative z-10"
-                      style={{ background: grad, boxShadow: sh }}>
-                      <Icon className="w-5 h-5 text-white" strokeWidth={2.3} />
+                  { val: conductGradeD,                                       label: "Conduct",       color: GREEN,  icon: CheckCircle, decorIcon: ShieldCheck, cardBg: "linear-gradient(135deg, rgba(0,200,83,0.13) 0%, rgba(0,200,83,0.04) 100%)",   cardBdr: "rgba(0,200,83,0.20)", iconBoxBg: "rgba(0,200,83,0.18)", iconBoxBdr: "rgba(0,200,83,0.30)" },
+                  { val: !hasBehaviourSignal ? "—" : `${punctualityPctD}%`,    label: "Punctuality",   color: B1,     icon: Clock,       decorIcon: Hourglass,   cardBg: "linear-gradient(135deg, rgba(0,85,255,0.10) 0%, rgba(0,85,255,0.03) 100%)",   cardBdr: "rgba(0,85,255,0.20)", iconBoxBg: "rgba(0,85,255,0.14)", iconBoxBdr: "rgba(0,85,255,0.28)" },
+                  { val: respectScoreD,                                       label: "Respect",       color: GOLD,   icon: Star,        decorIcon: HandHeart,   cardBg: "linear-gradient(135deg, rgba(255,170,0,0.13) 0%, rgba(255,170,0,0.04) 100%)", cardBdr: "rgba(255,170,0,0.22)", iconBoxBg: "rgba(255,170,0,0.18)", iconBoxBdr: "rgba(255,170,0,0.32)" },
+                  { val: participationScoreD,                                 label: "Participation", color: VIOLET, icon: Users,       decorIcon: Activity,    cardBg: "linear-gradient(135deg, rgba(123,63,244,0.12) 0%, rgba(123,63,244,0.04) 100%)", cardBdr: "rgba(123,63,244,0.22)", iconBoxBg: "rgba(123,63,244,0.16)", iconBoxBdr: "rgba(123,63,244,0.30)" },
+                ].map(({ val, label, color, icon: Icon, decorIcon: DecorIcon, cardBg, cardBdr, iconBoxBg, iconBoxBdr }) => (
+                  <div key={label} className="rounded-[18px] px-5 py-5 relative overflow-hidden transition-transform hover:-translate-y-0.5"
+                    style={{ background: cardBg, boxShadow: SH_D, border: `0.5px solid ${cardBdr}` }}>
+                    <div className="absolute pointer-events-none" style={{ bottom: 14, right: 14 }}>
+                      <DecorIcon style={{ width: 80, height: 80, color, opacity: 0.20, strokeWidth: 1.6 }} />
                     </div>
-                    <div className="text-[26px] font-bold leading-none mb-1 relative z-10" style={{ color, letterSpacing: "-0.6px" }}>{val}</div>
-                    <div className="text-[10px] font-bold uppercase tracking-[0.10em] relative z-10" style={{ color: T4 }}>{label}</div>
+                    <div className="w-10 h-10 rounded-[12px] flex items-center justify-center mb-3 relative"
+                      style={{ background: iconBoxBg, border: `0.5px solid ${iconBoxBdr}` }}>
+                      <Icon className="w-5 h-5" style={{ color }} strokeWidth={2.3} />
+                    </div>
+                    <div className="text-[26px] font-bold leading-none mb-1 relative" style={{ color, letterSpacing: "-0.6px" }}>{val}</div>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.10em] relative" style={{ color: T4 }}>{label}</div>
                   </div>
                 ))}
               </div>

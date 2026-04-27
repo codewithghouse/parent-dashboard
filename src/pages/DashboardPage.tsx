@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
-import { CheckCircle, AlertCircle, Calendar, Star, Clock, Loader2, ShieldCheck, BrainCircuit, Sparkles, TrendingUp, BookOpen, Lightbulb, Download, Trophy, ArrowRight } from "lucide-react";
+import { CheckCircle, AlertCircle, Calendar, Star, Clock, Loader2, ShieldCheck, BrainCircuit, Sparkles, TrendingUp, BookOpen, Lightbulb, Download, Trophy, ArrowRight, BarChart3, ClipboardList, Award } from "lucide-react";
 import { ParentAIController } from "../ai/controller/ai-controller";
 import { generateWeeklyReport } from "../ai/engines/weekly-report-engine";
 import WeeklyReportPDF from "../components/WeeklyReportPDF";
@@ -706,11 +706,11 @@ const DashboardPage = () => {
         {/* ── Stats Grid 2×2 ── */}
         <div className="grid grid-cols-2 gap-3 mx-5 mt-[14px]">
           {[
-            { icon: CheckCircle, iconColor: GREEN, bg: GREEN_S, border: "rgba(18,192,78,0.20)", glow: "rgba(18,192,78,0.14)", label: "Attendance", value: attDisplay, status: liveStats.attendance === null ? "No records yet" : attOnTrack ? "On track ✓" : "Below target", statusColor: liveStats.attendance === null ? T4 : attOnTrack ? GREEN : ORANGE, route: "/attendance" },
-            { icon: AlertCircle, iconColor: ORANGE, bg: ORANGE_S, border: "rgba(245,160,0,0.20)", glow: "rgba(245,160,0,0.14)", label: "Pending Work", value: pendingDisplay, status: liveStats.pending === null ? "No assignments yet" : noPending ? "All clear ✓" : "Due this week", statusColor: liveStats.pending === null ? T4 : noPending ? GREEN : ORANGE, route: "/assignments" },
-            { icon: Calendar, iconColor: IND, bg: IND_SOFT, border: IND_BDR, glow: "rgba(0,85,255,0.09)", label: "Upcoming Tests", value: testsDisplay, status: liveStats.tests === null ? "No tests scheduled" : "Next 7 days", statusColor: T4, route: "/tests" },
-            { icon: Star, iconColor: ROSE, bg: ROSE_S, border: "rgba(255,110,168,0.20)", glow: "rgba(255,110,168,0.14)", label: "Recent Grade", value: liveStats.recentGrade !== "N/A" ? liveStats.recentGrade : "—", status: liveStats.recentSubject, statusColor: T4, route: "/tests" },
-          ].map(({ icon: Icon, iconColor, bg, border, glow, label, value, status, statusColor, route }) => (
+            { icon: CheckCircle, decorIcon: TrendingUp, iconColor: GREEN, cardBg: "linear-gradient(135deg, rgba(0,200,83,0.13) 0%, rgba(0,200,83,0.04) 100%)", cardBdr: "rgba(0,200,83,0.20)", iconBoxBg: "rgba(0,200,83,0.18)", iconBoxBdr: "rgba(0,200,83,0.30)", label: "Attendance", value: attDisplay, status: liveStats.attendance === null ? "No records yet" : attOnTrack ? "On track ✓" : "Below target", statusColor: liveStats.attendance === null ? T4 : attOnTrack ? GREEN : ORANGE, route: "/attendance" },
+            { icon: AlertCircle, decorIcon: BarChart3, iconColor: ORANGE, cardBg: "linear-gradient(135deg, rgba(255,136,0,0.13) 0%, rgba(255,136,0,0.04) 100%)", cardBdr: "rgba(255,136,0,0.22)", iconBoxBg: "rgba(255,136,0,0.18)", iconBoxBdr: "rgba(255,136,0,0.32)", label: "Pending Work", value: pendingDisplay, status: liveStats.pending === null ? "No assignments yet" : noPending ? "All clear ✓" : "Due this week", statusColor: liveStats.pending === null ? T4 : noPending ? GREEN : ORANGE, route: "/assignments" },
+            { icon: Calendar, decorIcon: ClipboardList, iconColor: IND, cardBg: "linear-gradient(135deg, rgba(0,85,255,0.10) 0%, rgba(0,85,255,0.03) 100%)", cardBdr: "rgba(0,85,255,0.20)", iconBoxBg: "rgba(0,85,255,0.14)", iconBoxBdr: "rgba(0,85,255,0.28)", label: "Upcoming Tests", value: testsDisplay, status: liveStats.tests === null ? "No tests scheduled" : "Next 7 days", statusColor: T4, route: "/tests" },
+            { icon: Star, decorIcon: Award, iconColor: ROSE, cardBg: "linear-gradient(135deg, rgba(255,51,85,0.10) 0%, rgba(255,51,85,0.03) 100%)", cardBdr: "rgba(255,51,85,0.20)", iconBoxBg: "rgba(255,51,85,0.14)", iconBoxBdr: "rgba(255,51,85,0.30)", label: "Recent Grade", value: liveStats.recentGrade !== "N/A" ? liveStats.recentGrade : "—", status: liveStats.recentSubject, statusColor: T4, route: "/tests" },
+          ].map(({ icon: Icon, decorIcon: DecorIcon, iconColor, cardBg, cardBdr, iconBoxBg, iconBoxBdr, label, value, status, statusColor, route }) => (
             <div
               key={label}
               role="button"
@@ -718,12 +718,13 @@ const DashboardPage = () => {
               aria-label={`Open ${label} page`}
               onClick={() => navigate(route)}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(route); } }}
-              className="bg-white rounded-[22px] px-4 pt-[18px] pb-[18px] relative overflow-hidden cursor-pointer active:scale-[0.96] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
-              style={{ boxShadow: SH, border: `0.5px solid ${IND_BDR}`, transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
-              <div className="absolute -top-[18px] -right-[18px] w-[72px] h-[72px] rounded-full pointer-events-none"
-                style={{ background: `radial-gradient(circle, ${glow} 0%, transparent 70%)`, opacity: 0.55 }} />
+              className="rounded-[22px] px-4 pt-[18px] pb-[18px] relative overflow-hidden cursor-pointer active:scale-[0.96] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+              style={{ background: cardBg, boxShadow: SH, border: `0.5px solid ${cardBdr}`, transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
+              <div className="absolute pointer-events-none" style={{ bottom: 10, right: 10 }}>
+                <DecorIcon style={{ width: 60, height: 60, color: iconColor, opacity: 0.20, strokeWidth: 1.6 }} />
+              </div>
               <div className="w-[34px] h-[34px] rounded-[11px] flex items-center justify-center mb-[14px] relative"
-                style={{ background: bg, border: `0.5px solid ${border}` }}>
+                style={{ background: iconBoxBg, border: `0.5px solid ${iconBoxBdr}` }}>
                 <Icon className="w-[17px] h-[17px]" style={{ color: iconColor }} />
               </div>
               <div className="text-[10px] font-bold uppercase tracking-[0.08em] relative" style={{ color: T4 }}>{label}</div>
@@ -1427,11 +1428,11 @@ const DashboardPage = () => {
           {/* ── Row 2: 4 Stat Cards ── */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
             {[
-              { icon: CheckCircle, iconColor: GREEN, bg: GREEN_S, border: "rgba(18,192,78,0.20)", glow: "rgba(18,192,78,0.14)", label: "Attendance", value: attDisplay, status: liveStats.attendance === null ? "No records yet" : attOnTrack ? "On track ✓" : "Below target", statusColor: liveStats.attendance === null ? T4 : attOnTrack ? GREEN : ORANGE, route: "/attendance" },
-              { icon: AlertCircle, iconColor: ORANGE, bg: ORANGE_S, border: "rgba(245,160,0,0.20)", glow: "rgba(245,160,0,0.14)", label: "Pending Work", value: pendingDisplay, status: liveStats.pending === null ? "No assignments yet" : noPending ? "All clear ✓" : "Due this week", statusColor: liveStats.pending === null ? T4 : noPending ? GREEN : ORANGE, route: "/assignments" },
-              { icon: Calendar, iconColor: IND, bg: IND_SOFT, border: IND_BDR, glow: "rgba(0,85,255,0.09)", label: "Upcoming Tests", value: testsDisplay, status: liveStats.tests === null ? "No tests scheduled" : "Next 7 days", statusColor: T4, route: "/tests" },
-              { icon: Star, iconColor: ROSE, bg: ROSE_S, border: "rgba(255,110,168,0.20)", glow: "rgba(255,110,168,0.14)", label: "Recent Grade", value: liveStats.recentGrade !== "N/A" ? liveStats.recentGrade : "—", status: liveStats.recentSubject, statusColor: T4, route: "/tests" },
-            ].map(({ icon: Icon, iconColor, bg, border, glow, label, value, status, statusColor, route }) => (
+              { icon: CheckCircle, decorIcon: TrendingUp, iconColor: GREEN, cardBg: "linear-gradient(135deg, rgba(0,200,83,0.13) 0%, rgba(0,200,83,0.04) 100%)", cardBdr: "rgba(0,200,83,0.20)", iconBoxBg: "rgba(0,200,83,0.18)", iconBoxBdr: "rgba(0,200,83,0.30)", label: "Attendance", value: attDisplay, status: liveStats.attendance === null ? "No records yet" : attOnTrack ? "On track ✓" : "Below target", statusColor: liveStats.attendance === null ? T4 : attOnTrack ? GREEN : ORANGE, route: "/attendance" },
+              { icon: AlertCircle, decorIcon: BarChart3, iconColor: ORANGE, cardBg: "linear-gradient(135deg, rgba(255,136,0,0.13) 0%, rgba(255,136,0,0.04) 100%)", cardBdr: "rgba(255,136,0,0.22)", iconBoxBg: "rgba(255,136,0,0.18)", iconBoxBdr: "rgba(255,136,0,0.32)", label: "Pending Work", value: pendingDisplay, status: liveStats.pending === null ? "No assignments yet" : noPending ? "All clear ✓" : "Due this week", statusColor: liveStats.pending === null ? T4 : noPending ? GREEN : ORANGE, route: "/assignments" },
+              { icon: Calendar, decorIcon: ClipboardList, iconColor: IND, cardBg: "linear-gradient(135deg, rgba(0,85,255,0.10) 0%, rgba(0,85,255,0.03) 100%)", cardBdr: "rgba(0,85,255,0.20)", iconBoxBg: "rgba(0,85,255,0.14)", iconBoxBdr: "rgba(0,85,255,0.28)", label: "Upcoming Tests", value: testsDisplay, status: liveStats.tests === null ? "No tests scheduled" : "Next 7 days", statusColor: T4, route: "/tests" },
+              { icon: Star, decorIcon: Award, iconColor: ROSE, cardBg: "linear-gradient(135deg, rgba(255,51,85,0.10) 0%, rgba(255,51,85,0.03) 100%)", cardBdr: "rgba(255,51,85,0.20)", iconBoxBg: "rgba(255,51,85,0.14)", iconBoxBdr: "rgba(255,51,85,0.30)", label: "Recent Grade", value: liveStats.recentGrade !== "N/A" ? liveStats.recentGrade : "—", status: liveStats.recentSubject, statusColor: T4, route: "/tests" },
+            ].map(({ icon: Icon, decorIcon: DecorIcon, iconColor, cardBg, cardBdr, iconBoxBg, iconBoxBdr, label, value, status, statusColor, route }) => (
               <div
                 key={label}
                 role="button"
@@ -1439,12 +1440,13 @@ const DashboardPage = () => {
                 aria-label={`Open ${label} page`}
                 onClick={() => navigate(route)}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(route); } }}
-                className="bg-white rounded-[22px] px-5 pt-5 pb-5 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-1 hover:scale-[1.02] hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
-                style={{ boxShadow: SH, border: `0.5px solid ${IND_BDR}`, transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
-                <div className="absolute -top-[18px] -right-[18px] w-[90px] h-[90px] rounded-full pointer-events-none"
-                  style={{ background: `radial-gradient(circle, ${glow} 0%, transparent 70%)`, opacity: 0.55 }} />
+                className="rounded-[22px] px-5 pt-5 pb-5 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-1 hover:scale-[1.02] hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+                style={{ background: cardBg, boxShadow: SH, border: `0.5px solid ${cardBdr}`, transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
+                <div className="absolute pointer-events-none" style={{ bottom: 14, right: 14 }}>
+                  <DecorIcon style={{ width: 80, height: 80, color: iconColor, opacity: 0.20, strokeWidth: 1.6 }} />
+                </div>
                 <div className="w-[38px] h-[38px] rounded-[12px] flex items-center justify-center mb-4 relative"
-                  style={{ background: bg, border: `0.5px solid ${border}` }}>
+                  style={{ background: iconBoxBg, border: `0.5px solid ${iconBoxBdr}` }}>
                   <Icon className="w-[18px] h-[18px]" style={{ color: iconColor }} />
                 </div>
                 <div className="text-[10px] font-bold uppercase tracking-[0.08em] relative" style={{ color: T4 }}>{label}</div>

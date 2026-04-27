@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import {
   Clock, School,
   ShieldCheck, Loader2, Target, MessageSquare,
-  BookOpen, ChevronRight, Layers
+  BookOpen, ChevronRight, Layers,
+  GraduationCap, BookText, Library, BookMarked
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/AuthContext";
@@ -57,6 +58,78 @@ const BLUE_AVATARS = [
   { bg: "linear-gradient(140deg,#002DBB,#0055FF)", shadow: "0 3px 12px rgba(0,45,187,0.32)" },
   { bg: "linear-gradient(140deg,#003399,#3388FF)", shadow: "0 3px 12px rgba(0,51,153,0.32)" },
   { bg: "linear-gradient(140deg,#0022AA,#2266EE)", shadow: "0 3px 12px rgba(0,34,170,0.32)" },
+];
+
+// ── Soft tinted card themes (match dashboard stat card vibe) — rotated per-card ──
+const CARD_THEMES = [
+  // 1 · Green
+  {
+    hero: "linear-gradient(135deg, rgba(0,200,83,0.18) 0%, rgba(0,200,83,0.05) 100%)",
+    heroBdr: "rgba(0,200,83,0.18)",
+    accent: "#00A040",
+    accentSolid: "#00C853",
+    iconBoxBg: "rgba(0,200,83,0.18)",
+    iconBoxBdr: "rgba(0,200,83,0.32)",
+    pillBg: "rgba(0,200,83,0.18)",
+    pillBdr: "rgba(0,200,83,0.34)",
+    chipBg: "rgba(0,200,83,0.16)",
+    chipBdr: "rgba(0,200,83,0.30)",
+    btnGrad: "linear-gradient(135deg, #00C853 0%, #00A040 100%)",
+    btnShadow: "0 4px 18px rgba(0,200,83,0.34), 0 1px 4px rgba(0,200,83,0.20)",
+    avatar: { bg: "linear-gradient(140deg,#00C853,#00A040)", shadow: "0 3px 12px rgba(0,200,83,0.32)" },
+    decorIcon: GraduationCap,
+  },
+  // 2 · Orange
+  {
+    hero: "linear-gradient(135deg, rgba(255,136,0,0.18) 0%, rgba(255,136,0,0.05) 100%)",
+    heroBdr: "rgba(255,136,0,0.20)",
+    accent: "#CC6A00",
+    accentSolid: "#FF8800",
+    iconBoxBg: "rgba(255,136,0,0.18)",
+    iconBoxBdr: "rgba(255,136,0,0.34)",
+    pillBg: "rgba(255,136,0,0.18)",
+    pillBdr: "rgba(255,136,0,0.34)",
+    chipBg: "rgba(255,136,0,0.16)",
+    chipBdr: "rgba(255,136,0,0.32)",
+    btnGrad: "linear-gradient(135deg, #FF8800 0%, #E07000 100%)",
+    btnShadow: "0 4px 18px rgba(255,136,0,0.34), 0 1px 4px rgba(255,136,0,0.20)",
+    avatar: { bg: "linear-gradient(140deg,#FF8800,#E07000)", shadow: "0 3px 12px rgba(255,136,0,0.32)" },
+    decorIcon: BookText,
+  },
+  // 3 · Blue
+  {
+    hero: "linear-gradient(135deg, rgba(0,85,255,0.14) 0%, rgba(0,85,255,0.04) 100%)",
+    heroBdr: "rgba(0,85,255,0.20)",
+    accent: "#0033AA",
+    accentSolid: "#0055FF",
+    iconBoxBg: "rgba(0,85,255,0.14)",
+    iconBoxBdr: "rgba(0,85,255,0.28)",
+    pillBg: "rgba(0,85,255,0.14)",
+    pillBdr: "rgba(0,85,255,0.28)",
+    chipBg: "rgba(0,85,255,0.12)",
+    chipBdr: "rgba(0,85,255,0.26)",
+    btnGrad: "linear-gradient(135deg, #0055FF 0%, #1166FF 100%)",
+    btnShadow: "0 4px 18px rgba(0,85,255,0.34), 0 1px 4px rgba(0,85,255,0.20)",
+    avatar: { bg: "linear-gradient(140deg,#0055FF,#1166FF)", shadow: "0 3px 12px rgba(0,85,255,0.32)" },
+    decorIcon: Library,
+  },
+  // 4 · Rose
+  {
+    hero: "linear-gradient(135deg, rgba(255,51,85,0.16) 0%, rgba(255,51,85,0.05) 100%)",
+    heroBdr: "rgba(255,51,85,0.20)",
+    accent: "#CC2244",
+    accentSolid: "#FF3355",
+    iconBoxBg: "rgba(255,51,85,0.16)",
+    iconBoxBdr: "rgba(255,51,85,0.32)",
+    pillBg: "rgba(255,51,85,0.16)",
+    pillBdr: "rgba(255,51,85,0.32)",
+    chipBg: "rgba(255,51,85,0.14)",
+    chipBdr: "rgba(255,51,85,0.30)",
+    btnGrad: "linear-gradient(135deg, #FF3355 0%, #CC2244 100%)",
+    btnShadow: "0 4px 18px rgba(255,51,85,0.34), 0 1px 4px rgba(255,51,85,0.20)",
+    avatar: { bg: "linear-gradient(140deg,#FF3355,#CC2244)", shadow: "0 3px 12px rgba(255,51,85,0.32)" },
+    decorIcon: BookMarked,
+  },
 ];
 
 const ClassesPage = () => {
@@ -189,8 +262,9 @@ const ClassesPage = () => {
             {/* ── Per-class cards ── */}
             {enrollments.map((en, idx) => {
               const subject = resolveSubject(en);
-              const hero = BLUE_HEROES[idx % BLUE_HEROES.length];
-              const avatar = BLUE_AVATARS[idx % BLUE_AVATARS.length];
+              const theme = CARD_THEMES[2];
+              const DecorIcon = theme.decorIcon;
+              const avatar = theme.avatar;
               const className = en.className || en.classGroup || en.classSection || en.class || en.section || null;
               // Real schedule from Firestore — was hardcoded "08:30 – 09:30 AM"
               // for every card, every subject. Now shows "—" until the school
@@ -211,42 +285,42 @@ const ClassesPage = () => {
                   style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
 
                   {/* Hero */}
-                  <div className="relative overflow-hidden px-5 pt-6 pb-[26px]" style={{ background: hero }}>
-                    <div className="absolute -top-11 -right-[30px] w-[200px] h-[200px] rounded-full pointer-events-none"
-                      style={{ background: "radial-gradient(circle, rgba(255,255,255,0.22) 0%, transparent 65%)" }} />
-                    <div className="absolute -bottom-[50px] -left-5 w-[160px] h-[160px] rounded-full pointer-events-none"
-                      style={{ background: "radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 65%)" }} />
+                  <div className="relative overflow-hidden px-5 pt-5 pb-[22px]" style={{ background: theme.hero, borderBottom: `0.5px solid ${theme.heroBdr}` }}>
+                    {/* Decorative bottom-right icon (matches dashboard cards) */}
+                    <div className="absolute pointer-events-none" style={{ bottom: 12, right: 12 }}>
+                      <DecorIcon style={{ width: 72, height: 72, color: theme.accentSolid, opacity: 0.20, strokeWidth: 1.6 }} />
+                    </div>
 
                     {/* Active pill */}
-                    <div className="absolute top-4 right-4 z-[2] flex items-center gap-[5px] px-[13px] py-[5px] rounded-full text-[10px] font-bold tracking-[0.06em] text-white"
-                      style={{ background: "rgba(255,255,255,0.22)", border: "0.5px solid rgba(255,255,255,0.36)", WebkitBackdropFilter: "blur(8px)", backdropFilter: "blur(8px)" }}>
-                      <span className="w-[6px] h-[6px] rounded-full bg-white animate-pulse" style={{ boxShadow: "0 0 0 2.5px rgba(255,255,255,0.28)" }} />
+                    <div className="absolute top-4 right-4 z-[2] flex items-center gap-[5px] px-[12px] py-[5px] rounded-full text-[10px] font-bold tracking-[0.06em]"
+                      style={{ background: theme.pillBg, border: `0.5px solid ${theme.pillBdr}`, color: theme.accent }}>
+                      <span className="w-[6px] h-[6px] rounded-full animate-pulse" style={{ background: theme.accentSolid, boxShadow: `0 0 0 2.5px ${theme.pillBg}` }} />
                       Active
                     </div>
 
                     <div className="w-12 h-12 rounded-[16px] flex items-center justify-center mb-4 relative z-10"
-                      style={{ background: "rgba(255,255,255,0.22)", border: "0.5px solid rgba(255,255,255,0.32)", WebkitBackdropFilter: "blur(8px)", backdropFilter: "blur(8px)" }}>
-                      <BookOpen className="w-6 h-6 text-white" strokeWidth={2.1} />
+                      style={{ background: theme.iconBoxBg, border: `0.5px solid ${theme.iconBoxBdr}` }}>
+                      <BookOpen className="w-6 h-6" style={{ color: theme.accentSolid }} strokeWidth={2.1} />
                     </div>
 
-                    <div className="text-[9px] font-bold uppercase tracking-[0.12em] mb-[6px] relative z-10" style={{ color: "rgba(255,255,255,0.52)" }}>
+                    <div className="text-[9px] font-bold uppercase tracking-[0.12em] mb-[6px] relative z-10" style={{ color: T4 }}>
                       Subject
                     </div>
-                    <h2 className="text-[28px] font-bold text-white mb-[14px] relative z-10 leading-[1.08]" style={{ letterSpacing: "-0.7px" }}>
+                    <h2 className="text-[28px] font-bold mb-[14px] relative z-10 leading-[1.08]" style={{ color: T1, letterSpacing: "-0.7px" }}>
                       {subject || "Class"}
                     </h2>
 
                     {/* Class / section tag */}
                     {className ? (
-                      <div className="inline-flex items-center gap-[6px] px-[15px] py-[7px] rounded-full relative z-10 text-[12px] font-bold text-white"
-                        style={{ background: "rgba(255,255,255,0.20)", border: "0.5px solid rgba(255,255,255,0.32)", WebkitBackdropFilter: "blur(8px)", backdropFilter: "blur(8px)", boxShadow: "0 2px 8px rgba(0,0,0,0.12)" }}>
-                        <Layers className="w-3 h-3" style={{ color: "rgba(255,255,255,0.85)" }} strokeWidth={2.2} />
+                      <div className="inline-flex items-center gap-[6px] px-[14px] py-[7px] rounded-full relative z-10 text-[12px] font-bold"
+                        style={{ background: theme.chipBg, border: `0.5px solid ${theme.chipBdr}`, color: theme.accent }}>
+                        <Layers className="w-3 h-3" style={{ color: theme.accentSolid }} strokeWidth={2.2} />
                         {className}
                       </div>
                     ) : (
-                      <div className="inline-flex items-center gap-[6px] px-[15px] py-[7px] rounded-full relative z-10 text-[11px] font-medium"
-                        style={{ background: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.65)" }}>
-                        <Layers className="w-3 h-3" style={{ color: "rgba(255,255,255,0.6)" }} />
+                      <div className="inline-flex items-center gap-[6px] px-[14px] py-[7px] rounded-full relative z-10 text-[11px] font-medium"
+                        style={{ background: "rgba(0,0,0,0.04)", color: T3 }}>
+                        <Layers className="w-3 h-3" style={{ color: T4 }} />
                         Class not assigned
                       </div>
                     )}
@@ -301,7 +375,7 @@ const ClassesPage = () => {
                     <button
                       onClick={(e) => { e.stopPropagation(); navigate("/teacher-notes", { state: { teacherId: en.teacherId } }); }}
                       className="w-full rounded-[16px] px-[18px] py-[14px] flex items-center justify-between relative overflow-hidden active:scale-[0.97] transition-transform"
-                      style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: "0 4px 18px rgba(0,85,255,0.34), 0 1px 4px rgba(0,85,255,0.20)" }}
+                      style={{ background: theme.btnGrad, boxShadow: theme.btnShadow }}
                     >
                       <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 52%)" }} />
                       <div className="flex items-center gap-[10px] relative z-10">
@@ -480,8 +554,9 @@ const ClassesPage = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
               {enrollments.map((en, idx) => {
                 const subject = resolveSubject(en);
-                const hero = BLUE_HEROES[idx % BLUE_HEROES.length];
-                const avatar = BLUE_AVATARS[idx % BLUE_AVATARS.length];
+                const theme = CARD_THEMES[2];
+                const DecorIcon = theme.decorIcon;
+                const avatar = theme.avatar;
                 const className = en.className || en.classGroup || en.classSection || en.class || en.section || null;
                 const schedule = en.schedule || "—";
                 const year = en.academicYear || academicYear;
@@ -499,41 +574,41 @@ const ClassesPage = () => {
                     style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
 
                     {/* Hero */}
-                    <div className="relative overflow-hidden px-6 pt-6 pb-7" style={{ background: hero }}>
-                      <div className="absolute -top-11 -right-[30px] w-[220px] h-[220px] rounded-full pointer-events-none"
-                        style={{ background: "radial-gradient(circle, rgba(255,255,255,0.22) 0%, transparent 65%)" }} />
-                      <div className="absolute -bottom-[50px] -left-5 w-[180px] h-[180px] rounded-full pointer-events-none"
-                        style={{ background: "radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 65%)" }} />
+                    <div className="relative overflow-hidden px-6 pt-6 pb-7" style={{ background: theme.hero, borderBottom: `0.5px solid ${theme.heroBdr}` }}>
+                      {/* Decorative bottom-right icon (matches dashboard cards) */}
+                      <div className="absolute pointer-events-none" style={{ bottom: 14, right: 14 }}>
+                        <DecorIcon style={{ width: 88, height: 88, color: theme.accentSolid, opacity: 0.20, strokeWidth: 1.6 }} />
+                      </div>
 
                       <div className="flex items-start justify-between relative z-10 mb-4">
                         <div className="w-12 h-12 rounded-[16px] flex items-center justify-center"
-                          style={{ background: "rgba(255,255,255,0.22)", border: "0.5px solid rgba(255,255,255,0.32)" }}>
-                          <BookOpen className="w-6 h-6 text-white" strokeWidth={2.1} />
+                          style={{ background: theme.iconBoxBg, border: `0.5px solid ${theme.iconBoxBdr}` }}>
+                          <BookOpen className="w-6 h-6" style={{ color: theme.accentSolid }} strokeWidth={2.1} />
                         </div>
-                        <div className="flex items-center gap-[5px] px-[13px] py-[5px] rounded-full text-[10px] font-bold tracking-[0.06em] text-white"
-                          style={{ background: "rgba(255,255,255,0.22)", border: "0.5px solid rgba(255,255,255,0.36)" }}>
-                          <span className="w-[6px] h-[6px] rounded-full bg-white animate-pulse" style={{ boxShadow: "0 0 0 2.5px rgba(255,255,255,0.28)" }} />
+                        <div className="flex items-center gap-[5px] px-[13px] py-[5px] rounded-full text-[10px] font-bold tracking-[0.06em]"
+                          style={{ background: theme.pillBg, border: `0.5px solid ${theme.pillBdr}`, color: theme.accent }}>
+                          <span className="w-[6px] h-[6px] rounded-full animate-pulse" style={{ background: theme.accentSolid, boxShadow: `0 0 0 2.5px ${theme.pillBg}` }} />
                           Active
                         </div>
                       </div>
 
-                      <div className="text-[9px] font-bold uppercase tracking-[0.12em] mb-[6px] relative z-10" style={{ color: "rgba(255,255,255,0.52)" }}>
+                      <div className="text-[9px] font-bold uppercase tracking-[0.12em] mb-[6px] relative z-10" style={{ color: T4 }}>
                         Subject
                       </div>
-                      <h2 className="text-[26px] font-bold text-white mb-[14px] relative z-10 leading-[1.08]" style={{ letterSpacing: "-0.6px" }}>
+                      <h2 className="text-[26px] font-bold mb-[14px] relative z-10 leading-[1.08]" style={{ color: T1, letterSpacing: "-0.6px" }}>
                         {subject || "Class"}
                       </h2>
 
                       {className ? (
-                        <div className="inline-flex items-center gap-[6px] px-[15px] py-[7px] rounded-full relative z-10 text-[12px] font-bold text-white"
-                          style={{ background: "rgba(255,255,255,0.20)", border: "0.5px solid rgba(255,255,255,0.32)", boxShadow: "0 2px 8px rgba(0,0,0,0.12)" }}>
-                          <Layers className="w-3 h-3" style={{ color: "rgba(255,255,255,0.85)" }} strokeWidth={2.2} />
+                        <div className="inline-flex items-center gap-[6px] px-[14px] py-[7px] rounded-full relative z-10 text-[12px] font-bold"
+                          style={{ background: theme.chipBg, border: `0.5px solid ${theme.chipBdr}`, color: theme.accent }}>
+                          <Layers className="w-3 h-3" style={{ color: theme.accentSolid }} strokeWidth={2.2} />
                           {className}
                         </div>
                       ) : (
-                        <div className="inline-flex items-center gap-[6px] px-[15px] py-[7px] rounded-full relative z-10 text-[11px] font-medium"
-                          style={{ background: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.65)" }}>
-                          <Layers className="w-3 h-3" style={{ color: "rgba(255,255,255,0.6)" }} />
+                        <div className="inline-flex items-center gap-[6px] px-[14px] py-[7px] rounded-full relative z-10 text-[11px] font-medium"
+                          style={{ background: "rgba(0,0,0,0.04)", color: T3 }}>
+                          <Layers className="w-3 h-3" style={{ color: T4 }} />
                           Class not assigned
                         </div>
                       )}
@@ -589,7 +664,7 @@ const ClassesPage = () => {
                         <button
                           onClick={(e) => { e.stopPropagation(); navigate("/teacher-notes", { state: { teacherId: en.teacherId } }); }}
                           className="w-full rounded-[16px] px-5 py-[14px] flex items-center justify-between relative overflow-hidden transition-transform hover:scale-[1.01]"
-                          style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: "0 4px 18px rgba(0,85,255,0.34), 0 1px 4px rgba(0,85,255,0.20)" }}>
+                          style={{ background: theme.btnGrad, boxShadow: theme.btnShadow }}>
                           <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 52%)" }} />
                           <div className="flex items-center gap-[10px] relative z-10">
                             <MessageSquare className="w-[17px] h-[17px] text-white" strokeWidth={2.2} />

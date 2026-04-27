@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { User, Clock, CheckCircle2, Loader2, Upload, FileCheck, X, FileText, BarChart3, Target, Trophy, Send, Lightbulb, Sparkles, ChevronDown } from "lucide-react";
+import { User, Clock, CheckCircle2, Loader2, Upload, FileCheck, X, FileText, BarChart3, Target, Trophy, Send, Lightbulb, Sparkles, ChevronDown, CalendarCheck, Hourglass } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { db, storage } from "@/lib/firebase";
 import { collection, where, onSnapshot, addDoc, serverTimestamp, Unsubscribe } from "firebase/firestore";
@@ -408,10 +408,10 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
           {/* ── Stats Scroll (Completion / On-Time / Avg Score) ── */}
           <div className="flex gap-[10px] px-[22px] pt-4 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
             {[
-              { label: "Completion", value: completionDisplay, color: GREEN, iconBg: "rgba(0,200,83,0.12)", iconBorder: "rgba(0,200,83,0.22)", icon: Target, bar: "linear-gradient(90deg, #00C853, #66EE99)", barPct: completionPct ?? 0, glow: "rgba(0,200,83,0.14)" },
-              { label: "On-Time",    value: onTimeDisplay,    color: B1,    iconBg: "rgba(0,85,255,0.10)",   iconBorder: "rgba(0,85,255,0.18)",   icon: BarChart3, bar: `linear-gradient(90deg, ${B1}, ${B4})`, barPct: onTimePct ?? 0, glow: "rgba(0,85,255,0.10)" },
-              { label: "Avg Score",  value: avgScoreDisplay,  color: VIOLET, iconBg: "rgba(107,33,232,0.10)", iconBorder: "rgba(107,33,232,0.20)", icon: Trophy, bar: "linear-gradient(90deg, #6B21E8, #A87FF8)", barPct: avgScorePct ?? 0, glow: "rgba(107,33,232,0.10)" },
-            ].map(({ label, value, color, iconBg, iconBorder, icon: Icon, bar, barPct, glow }) => (
+              { label: "Completion", value: completionDisplay, color: GREEN, decorIcon: CheckCircle2, cardBg: "linear-gradient(135deg, rgba(0,200,83,0.13) 0%, rgba(0,200,83,0.04) 100%)", cardBdr: "rgba(0,200,83,0.20)", iconBoxBg: "rgba(0,200,83,0.18)", iconBoxBdr: "rgba(0,200,83,0.30)", icon: Target },
+              { label: "On-Time",    value: onTimeDisplay,    color: B1,    decorIcon: CalendarCheck, cardBg: "linear-gradient(135deg, rgba(0,85,255,0.10) 0%, rgba(0,85,255,0.03) 100%)", cardBdr: "rgba(0,85,255,0.20)", iconBoxBg: "rgba(0,85,255,0.14)", iconBoxBdr: "rgba(0,85,255,0.28)", icon: BarChart3 },
+              { label: "Avg Score",  value: avgScoreDisplay,  color: VIOLET, decorIcon: Sparkles, cardBg: "linear-gradient(135deg, rgba(107,33,232,0.12) 0%, rgba(107,33,232,0.04) 100%)", cardBdr: "rgba(107,33,232,0.22)", iconBoxBg: "rgba(107,33,232,0.16)", iconBoxBdr: "rgba(107,33,232,0.30)", icon: Trophy },
+            ].map(({ label, value, color, decorIcon: DecorIcon, cardBg, cardBdr }) => (
               <div
                 key={label}
                 role="button"
@@ -419,21 +419,13 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
                 aria-label={`Open reports page for ${label}`}
                 onClick={() => navigate("/reports")}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
-                className="bg-white rounded-[22px] px-[18px] py-4 min-w-[110px] flex-shrink-0 relative overflow-hidden cursor-pointer active:scale-[0.96] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
-                style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)", transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
-                <div className="absolute -top-[16px] -right-[16px] w-[60px] h-[60px] rounded-full pointer-events-none"
-                  style={{ background: `radial-gradient(circle, ${glow} 0%, transparent 70%)`, opacity: 0.55 }} />
-                <div className="flex items-center justify-between mb-[10px] relative">
-                  <span className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: T4 }}>{label}</span>
-                  <div className="w-[26px] h-[26px] rounded-[8px] flex items-center justify-center"
-                    style={{ background: iconBg, border: `0.5px solid ${iconBorder}` }}>
-                    <Icon className="w-[13px] h-[13px]" style={{ color }} strokeWidth={2.5} />
-                  </div>
+                className="rounded-[22px] px-[18px] py-4 min-w-[130px] flex-shrink-0 relative overflow-hidden cursor-pointer active:scale-[0.96] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+                style={{ background: cardBg, boxShadow: SH, border: `0.5px solid ${cardBdr}`, transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
+                <div className="absolute pointer-events-none" style={{ bottom: 8, right: 8 }}>
+                  <DecorIcon style={{ width: 52, height: 52, color, opacity: 0.20, strokeWidth: 1.6 }} />
                 </div>
-                <div className="text-[28px] font-bold leading-none mb-[6px] relative" style={{ color, letterSpacing: "-0.8px" }}>{value}</div>
-                <div className="h-[3.5px] rounded-[2px] relative" style={{ background: BG2, width: "100%" }}>
-                  <div className="h-full rounded-[2px]" style={{ width: `${barPct}%`, background: bar }} />
-                </div>
+                <div className="text-[9px] font-bold uppercase tracking-[0.10em] mb-[10px] relative" style={{ color: T4 }}>{label}</div>
+                <div className="text-[28px] font-bold leading-none relative" style={{ color, letterSpacing: "-0.8px" }}>{value}</div>
               </div>
             ))}
           </div>
@@ -1008,13 +1000,11 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
         {/* ── Stats Row (4-col) ── */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
           {[
-            { label: "Completion", value: completionDisplay, color: GREEN, iconBg: "rgba(0,200,83,0.12)", iconBdr: "rgba(0,200,83,0.22)", icon: Target, bar: "linear-gradient(90deg, #00C853, #66EE99)", barPct: completionPct ?? 0, glow: "rgba(0,200,83,0.14)" },
-            { label: "On-Time",    value: onTimeDisplay,    color: B1,    iconBg: "rgba(0,85,255,0.10)",   iconBdr: "rgba(0,85,255,0.18)",   icon: BarChart3, bar: `linear-gradient(90deg, ${B1}, ${B4})`, barPct: onTimePct ?? 0, glow: "rgba(0,85,255,0.10)" },
-            { label: "Avg Score",  value: avgScoreDisplay,  color: VIOLET, iconBg: "rgba(107,33,232,0.10)", iconBdr: "rgba(107,33,232,0.20)", icon: Trophy, bar: "linear-gradient(90deg, #6B21E8, #A87FF8)", barPct: avgScorePct ?? 0, glow: "rgba(107,33,232,0.10)" },
-            // Pending bar: share of total assignments still pending. Previously
-            // hardcoded to 60% regardless of real data.
-            { label: "Pending",    value: `${pendingListD.length}`, color: ORANGE, iconBg: "rgba(255,136,0,0.10)", iconBdr: "rgba(255,136,0,0.22)", icon: Clock, bar: "linear-gradient(90deg, #FF8800, #FFCC44)", barPct: totalAssignments === 0 ? 0 : Math.round((pendingListD.length / totalAssignments) * 100), glow: "rgba(255,136,0,0.14)" },
-          ].map(({ label, value, color, iconBg, iconBdr, icon: Icon, bar, barPct, glow }) => (
+            { label: "Completion", value: completionDisplay, color: GREEN, decorIcon: CheckCircle2, cardBg: "linear-gradient(135deg, rgba(0,200,83,0.13) 0%, rgba(0,200,83,0.04) 100%)", cardBdr: "rgba(0,200,83,0.20)", iconBoxBg: "rgba(0,200,83,0.18)", iconBoxBdr: "rgba(0,200,83,0.30)", icon: Target },
+            { label: "On-Time",    value: onTimeDisplay,    color: B1,    decorIcon: CalendarCheck, cardBg: "linear-gradient(135deg, rgba(0,85,255,0.10) 0%, rgba(0,85,255,0.03) 100%)", cardBdr: "rgba(0,85,255,0.20)", iconBoxBg: "rgba(0,85,255,0.14)", iconBoxBdr: "rgba(0,85,255,0.28)", icon: BarChart3 },
+            { label: "Avg Score",  value: avgScoreDisplay,  color: VIOLET, decorIcon: Sparkles, cardBg: "linear-gradient(135deg, rgba(107,33,232,0.12) 0%, rgba(107,33,232,0.04) 100%)", cardBdr: "rgba(107,33,232,0.22)", iconBoxBg: "rgba(107,33,232,0.16)", iconBoxBdr: "rgba(107,33,232,0.30)", icon: Trophy },
+            { label: "Pending",    value: `${pendingListD.length}`, color: ORANGE, decorIcon: Hourglass, cardBg: "linear-gradient(135deg, rgba(255,136,0,0.13) 0%, rgba(255,136,0,0.04) 100%)", cardBdr: "rgba(255,136,0,0.22)", iconBoxBg: "rgba(255,136,0,0.18)", iconBoxBdr: "rgba(255,136,0,0.32)", icon: Clock },
+          ].map(({ label, value, color, decorIcon: DecorIcon, cardBg, cardBdr }) => (
             <div
               key={label}
               role="button"
@@ -1022,21 +1012,13 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
               aria-label={`Open reports page for ${label}`}
               onClick={() => navigate("/reports")}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
-              className="bg-white rounded-[22px] px-6 py-5 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
-              style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-              <div className="absolute -top-[20px] -right-[20px] w-[90px] h-[90px] rounded-full pointer-events-none"
-                style={{ background: `radial-gradient(circle, ${glow} 0%, transparent 70%)`, opacity: 0.65 }} />
-              <div className="flex items-center justify-between mb-3 relative">
-                <span className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: T4 }}>{label}</span>
-                <div className="w-9 h-9 rounded-[11px] flex items-center justify-center"
-                  style={{ background: iconBg, border: `0.5px solid ${iconBdr}` }}>
-                  <Icon className="w-[16px] h-[16px]" style={{ color }} strokeWidth={2.5} />
-                </div>
+              className="rounded-[22px] px-6 py-5 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+              style={{ background: cardBg, boxShadow: SH, border: `0.5px solid ${cardBdr}` }}>
+              <div className="absolute pointer-events-none" style={{ bottom: 14, right: 14 }}>
+                <DecorIcon style={{ width: 80, height: 80, color, opacity: 0.20, strokeWidth: 1.6 }} />
               </div>
-              <div className="text-[36px] font-bold leading-none mb-3 relative" style={{ color, letterSpacing: "-1px" }}>{value}</div>
-              <div className="h-[4px] rounded-[2px] relative" style={{ background: BG2, width: "100%" }}>
-                <div className="h-full rounded-[2px]" style={{ width: `${barPct}%`, background: bar }} />
-              </div>
+              <div className="text-[10px] font-bold uppercase tracking-[0.12em] mb-3 relative" style={{ color: T4 }}>{label}</div>
+              <div className="text-[36px] font-bold leading-none relative" style={{ color, letterSpacing: "-1px" }}>{value}</div>
             </div>
           ))}
         </div>
