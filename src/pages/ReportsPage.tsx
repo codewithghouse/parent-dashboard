@@ -479,42 +479,32 @@ const ReportsPage = () => {
           </div>
         </div>
 
-        {/* ── Stat Cards (4-col, 3D hover) ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5" style={{ perspective: "1200px" }}>
+        {/* ── Stat Cards (dashboard 4-stat-card vibe) ── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
           {[
-            { label: "All Reports", val: reports.length, color: B1, icon: FileText, grad: `linear-gradient(135deg, ${B1}, ${B3})`, sh: "0 3px 10px rgba(0,85,255,0.28)", glow: "rgba(0,85,255,0.09)", key: "all" as const },
-            { label: "PDF Files", val: pdfCountD, color: ORANGE, icon: FileText, grad: `linear-gradient(135deg, ${ORANGE}, #FFAA22)`, sh: "0 3px 10px rgba(255,136,0,0.28)", glow: "rgba(255,136,0,0.09)", key: "pdf" as const },
-            { label: "Excel", val: excelCountD, color: GREEN, icon: FileCheck, grad: `linear-gradient(135deg, ${GREEN}, #22EE66)`, sh: "0 3px 10px rgba(0,200,83,0.28)", glow: "rgba(0,200,83,0.09)", key: "excel" as const },
-            { label: "Verified", val: verifiedCountD, color: "#6B21E8", icon: ShieldCheck, grad: "linear-gradient(135deg, #6B21E8, #A87FF8)", sh: "0 3px 10px rgba(107,33,232,0.28)", glow: "rgba(107,33,232,0.09)", key: "verified" as const },
-          ].map(({ label, val, color, icon: Icon, grad, sh, glow, key }) => {
+            { label: "All Reports", val: reports.length, color: B1,        icon: FileText,    cardBg: "linear-gradient(135deg, rgba(0,85,255,0.10) 0%, rgba(0,85,255,0.03) 100%)",   cardBdr: "rgba(0,85,255,0.20)",  iconBoxBg: "rgba(0,85,255,0.14)",  iconBoxBdr: "rgba(0,85,255,0.28)",  key: "all" as const },
+            { label: "PDF Files",   val: pdfCountD,      color: ORANGE,    icon: FileText,    cardBg: "linear-gradient(135deg, rgba(255,136,0,0.13) 0%, rgba(255,136,0,0.04) 100%)", cardBdr: "rgba(255,136,0,0.22)", iconBoxBg: "rgba(255,136,0,0.18)", iconBoxBdr: "rgba(255,136,0,0.32)", key: "pdf" as const },
+            { label: "Excel",       val: excelCountD,    color: GREEN,     icon: FileCheck,   cardBg: "linear-gradient(135deg, rgba(0,200,83,0.13) 0%, rgba(0,200,83,0.04) 100%)",   cardBdr: "rgba(0,200,83,0.20)",  iconBoxBg: "rgba(0,200,83,0.18)",  iconBoxBdr: "rgba(0,200,83,0.30)",  key: "excel" as const },
+            { label: "Verified",    val: verifiedCountD, color: "#6B21E8", icon: ShieldCheck, cardBg: "linear-gradient(135deg, rgba(107,33,232,0.10) 0%, rgba(107,33,232,0.03) 100%)", cardBdr: "rgba(107,33,232,0.22)", iconBoxBg: "rgba(107,33,232,0.14)", iconBoxBdr: "rgba(107,33,232,0.30)", key: "verified" as const },
+          ].map(({ label, val, color, icon: Icon, cardBg, cardBdr, iconBoxBg, iconBoxBdr, key }) => {
             const isAct = formatFilter === key;
             return (
               <button key={label}
-                onMouseEnter={handle3DEnter}
-                onMouseMove={handle3DMove}
-                onMouseLeave={handle3DLeave}
                 onClick={() => setFormatFilter(key)}
-                className="bg-white rounded-[22px] px-6 py-5 relative overflow-hidden text-left cursor-pointer"
+                className="rounded-[22px] px-5 pt-[18px] pb-[18px] relative overflow-hidden text-left cursor-pointer transition-transform hover:-translate-y-0.5"
                 style={{
+                  background: cardBg,
                   boxShadow: isAct ? `${SH_LG_D}, 0 0 0 2px ${color}` : SH_D,
-                  border: "0.5px solid rgba(0,85,255,0.10)",
-                  transformStyle: "preserve-3d",
-                  willChange: "transform",
+                  border: `0.5px solid ${cardBdr}`,
                 }}>
-                <div data-glow className="absolute inset-0 pointer-events-none transition-opacity duration-300"
-                  style={{ opacity: 0 }} />
-                <div className="absolute -top-[20px] -right-[20px] w-[100px] h-[100px] rounded-full pointer-events-none"
-                  style={{ background: `radial-gradient(circle, ${glow} 0%, transparent 70%)` }} />
-                <div className="flex items-center justify-between mb-3 relative">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: T4 }}>{label}</span>
-                  <div className="w-10 h-10 rounded-[12px] flex items-center justify-center"
-                    style={{ background: grad, boxShadow: sh, transform: "translateZ(18px)" }}>
-                    <Icon className="w-[18px] h-[18px] text-white" strokeWidth={2.3} />
-                  </div>
+                <div className="w-[34px] h-[34px] rounded-[11px] flex items-center justify-center mb-[14px] relative"
+                  style={{ background: iconBoxBg, border: `0.5px solid ${iconBoxBdr}` }}>
+                  <Icon className="w-[17px] h-[17px]" style={{ color }} strokeWidth={2.3} />
                 </div>
-                <div className="text-[34px] font-bold leading-none relative" style={{ color, letterSpacing: "-1px", transform: "translateZ(10px)" }}>{val}</div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.10em] relative" style={{ color: T4 }}>{label}</div>
+                <div className="text-[34px] font-bold mt-1 leading-none relative" style={{ color, letterSpacing: "-1px" }}>{val}</div>
                 {isAct && (
-                  <div className="absolute bottom-3 right-5 text-[10px] font-bold uppercase tracking-[0.10em] flex items-center gap-[4px]" style={{ color }}>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.10em] mt-[8px] flex items-center gap-[4px] relative" style={{ color }}>
                     <CheckCircle2 className="w-[11px] h-[11px]" strokeWidth={2.5} /> Active
                   </div>
                 )}

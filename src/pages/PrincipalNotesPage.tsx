@@ -119,154 +119,108 @@ const PrincipalNotesPage = () => {
   }, [allMessages]);
 
   const principalName = allMessages[0]?.principalName || "Principal";
-  const principalInitial = (principalName?.[0] || "P").toUpperCase();
 
   // ═══════════════════════════════════════════════════════════════
-  // MOBILE — Blue Premium UI (Principal Chat — full bleed)
+  // MOBILE — WhatsApp UI (Principal Chat — full bleed)
   // ═══════════════════════════════════════════════════════════════
   if (isMobile) {
-    const B1 = "#0055FF", B2 = "#1166FF", B3 = "#2277FF";
-    const BG = "#EEF4FF", CARD = "#FFFFFF";
-    const T1 = "#001040", T2 = "#002080", T3 = "#5070B0", T4 = "#99AACC";
-    const ORANGE = "#FF8800";
-    const SH    = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.08), 0 10px 24px rgba(0,85,255,0.10)";
-    const SH_LG = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.11), 0 18px 44px rgba(0,85,255,0.13)";
-    const SH_BTN = "0 6px 22px rgba(0,85,255,0.42), 0 2px 6px rgba(0,85,255,0.22)";
+    const WA_GREEN = "#00A884";
+    const WA_HEADER_BG = "#F0F2F5";
+    const WA_CHAT_BG = "#EFEAE2";
+    const WA_BUBBLE_OUT = "#D9FDD3";
+    const WA_TICK_READ = "#53BDEB";
+    const WA_T1 = "#111B21", WA_T3 = "#667781";
     const FONT = "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif";
 
     return (
-      <div className="flex-1 flex flex-col -mx-3 -mt-3 md:mx-0 md:mt-0 animate-in fade-in duration-500"
-        style={{ background: BG, fontFamily: FONT }}>
+      <div className="flex-1 flex flex-col -mx-3 -mt-3 md:mx-0 md:mt-0 mb-[calc(-88px-env(safe-area-inset-bottom)-1rem)] md:mb-0 pb-[calc(88px+env(safe-area-inset-bottom)+0.5rem)] md:pb-0 animate-in fade-in duration-500"
+        style={{ background: WA_CHAT_BG, fontFamily: FONT }}>
         <style>{`.pn-scroll::-webkit-scrollbar{display:none}`}</style>
 
-        {/* Stat row */}
-        <div className="flex gap-[10px] px-5 pt-3 shrink-0">
-          <div className="flex-1 rounded-[18px] p-[14px] flex flex-col gap-[5px] relative overflow-hidden"
-            style={{ background: CARD, boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-            <div className="absolute -top-4 -right-3 w-[60px] h-[60px] rounded-full opacity-50 pointer-events-none"
-              style={{ background: "radial-gradient(circle, rgba(0,85,255,0.10) 0%, transparent 70%)" }} />
-            <div className="w-[26px] h-[26px] rounded-[8px] flex items-center justify-center mb-[3px]"
-              style={{ background: "rgba(0,85,255,0.10)", border: "0.5px solid rgba(0,85,255,0.18)" }}>
-              <MessageSquare className="w-[13px] h-[13px]" style={{ color: B1 }} strokeWidth={2.4} />
-            </div>
-            <div className="text-[9px] font-bold uppercase tracking-[0.07em] leading-[1.4]" style={{ color: T4 }}>Total Messages</div>
-            <div className="text-[24px] font-bold leading-none" style={{ color: T1, letterSpacing: "-0.6px" }}>{stats.total}</div>
-          </div>
-          <div className="flex-1 rounded-[18px] p-[14px] flex flex-col gap-[5px] relative overflow-hidden"
-            style={{ background: CARD, boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-            <div className="absolute -top-4 -right-3 w-[60px] h-[60px] rounded-full opacity-50 pointer-events-none"
-              style={{ background: "radial-gradient(circle, rgba(255,136,0,0.10) 0%, transparent 70%)" }} />
-            <div className="w-[26px] h-[26px] rounded-[8px] flex items-center justify-center mb-[3px]"
-              style={{ background: "rgba(255,136,0,0.10)", border: "0.5px solid rgba(255,136,0,0.22)" }}>
-              <Mail className="w-[13px] h-[13px]" style={{ color: ORANGE }} strokeWidth={2.4} />
-            </div>
-            <div className="text-[9px] font-bold uppercase tracking-[0.07em] leading-[1.4]" style={{ color: T4 }}>
-              Unread from<br />Principal
-            </div>
-            <div className="text-[24px] font-bold leading-none" style={{ color: T1, letterSpacing: "-0.6px" }}>{stats.unread}</div>
-          </div>
-        </div>
-
-        {/* Chat header — gradient banner */}
-        <div className="mx-5 mt-3 rounded-[20px] px-[16px] py-[15px] flex items-center gap-3 relative overflow-hidden shrink-0"
-          style={{ background: `linear-gradient(135deg, #0033CC 0%, ${B1} 50%, ${B3} 100%)`, boxShadow: SH_BTN }}>
-          <div className="absolute -top-7 -right-4 w-[130px] h-[130px] rounded-full pointer-events-none"
-            style={{ background: "radial-gradient(circle, rgba(255,255,255,0.14) 0%, transparent 65%)" }} />
+        {/* WA-style green chat header */}
+        <div className="flex items-center gap-3 px-3 py-[10px] shrink-0"
+          style={{ background: WA_GREEN, color: "#fff" }}>
           <button onClick={() => navigate(-1)}
-            className="w-[34px] h-[34px] rounded-[11px] flex items-center justify-center active:scale-90 relative z-10 shrink-0"
-            style={{ background: "rgba(255,255,255,0.20)", border: "0.5px solid rgba(255,255,255,0.28)" }}
+            className="w-8 h-8 flex items-center justify-center active:scale-90 shrink-0"
             aria-label="Back">
-            <ChevronLeft className="w-[14px] h-[14px] text-white" strokeWidth={2.5} />
+            <ChevronLeft className="w-[22px] h-[22px] text-white" strokeWidth={2.5} />
           </button>
-          <div className="w-[44px] h-[44px] rounded-[14px] flex items-center justify-center text-white relative z-10 shrink-0"
-            style={{ background: "rgba(255,255,255,0.22)", border: "2px solid rgba(255,255,255,0.30)" }}>
-            <School className="w-[22px] h-[22px]" strokeWidth={2.1} />
+          <div className="w-10 h-10 rounded-full flex items-center justify-center text-white shrink-0"
+            style={{ background: "rgba(255,255,255,0.22)", border: "1.5px solid rgba(255,255,255,0.30)" }}>
+            <School className="w-[20px] h-[20px]" strokeWidth={2.1} />
           </div>
-          <div className="flex-1 min-w-0 relative z-10">
-            <div className="text-[16px] font-bold text-white truncate" style={{ letterSpacing: "-0.3px" }}>{principalName}</div>
-            <div className="text-[11px] font-medium mt-[2px] flex items-center gap-[5px]" style={{ color: "rgba(255,255,255,0.65)" }}>
-              <div className="w-[5px] h-[5px] rounded-full animate-pulse" style={{ background: "#00EE88", boxShadow: "0 0 0 1.5px rgba(0,238,136,0.22)" }} />
-              School Administration
+          <div className="flex-1 min-w-0">
+            <div className="text-[16px] font-semibold text-white truncate" style={{ letterSpacing: "-0.1px" }}>{principalName}</div>
+            <div className="text-[12px] truncate" style={{ color: "rgba(255,255,255,0.78)" }}>
+              School Administration · online
             </div>
           </div>
-          <div className="flex items-center gap-[3px] px-[10px] py-[6px] rounded-[11px] relative z-10 shrink-0"
-            style={{ background: "rgba(255,255,255,0.20)", border: "0.5px solid rgba(255,255,255,0.28)" }}>
+          <div className="flex items-center gap-[3px] px-[10px] py-[5px] rounded-full shrink-0"
+            style={{ background: "rgba(255,255,255,0.18)" }}>
             <Shield className="w-[11px] h-[11px] text-white" strokeWidth={2.5} />
-            <span className="text-[10px] font-bold text-white tracking-[0.04em]">Official</span>
+            <span className="text-[10px] font-semibold text-white tracking-[0.04em]">Official</span>
           </div>
         </div>
 
-        {/* Chat scroll area */}
-        <div className="pn-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-5 py-3 flex flex-col gap-4"
-          style={{ scrollbarWidth: "none" }}>
+        {/* Chat scroll area — WA wallpaper */}
+        <div className="pn-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 py-3 flex flex-col"
+          style={{
+            background: WA_CHAT_BG,
+            backgroundImage: "radial-gradient(circle at 1px 1px, rgba(11,20,26,0.05) 1px, transparent 0)",
+            backgroundSize: "22px 22px",
+            scrollbarWidth: "none",
+          }}>
           {loading ? (
             <div className="flex-1 flex items-center justify-center">
-              <Loader2 className="w-6 h-6 animate-spin" style={{ color: B1 }} />
+              <Loader2 className="w-6 h-6 animate-spin" style={{ color: WA_GREEN }} />
             </div>
           ) : groupedMessages.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 py-8">
-              <div className="w-[60px] h-[60px] rounded-[20px] flex items-center justify-center"
-                style={{ background: "rgba(0,85,255,0.08)", border: "0.5px solid rgba(0,85,255,0.14)", boxShadow: "0 0 0 8px rgba(0,85,255,0.04)" }}>
-                <School className="w-[26px] h-[26px]" style={{ color: "rgba(0,85,255,0.45)" }} strokeWidth={2.1} />
+              <div className="w-[60px] h-[60px] rounded-full flex items-center justify-center"
+                style={{ background: "rgba(0,168,132,0.10)" }}>
+                <School className="w-[26px] h-[26px]" style={{ color: WA_GREEN, opacity: 0.7 }} strokeWidth={2.1} />
               </div>
-              <div className="text-[16px] font-bold text-center" style={{ color: T2, letterSpacing: "-0.3px" }}>No messages from Principal yet</div>
-              <div className="text-[12px] text-center max-w-[230px] font-normal leading-[1.6]" style={{ color: T4 }}>
+              <div className="text-[15px] font-semibold text-center" style={{ color: WA_T1 }}>No messages from Principal yet</div>
+              <div className="text-[12px] text-center max-w-[230px] leading-[1.5]" style={{ color: WA_T3 }}>
                 Messages from your school principal will appear here
               </div>
             </div>
           ) : groupedMessages.map(group => (
-            <div key={group.date} className="flex flex-col gap-3">
-              <div className="flex justify-center">
-                <span className="text-[11px] font-semibold px-[14px] py-[5px] rounded-full"
-                  style={{ background: "rgba(0,85,255,0.08)", color: T3, border: "0.5px solid rgba(0,85,255,0.14)", letterSpacing: "-0.1px" }}>
+            <div key={group.date}>
+              <div className="flex justify-center my-3">
+                <span className="px-[10px] py-[4px] rounded-[6px] text-[11px] font-medium"
+                  style={{ background: "#FFFFFF", color: WA_T3, boxShadow: "0 1px 1px rgba(11,20,26,0.08)" }}>
                   {group.date}
                 </span>
               </div>
               {group.messages.map(n => {
                 const isParent = n.from === "parent";
                 return isParent ? (
-                  <div key={n.id} className="flex justify-end">
-                    <div className="max-w-[82%]">
-                      <div className="px-[16px] py-[13px] text-[13px] text-white font-normal leading-[1.65] relative overflow-hidden"
-                        style={{
-                          background: `linear-gradient(135deg, ${B1}, ${B2})`,
-                          borderRadius: "20px 5px 20px 20px",
-                          boxShadow: "0 3px 14px rgba(0,85,255,0.28)",
-                          letterSpacing: "-0.1px",
-                        }}>
-                        <div className="whitespace-pre-wrap break-words">{n.message}</div>
-                      </div>
-                      <div className="text-[10px] font-semibold text-right mt-[5px] flex items-center justify-end gap-[5px]" style={{ color: T4 }}>
-                        <span>{fmtTime(n.timestamp)}</span>
-                        <CheckCheck className="w-[13px] h-[13px]" style={{ color: B1, opacity: 0.55 }} />
+                  <div key={n.id} className="flex justify-end mb-[3px]">
+                    <div className="max-w-[78%] px-[9px] py-[6px] relative"
+                      style={{
+                        background: WA_BUBBLE_OUT,
+                        borderRadius: "8px 8px 0 8px",
+                        boxShadow: "0 1px 1px rgba(11,20,26,0.08)",
+                      }}>
+                      <div className="text-[14px] leading-[1.4] whitespace-pre-wrap break-words pr-[58px]" style={{ color: WA_T1 }}>{n.message}</div>
+                      <div className="absolute right-[8px] bottom-[4px] flex items-center gap-[3px]">
+                        <span className="text-[10px]" style={{ color: WA_T3 }}>{fmtTime(n.timestamp)}</span>
+                        <CheckCheck className="w-[14px] h-[14px]" style={{ color: WA_TICK_READ }} />
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div key={n.id} className="flex items-start gap-[10px] max-w-[88%]">
-                    <div className="w-9 h-9 rounded-[12px] flex items-center justify-center text-white text-[14px] font-bold shrink-0"
-                      style={{ background: `linear-gradient(135deg, ${B1}, ${B3})`, boxShadow: "0 3px 10px rgba(0,85,255,0.24)" }}>
-                      {principalInitial}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[11px] font-bold mb-[5px]" style={{ color: B1, letterSpacing: "-0.1px" }}>
-                        {principalName} · School Admin
-                      </div>
-                      <div className="px-[18px] py-[16px] text-[13px] font-normal leading-[1.72] relative overflow-hidden"
-                        style={{
-                          background: CARD, color: T1,
-                          borderRadius: "5px 20px 20px 20px",
-                          boxShadow: SH_LG,
-                          border: "0.5px solid rgba(0,85,255,0.10)",
-                          letterSpacing: "-0.1px",
-                        }}>
-                        <div className="absolute -top-4 -right-3 w-[70px] h-[70px] rounded-full pointer-events-none"
-                          style={{ background: "radial-gradient(circle, rgba(0,85,255,0.04) 0%, transparent 70%)" }} />
-                        <div className="whitespace-pre-wrap break-words relative z-10">{n.message}</div>
-                      </div>
-                      <div className="text-[10px] font-semibold text-right mt-[5px] flex items-center justify-end gap-[5px]" style={{ color: T4 }}>
-                        <span>{fmtTime(n.timestamp)}</span>
-                        <CheckCheck className="w-[13px] h-[13px]" style={{ color: B1, opacity: 0.55 }} />
+                  <div key={n.id} className="flex justify-start mb-[3px]">
+                    <div className="max-w-[78%] px-[9px] py-[6px] relative"
+                      style={{
+                        background: "#fff",
+                        borderRadius: "8px 8px 8px 0",
+                        boxShadow: "0 1px 1px rgba(11,20,26,0.08)",
+                      }}>
+                      <div className="text-[14px] leading-[1.4] whitespace-pre-wrap break-words pr-[44px]" style={{ color: WA_T1 }}>{n.message}</div>
+                      <div className="absolute right-[8px] bottom-[4px]">
+                        <span className="text-[10px]" style={{ color: WA_T3 }}>{fmtTime(n.timestamp)}</span>
                       </div>
                     </div>
                   </div>
@@ -277,33 +231,27 @@ const PrincipalNotesPage = () => {
           <div ref={chatEndRef} />
         </div>
 
-        {/* Reply bar */}
-        <div className="px-[18px] py-[10px] pb-[14px] flex items-center gap-[10px] shrink-0"
-          style={{
-            background: "rgba(238,244,255,0.94)",
-            WebkitBackdropFilter: "saturate(220%) blur(28px)",
-            backdropFilter: "saturate(220%) blur(28px)",
-            borderTop: "0.5px solid rgba(0,85,255,0.10)",
-          }}>
-          <button className="w-9 h-9 rounded-[12px] flex items-center justify-center active:scale-90 shrink-0"
-            style={{ background: CARD, border: "0.5px solid rgba(0,85,255,0.14)", boxShadow: SH }}
-            aria-label="Emoji">
-            <Smile className="w-[16px] h-[16px]" style={{ color: "rgba(0,85,255,0.6)" }} strokeWidth={2} />
-          </button>
-          <input
-            type="text"
-            value={messageContent}
-            onChange={e => setMessageContent(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-            placeholder="Reply to principal..."
-            className="flex-1 min-w-0 px-[15px] py-[11px] rounded-[14px] text-[13px] outline-none"
-            style={{ background: CARD, border: "0.5px solid rgba(0,85,255,0.14)", color: T1, boxShadow: SH, fontFamily: FONT }}
-          />
+        {/* WA reply bar */}
+        <div className="px-2 py-[7px] flex items-end gap-[6px] shrink-0" style={{ background: WA_HEADER_BG }}>
+          <div className="flex-1 flex items-center gap-1 px-3 py-[8px] rounded-[24px] bg-white">
+            <button className="w-7 h-7 flex items-center justify-center active:scale-90 shrink-0" aria-label="Emoji">
+              <Smile className="w-[22px] h-[22px]" style={{ color: WA_T3 }} strokeWidth={1.8} />
+            </button>
+            <input
+              type="text"
+              value={messageContent}
+              onChange={e => setMessageContent(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+              placeholder="Reply to principal"
+              className="flex-1 min-w-0 px-2 text-[15px] outline-none bg-transparent"
+              style={{ color: WA_T1, fontFamily: FONT }}
+            />
+          </div>
           <button onClick={handleSend} disabled={!messageContent.trim()}
-            className="w-[38px] h-[38px] rounded-[12px] flex items-center justify-center active:scale-90 shrink-0 disabled:opacity-50"
-            style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: "0 3px 12px rgba(0,85,255,0.30)" }}
+            className="w-11 h-11 rounded-full flex items-center justify-center active:scale-90 shrink-0 disabled:opacity-50"
+            style={{ background: WA_GREEN }}
             aria-label="Send">
-            <Send className="w-[15px] h-[15px] text-white" strokeWidth={2.5} />
+            <Send className="w-[18px] h-[18px] text-white" strokeWidth={2.4} fill="#fff" />
           </button>
         </div>
       </div>
@@ -314,14 +262,22 @@ const PrincipalNotesPage = () => {
      DESKTOP — Bright Blue Apple UI
      ═══════════════════════════════════════════════════════════════ */
   const B1 = "#0055FF", B2 = "#1166FF", B3 = "#2277FF";
-  const BG_D = "#EEF4FF", BG2_D = "#E0ECFF";
+  const BG_D = "#EEF4FF";
   const T1 = "#001040", T3 = "#5070B0", T4 = "#99AACC";
   const ORANGE = "#FF8800", GREEN = "#00C853", RED = "#FF3355";
   const BLUE_BDR = "rgba(0,85,255,0.12)";
   const SH_D = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.09), 0 10px 28px rgba(0,85,255,0.11)";
   const SH_LG_D = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 18px 44px rgba(0,85,255,0.14)";
-  const SH_BTN_D = "0 6px 22px rgba(0,85,255,0.42), 0 2px 6px rgba(0,85,255,0.22)";
   const FONT_D = "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif";
+
+  // ── WhatsApp Web palette (used inside the chat card) ──
+  const WA_GREEN = "#00A884", WA_GREEN_DEEP = "#008069";
+  const WA_HEADER_BG = "#F0F2F5";
+  const WA_CHAT_BG = "#EFEAE2";
+  const WA_BUBBLE_OUT = "#D9FDD3";
+  const WA_TICK_READ = "#53BDEB";
+  const WA_SEP = "#E9EDEF";
+  const WA_T1 = "#111B21", WA_T3 = "#667781";
 
   return (
     <div className="animate-in fade-in duration-500 -m-4 sm:-m-6 md:-m-8 min-h-[calc(100vh-64px)]"
@@ -373,121 +329,83 @@ const PrincipalNotesPage = () => {
           ))}
         </div>
 
-        {/* ── Main chat card ── */}
-        <div className="bg-white rounded-[22px] overflow-hidden flex flex-col"
-          style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)", height: "calc(100vh - 320px)", minHeight: 560 }}>
+        {/* ── Main chat card — WhatsApp Web style ── */}
+        <div className="rounded-[14px] overflow-hidden flex flex-col bg-white"
+          style={{ boxShadow: SH_LG_D, border: `1px solid ${WA_SEP}`, height: "calc(100vh - 320px)", minHeight: 560 }}>
 
-          {/* Chat header — gradient banner */}
-          <div className="px-7 py-5 flex items-center gap-4 relative overflow-hidden shrink-0"
-            style={{ background: `linear-gradient(135deg, #0033CC 0%, ${B1} 50%, ${B3} 100%)`, boxShadow: "0 4px 14px rgba(0,51,204,0.24)" }}>
-            <div className="absolute -top-[40px] -right-[30px] w-[260px] h-[260px] rounded-full pointer-events-none"
-              style={{ background: "radial-gradient(circle, rgba(255,255,255,0.16) 0%, transparent 65%)" }} />
-            <div className="absolute inset-0 pointer-events-none" style={{
-              backgroundImage: "linear-gradient(rgba(255,255,255,0.016) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.016) 1px, transparent 1px)",
-              backgroundSize: "22px 22px"
-            }} />
-            <div className="w-14 h-14 rounded-[18px] flex items-center justify-center relative z-10 shrink-0"
-              style={{ background: "rgba(255,255,255,0.22)", border: "2px solid rgba(255,255,255,0.30)" }}>
-              <School className="w-7 h-7 text-white" strokeWidth={2.1} />
+          {/* WA-style chat header */}
+          <div className="px-4 py-[10px] flex items-center gap-3 shrink-0"
+            style={{ background: WA_HEADER_BG, borderBottom: `1px solid ${WA_SEP}` }}>
+            <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+              style={{ background: `linear-gradient(135deg, ${B1}, ${B3})`, color: "#fff", boxShadow: "0 2px 6px rgba(0,85,255,0.22)" }}>
+              <School className="w-5 h-5" strokeWidth={2.1} />
             </div>
-            <div className="flex-1 min-w-0 relative z-10">
-              <div className="text-[22px] font-bold text-white" style={{ letterSpacing: "-0.5px" }}>{principalName}</div>
-              <div className="text-[12px] font-medium mt-[4px] flex items-center gap-2" style={{ color: "rgba(255,255,255,0.70)" }}>
-                <div className="w-[6px] h-[6px] rounded-full animate-pulse" style={{ background: "#00EE88", boxShadow: "0 0 0 2px rgba(0,238,136,0.22)" }} />
-                School Administration · Online
+            <div className="flex-1 min-w-0">
+              <div className="text-[16px] font-medium leading-tight" style={{ color: WA_T1, letterSpacing: "-0.1px" }}>{principalName}</div>
+              <div className="text-[12px] mt-[2px]" style={{ color: WA_T3 }}>
+                School Administration · online
               </div>
             </div>
-            <div className="flex items-center gap-[5px] px-3 py-[7px] rounded-[12px] relative z-10"
-              style={{ background: "rgba(255,255,255,0.20)", border: "0.5px solid rgba(255,255,255,0.28)", backdropFilter: "blur(8px)" }}>
-              <Shield className="w-[13px] h-[13px] text-white" strokeWidth={2.5} />
-              <span className="text-[11px] font-bold text-white tracking-[0.04em]">Official</span>
+            <div className="flex items-center gap-[5px] px-[10px] py-[6px] rounded-full"
+              style={{ background: "rgba(0,168,132,0.10)", color: WA_GREEN_DEEP }}>
+              <Shield className="w-[12px] h-[12px]" strokeWidth={2.5} />
+              <span className="text-[11px] font-semibold tracking-[0.04em]">Official</span>
             </div>
           </div>
 
-          {/* Messages scroll */}
-          <div className="flex-1 overflow-y-auto no-sb px-8 py-6 flex flex-col gap-4 relative"
+          {/* Messages — WA wallpaper */}
+          <div className="flex-1 overflow-y-auto no-sb px-[60px] py-4 flex flex-col"
             style={{
-              background: BG_D,
-              backgroundImage: "radial-gradient(circle at 1px 1px, rgba(0,85,255,0.04) 1px, transparent 0)",
+              background: WA_CHAT_BG,
+              backgroundImage: "radial-gradient(circle at 1px 1px, rgba(11,20,26,0.05) 1px, transparent 0)",
               backgroundSize: "22px 22px",
             }}>
             <style>{`.no-sb::-webkit-scrollbar{display:none}`}</style>
             {loading ? (
               <div className="flex-1 flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin" style={{ color: B1 }} />
+                <Loader2 className="w-8 h-8 animate-spin" style={{ color: WA_GREEN }} />
               </div>
             ) : allMessages.length === 0 ? (
               <div className="flex-1 flex items-center justify-center text-center">
-                <div className="bg-white rounded-[22px] px-12 py-12 max-w-md relative overflow-hidden"
-                  style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-                  <div className="absolute -top-[60px] -right-[40px] w-[220px] h-[220px] rounded-full pointer-events-none"
-                    style={{ background: "radial-gradient(circle, rgba(0,85,255,0.06) 0%, transparent 70%)" }} />
-                  <div className="w-[80px] h-[80px] rounded-[24px] flex items-center justify-center mx-auto mb-5 relative z-10"
-                    style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: SH_BTN_D }}>
-                    <School className="w-10 h-10 text-white" strokeWidth={2.2} />
+                <div className="px-10 py-8 rounded-[8px]"
+                  style={{ background: "rgba(255,255,255,0.94)", boxShadow: "0 1px 3px rgba(11,20,26,0.10)" }}>
+                  <div className="w-[64px] h-[64px] rounded-full flex items-center justify-center mx-auto mb-4"
+                    style={{ background: "rgba(0,168,132,0.10)" }}>
+                    <School className="w-8 h-8" style={{ color: WA_GREEN, opacity: 0.7 }} strokeWidth={2.2} />
                   </div>
-                  <div className="text-[20px] font-bold mb-2 relative z-10" style={{ color: T1, letterSpacing: "-0.4px" }}>No messages yet</div>
-                  <div className="text-[13px] leading-[1.6] relative z-10" style={{ color: T3 }}>
+                  <div className="text-[17px] font-semibold mb-1" style={{ color: WA_T1, letterSpacing: "-0.2px" }}>No messages yet</div>
+                  <div className="text-[13px] max-w-[300px] leading-[1.5]" style={{ color: WA_T3 }}>
                     Messages from your school principal will appear here. Official notices and announcements will be delivered directly to this inbox.
                   </div>
                 </div>
               </div>
             ) : groupedMessages.map(group => (
-              <div key={group.date} className="flex flex-col gap-3">
-                <div className="flex justify-center">
-                  <span className="text-[11px] font-bold px-4 py-[6px] rounded-full"
-                    style={{ background: "#fff", color: T3, border: `0.5px solid ${BLUE_BDR}`, boxShadow: SH_D, letterSpacing: "-0.1px" }}>
+              <div key={group.date}>
+                <div className="flex justify-center my-3">
+                  <span className="px-[10px] py-[4px] rounded-[6px] text-[11.5px] font-medium"
+                    style={{ background: "#FFFFFF", color: WA_T3, boxShadow: "0 1px 1px rgba(11,20,26,0.08)" }}>
                     {group.date}
                   </span>
                 </div>
                 {group.messages.map(n => {
                   const isParent = n.from === "parent";
-                  return isParent ? (
-                    <div key={n.id} className="flex justify-end">
-                      <div className="max-w-[65%]">
-                        <div className="px-5 py-[13px] text-[14px] text-white font-normal leading-[1.6] relative overflow-hidden"
-                          style={{
-                            background: `linear-gradient(135deg, ${B1}, ${B2})`,
-                            borderRadius: "20px 6px 20px 20px",
-                            boxShadow: "0 3px 14px rgba(0,85,255,0.28)",
-                            letterSpacing: "-0.1px",
-                          }}>
-                          <div className="whitespace-pre-wrap break-words">{n.message}</div>
-                        </div>
-                        <div className="text-[11px] font-semibold text-right mt-[6px] flex items-center justify-end gap-[5px]" style={{ color: T4 }}>
-                          <span>{fmtTime(n.timestamp)}</span>
-                          <CheckCheck className="w-[14px] h-[14px]" style={{ color: B1, opacity: 0.6 }} />
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div key={n.id} className="flex items-start gap-3 max-w-[70%]">
-                      <div className="w-11 h-11 rounded-[14px] flex items-center justify-center text-white text-[15px] font-bold shrink-0"
-                        style={{ background: `linear-gradient(135deg, ${B1}, ${B3})`, boxShadow: "0 3px 10px rgba(0,85,255,0.28)" }}>
-                        {principalInitial}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[12px] font-bold mb-[6px] flex items-center gap-2" style={{ color: B1, letterSpacing: "-0.1px" }}>
-                          {principalName}
-                          <span className="px-2 py-[2px] rounded-full text-[9px] font-bold uppercase tracking-[0.05em]"
-                            style={{ background: "rgba(0,85,255,0.08)", color: B1, border: `0.5px solid ${BLUE_BDR}` }}>
-                            Principal
-                          </span>
-                        </div>
-                        <div className="px-6 py-4 text-[14px] font-normal leading-[1.7] relative overflow-hidden"
-                          style={{
-                            background: "#fff", color: T1,
-                            borderRadius: "6px 20px 20px 20px",
-                            boxShadow: SH_LG_D,
-                            border: "0.5px solid rgba(0,85,255,0.10)",
-                            letterSpacing: "-0.1px",
-                          }}>
-                          <div className="absolute -top-5 -right-4 w-[90px] h-[90px] rounded-full pointer-events-none"
-                            style={{ background: "radial-gradient(circle, rgba(0,85,255,0.05) 0%, transparent 70%)" }} />
-                          <div className="whitespace-pre-wrap break-words relative z-10">{n.message}</div>
-                        </div>
-                        <div className="text-[11px] font-semibold mt-[6px] flex items-center gap-[5px]" style={{ color: T4 }}>
-                          <span>{fmtTime(n.timestamp)}</span>
+                  return (
+                    <div key={n.id} className={`flex mb-[3px] ${isParent ? "justify-end" : "justify-start"}`}>
+                      <div className="max-w-[65%] px-[9px] py-[6px] relative"
+                        style={isParent ? {
+                          background: WA_BUBBLE_OUT,
+                          borderRadius: "8px 8px 0 8px",
+                          boxShadow: "0 1px 1px rgba(11,20,26,0.08)",
+                        } : {
+                          background: "#fff",
+                          borderRadius: "8px 8px 8px 0",
+                          boxShadow: "0 1px 1px rgba(11,20,26,0.08)",
+                        }}>
+                        <p className={`text-[14.2px] whitespace-pre-wrap leading-[1.4] ${isParent ? "pr-[58px]" : "pr-[44px]"}`}
+                          style={{ color: WA_T1 }}>{n.message}</p>
+                        <div className="absolute right-[8px] bottom-[4px] flex items-center gap-[3px]">
+                          <span className="text-[11px]" style={{ color: WA_T3 }}>{fmtTime(n.timestamp)}</span>
+                          {isParent && <CheckCheck className="w-[15px] h-[15px]" style={{ color: WA_TICK_READ }} strokeWidth={2.2} />}
                         </div>
                       </div>
                     </div>
@@ -498,31 +416,23 @@ const PrincipalNotesPage = () => {
             <div ref={chatEndRef} />
           </div>
 
-          {/* Reply bar */}
-          <div className="px-6 py-4 flex items-center gap-3 shrink-0"
-            style={{ background: "#fff", borderTop: `0.5px solid ${BLUE_BDR}` }}>
-            <button className="w-11 h-11 rounded-[12px] flex items-center justify-center"
-              style={{ background: BG_D, border: `0.5px solid ${BLUE_BDR}` }}>
-              <Smile className="w-5 h-5" style={{ color: T3 }} strokeWidth={2} />
+          {/* WA reply bar */}
+          <div className="flex items-end gap-2 px-4 py-[10px] shrink-0" style={{ background: WA_HEADER_BG }}>
+            <button className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-[rgba(11,20,26,0.06)]">
+              <Smile className="w-[22px] h-[22px]" style={{ color: WA_T3 }} strokeWidth={1.8} />
             </button>
-            <div className="flex-1 rounded-[14px] flex items-center min-h-[44px] px-4"
-              style={{ background: BG_D, border: `0.5px solid ${BLUE_BDR}` }}>
+            <div className="flex-1 rounded-[8px] flex items-center min-h-[42px] px-4 py-2 bg-white">
               <textarea rows={1} value={messageContent}
                 onChange={e => setMessageContent(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                placeholder="Reply to principal…"
-                className="flex-1 bg-transparent border-none focus:ring-0 text-[14px] resize-none outline-none leading-relaxed py-2"
-                style={{ fontFamily: FONT_D, color: T1, letterSpacing: "-0.1px" }} />
+                placeholder="Reply to principal"
+                className="flex-1 bg-transparent border-none focus:ring-0 text-[14px] resize-none outline-none leading-relaxed"
+                style={{ fontFamily: FONT_D, color: WA_T1 }} />
             </div>
             <button onClick={handleSend} disabled={!messageContent.trim()}
-              className="h-11 px-5 rounded-[12px] flex items-center gap-2 text-[13px] font-bold transition-transform hover:scale-[1.04] disabled:opacity-40"
-              style={{
-                background: messageContent.trim() ? `linear-gradient(135deg, ${B1}, ${B2})` : BG2_D,
-                color: messageContent.trim() ? "#fff" : T4,
-                boxShadow: messageContent.trim() ? SH_BTN_D : "none",
-                letterSpacing: "-0.1px"
-              }}>
-              <Send className="w-[15px] h-[15px]" strokeWidth={2.3} /> Send
+              className="w-11 h-11 rounded-full flex items-center justify-center transition-transform hover:scale-105 disabled:opacity-40"
+              style={{ background: WA_GREEN }}>
+              <Send className="w-[18px] h-[18px] text-white" strokeWidth={2.3} fill="#fff" />
             </button>
           </div>
         </div>

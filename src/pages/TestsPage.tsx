@@ -138,7 +138,6 @@ const TestsPage = () => {
     const ORANGE = "#FF8800";
     const SH = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.09), 0 10px 24px rgba(0,85,255,0.10)";
     const SH_LG = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.11), 0 18px 44px rgba(0,85,255,0.13)";
-    const SH_BTN = "0 6px 22px rgba(0,85,255,0.42), 0 2px 6px rgba(0,85,255,0.22)";
 
     const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -202,68 +201,50 @@ const TestsPage = () => {
           <div className="text-[12px] font-normal" style={{ color: T3 }}>Track upcoming assessments and latest outcomes</div>
         </div>
 
-        {/* ── Hero Banner ── */}
+        {/* ── Hero Banner (dashboard 4-stat-card vibe) ── */}
         <div
           role="button"
           tabIndex={0}
           aria-label="Open syllabus page to prepare for upcoming test"
           onClick={() => navigate("/syllabus")}
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/syllabus"); } }}
-          className="mx-5 mt-[18px] rounded-[26px] px-[22px] py-6 relative overflow-hidden flex flex-col items-center text-center cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+          className="mx-5 mt-[18px] rounded-[22px] px-4 pt-[18px] pb-[18px] relative overflow-hidden cursor-pointer active:scale-[0.96] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
           style={{
-            background: "linear-gradient(140deg, #0033CC 0%, #0055FF 42%, #2277FF 72%, #55AAFF 100%)",
-            boxShadow: SH_BTN,
-            minHeight: 156,
+            background: "linear-gradient(135deg, rgba(0,85,255,0.10) 0%, rgba(0,85,255,0.03) 100%)",
+            boxShadow: SH,
+            border: "0.5px solid rgba(0,85,255,0.20)",
+            transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)",
           }}>
-          <div className="absolute -top-5 -right-5 w-[130px] h-[130px] rounded-full pointer-events-none" style={{ background: "rgba(255,255,255,0.10)" }} />
-          <div className="absolute -bottom-[30px] right-5 w-[120px] h-[120px] rounded-full pointer-events-none" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.10)" }} />
-          <div className="absolute -bottom-[10px] right-[80px] w-20 h-20 rounded-full pointer-events-none" style={{ background: "rgba(255,255,255,0.07)" }} />
-          <div className="absolute inset-0 pointer-events-none" style={{
-            backgroundImage: "linear-gradient(rgba(255,255,255,0.016) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.016) 1px, transparent 1px)",
-            backgroundSize: "24px 24px"
-          }} />
-          <div className="absolute right-[-10px] top-1/2 -translate-y-1/2 opacity-[0.10] pointer-events-none">
-            <GraduationCap size={180} color="#fff" strokeWidth={0.8} />
+          <div className="absolute pointer-events-none" style={{ bottom: 10, right: 10 }}>
+            <GraduationCap style={{ width: 72, height: 72, color: B1, opacity: 0.20, strokeWidth: 1.6 }} />
           </div>
-
-          <div className="w-[52px] h-[52px] rounded-[18px] flex items-center justify-center mb-4 relative z-10"
-            style={{
-              background: "rgba(255,255,255,0.22)",
-              border: "0.5px solid rgba(255,255,255,0.32)",
-              WebkitBackdropFilter: "blur(8px)",
-              backdropFilter: "blur(8px)",
-              boxShadow: "0 4px 16px rgba(0,0,0,0.15)"
-            }}>
-            <Calendar className="w-[26px] h-[26px]" style={{ color: "rgba(255,255,255,0.95)" }} strokeWidth={2.2} />
+          <div className="w-[34px] h-[34px] rounded-[11px] flex items-center justify-center mb-[14px] relative"
+            style={{ background: "rgba(0,85,255,0.14)", border: "0.5px solid rgba(0,85,255,0.28)" }}>
+            <Calendar className="w-[17px] h-[17px]" style={{ color: B1 }} />
           </div>
-          <div className="text-[9px] font-bold uppercase tracking-[0.14em] mb-2 relative z-10" style={{ color: "rgba(255,255,255,0.55)" }}>Coming Up Next</div>
-          <div className="text-[24px] font-bold text-white mb-2 relative z-10 leading-[1.15]" style={{ letterSpacing: "-0.6px" }}>
+          <div className="text-[10px] font-bold uppercase tracking-[0.08em] relative" style={{ color: T4 }}>Coming Up Next</div>
+          <div className="text-[22px] font-bold mt-1 leading-[1.15] relative" style={{ color: T1, letterSpacing: "-0.6px" }}>
             {nextTest?.testName || "No upcoming tests"}
           </div>
-          <div className="flex items-center justify-center gap-[7px] relative z-10">
-            {nextTest && (
-              <>
-                <span className="text-[12px] font-semibold" style={{ color: "rgba(255,255,255,0.65)", letterSpacing: "-0.1px" }}>
-                  {formatDate(nextTest.date)}
-                </span>
-                {/* Only show the time when the test doc actually has one —
-                    previously we fell back to a hardcoded "9:00 AM" which
-                    looked like real scheduled time to the parent. */}
-                {nextTest.time && (
-                  <>
-                    <div className="w-1 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.45)" }} />
-                    <span className="text-[12px] font-semibold" style={{ color: "rgba(255,255,255,0.65)", letterSpacing: "-0.1px" }}>
-                      {nextTest.time}
-                    </span>
-                  </>
-                )}
-                <div className="w-1 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.45)" }} />
-                <span className="text-[12px] font-semibold" style={{ color: "rgba(255,255,255,0.65)", letterSpacing: "-0.1px" }}>
-                  {getDayDiff(nextTest.date)} day{getDayDiff(nextTest.date) === 1 ? "" : "s"}
-                </span>
-              </>
-            )}
-          </div>
+          {nextTest && (
+            <div className="flex items-center gap-[7px] mt-[10px] relative flex-wrap">
+              <span className="text-[12px] font-semibold" style={{ color: T3, letterSpacing: "-0.1px" }}>
+                {formatDate(nextTest.date)}
+              </span>
+              {/* Only render time when the test doc provides one —
+                  previously defaulted to "9:00 AM" which looked real. */}
+              {nextTest.time && (
+                <>
+                  <div className="w-1 h-1 rounded-full" style={{ background: T4 }} />
+                  <span className="text-[12px] font-semibold" style={{ color: T3 }}>{nextTest.time}</span>
+                </>
+              )}
+              <div className="w-1 h-1 rounded-full" style={{ background: T4 }} />
+              <span className="text-[12px] font-semibold" style={{ color: B1 }}>
+                {getDayDiff(nextTest.date)} day{getDayDiff(nextTest.date) === 1 ? "" : "s"}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* ── Upcoming Tests Section ── */}
@@ -523,7 +504,6 @@ const TestsPage = () => {
   const ORANGE = "#FF8800";
   const SH = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.09), 0 10px 24px rgba(0,85,255,0.10)";
   const SH_LG = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.11), 0 18px 44px rgba(0,85,255,0.13)";
-  const SH_BTN = "0 6px 22px rgba(0,85,255,0.42), 0 2px 6px rgba(0,85,255,0.22)";
 
   const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -593,48 +573,37 @@ const TestsPage = () => {
           )}
         </div>
 
-        {/* ── Hero Banner ── */}
+        {/* ── Hero Banner (dashboard 4-stat-card vibe) ── */}
         <div
           role="button"
           tabIndex={0}
           aria-label="Open syllabus page to prepare for upcoming test"
           onClick={() => navigate("/syllabus")}
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/syllabus"); } }}
-          className="rounded-[26px] px-8 pt-8 pb-8 relative overflow-hidden mb-5 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+          className="rounded-[24px] px-6 py-6 relative overflow-hidden mb-5 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
           style={{
-            background: "linear-gradient(140deg, #0033CC 0%, #0055FF 42%, #2277FF 72%, #55AAFF 100%)",
-            boxShadow: SH_BTN,
-            minHeight: 180,
+            background: "linear-gradient(135deg, rgba(0,85,255,0.10) 0%, rgba(0,85,255,0.03) 100%)",
+            boxShadow: SH,
+            border: "0.5px solid rgba(0,85,255,0.20)",
           }}>
-          <div className="absolute -top-10 -right-10 w-[220px] h-[220px] rounded-full pointer-events-none" style={{ background: "rgba(255,255,255,0.10)" }} />
-          <div className="absolute -bottom-[50px] right-10 w-[180px] h-[180px] rounded-full pointer-events-none" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.10)" }} />
-          <div className="absolute -bottom-[10px] right-[180px] w-[120px] h-[120px] rounded-full pointer-events-none" style={{ background: "rgba(255,255,255,0.07)" }} />
-          <div className="absolute inset-0 pointer-events-none" style={{
-            backgroundImage: "linear-gradient(rgba(255,255,255,0.016) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.016) 1px, transparent 1px)",
-            backgroundSize: "28px 28px"
-          }} />
-          <div className="absolute right-10 top-1/2 -translate-y-1/2 opacity-[0.10] pointer-events-none">
-            <GraduationCap size={220} color="#fff" strokeWidth={0.8} />
+          <div className="absolute pointer-events-none" style={{ bottom: 16, right: 20 }}>
+            <GraduationCap style={{ width: 110, height: 110, color: B1, opacity: 0.18, strokeWidth: 1.6 }} />
           </div>
 
-          <div className="flex items-center justify-between gap-8 flex-wrap relative z-10">
-            <div className="flex items-center gap-5">
-              <div className="w-16 h-16 rounded-[20px] flex items-center justify-center shrink-0"
-                style={{
-                  background: "rgba(255,255,255,0.22)",
-                  border: "0.5px solid rgba(255,255,255,0.32)",
-                  boxShadow: "0 4px 16px rgba(0,0,0,0.15)"
-                }}>
-                <Calendar className="w-8 h-8" style={{ color: "rgba(255,255,255,0.95)" }} strokeWidth={2.2} />
+          <div className="flex items-center justify-between gap-6 flex-wrap relative z-10">
+            <div className="flex items-center gap-4">
+              <div className="w-[44px] h-[44px] rounded-[14px] flex items-center justify-center shrink-0"
+                style={{ background: "rgba(0,85,255,0.14)", border: "0.5px solid rgba(0,85,255,0.28)" }}>
+                <Calendar className="w-[22px] h-[22px]" style={{ color: B1 }} strokeWidth={2.2} />
               </div>
               <div>
-                <div className="text-[10px] font-bold uppercase tracking-[0.14em] mb-2" style={{ color: "rgba(255,255,255,0.55)" }}>Coming Up Next</div>
-                <div className="text-[32px] font-bold text-white mb-2 leading-[1.08]" style={{ letterSpacing: "-0.8px" }}>
+                <div className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: T4 }}>Coming Up Next</div>
+                <div className="text-[28px] font-bold mt-1 leading-[1.1]" style={{ color: T1, letterSpacing: "-0.8px" }}>
                   {nextTest?.testName || "No upcoming tests"}
                 </div>
-                <div className="flex items-center gap-[8px]">
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
                   {nextTest && (
-                    <span className="text-[14px] font-semibold" style={{ color: "rgba(255,255,255,0.68)", letterSpacing: "-0.1px" }}>
+                    <span className="text-[13px] font-semibold" style={{ color: T3, letterSpacing: "-0.1px" }}>
                       {formatDate(nextTest.date)}
                     </span>
                   )}
@@ -642,8 +611,8 @@ const TestsPage = () => {
                       previously defaulted to "9:00 AM" which looked real. */}
                   {nextTest?.time && (
                     <>
-                      <div className="w-1 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.45)" }} />
-                      <span className="text-[14px] font-semibold" style={{ color: "rgba(255,255,255,0.68)", letterSpacing: "-0.1px" }}>
+                      <div className="w-1 h-1 rounded-full" style={{ background: T4 }} />
+                      <span className="text-[13px] font-semibold" style={{ color: T3, letterSpacing: "-0.1px" }}>
                         {nextTest.time}
                       </span>
                     </>
@@ -653,10 +622,10 @@ const TestsPage = () => {
             </div>
 
             {nextTest && (
-              <div className="px-8 py-5 rounded-[20px] text-center min-w-[140px]"
-                style={{ background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.20)" }}>
-                <div className="text-[56px] font-bold leading-none text-white" style={{ letterSpacing: "-1.8px" }}>{getDayDiff(nextTest.date)}</div>
-                <div className="text-[10px] font-bold uppercase tracking-widest mt-1" style={{ color: "rgba(255,255,255,0.68)" }}>Days Left</div>
+              <div className="px-6 py-4 rounded-[18px] text-center min-w-[120px] relative"
+                style={{ background: "rgba(0,85,255,0.08)", border: "0.5px solid rgba(0,85,255,0.20)" }}>
+                <div className="text-[44px] font-bold leading-none" style={{ color: B1, letterSpacing: "-1.4px" }}>{getDayDiff(nextTest.date)}</div>
+                <div className="text-[10px] font-bold uppercase tracking-widest mt-1" style={{ color: T4 }}>Days Left</div>
               </div>
             )}
           </div>

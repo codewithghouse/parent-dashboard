@@ -420,45 +420,44 @@ const AIPracticePage = () => {
           </div>
         </div>
 
-        {/* ── AI Hero Card ── */}
-        <div className="mx-[18px] mt-[14px] rounded-[26px] px-5 pt-[18px] pb-[22px] relative overflow-hidden"
-          style={{ background: "linear-gradient(140deg, #0033CC 0%, #0055FF 40%, #2277FF 70%, #55AAFF 100%)", boxShadow: SH_BTN }}>
-          <div className="absolute -top-11 -right-8 w-[200px] h-[200px] rounded-full pointer-events-none"
-            style={{ background: "radial-gradient(circle, rgba(255,255,255,0.16) 0%, transparent 65%)" }} />
-          <div className="absolute -bottom-9 -left-5 w-[150px] h-[150px] rounded-full pointer-events-none"
-            style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.10)" }} />
-          <div className="absolute inset-0 pointer-events-none" style={{
-            backgroundImage: "linear-gradient(rgba(255,255,255,0.016) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.016) 1px, transparent 1px)",
-            backgroundSize: "22px 22px"
-          }} />
+        {/* ── AI Hero Card (dashboard 4-stat-card vibe) ── */}
+        <div className="mx-[18px] mt-[14px] rounded-[22px] px-5 pt-[18px] pb-[20px] relative overflow-hidden"
+          style={{
+            background: "linear-gradient(135deg, rgba(0,85,255,0.10) 0%, rgba(0,85,255,0.03) 100%)",
+            boxShadow: SH,
+            border: "0.5px solid rgba(0,85,255,0.20)",
+          }}>
+          <div className="absolute pointer-events-none" style={{ top: 12, right: 12 }}>
+            <Sparkles style={{ width: 70, height: 70, color: B1, opacity: 0.16, strokeWidth: 1.6 }} />
+          </div>
 
           <div className="relative z-10">
             <div className="inline-flex items-center gap-[5px] px-3 py-[5px] rounded-full mb-[14px] text-[9px] font-bold uppercase tracking-[0.10em]"
-              style={{ background: "rgba(255,255,255,0.18)", border: "0.5px solid rgba(255,255,255,0.28)", color: "rgba(255,255,255,0.80)", backdropFilter: "blur(8px)" }}>
+              style={{ background: "rgba(0,85,255,0.10)", border: "0.5px solid rgba(0,85,255,0.22)", color: B1 }}>
               <Sparkles className="w-[11px] h-[11px]" strokeWidth={2.5} />
               AI Powered · USP Feature
             </div>
-            <h1 className="text-[32px] font-bold text-white leading-[1.08] mb-2" style={{ letterSpacing: "-0.8px" }}>
+            <h1 className="text-[30px] font-bold leading-[1.08] mb-2" style={{ color: T1, letterSpacing: "-0.8px" }}>
               AI Practice<br />Exams
             </h1>
-            <p className="text-[12px] leading-[1.6] font-normal mb-[18px]" style={{ color: "rgba(255,255,255,0.65)" }}>
+            <p className="text-[12px] leading-[1.6] font-normal mb-[18px]" style={{ color: T3 }}>
               Upload syllabus, take AI exams,<br />learn from mistakes.
             </p>
 
             {/* Stat chips */}
             <div className="grid grid-cols-3 gap-2">
               {[
-                { icon: "🔥", val: `${streak}d`, label: "Streak" },
-                { icon: <BarChart3 className="w-[18px] h-[18px]" style={{ color: "rgba(255,255,255,0.80)" }} strokeWidth={2.2} />, val: `${attempts.length}`, label: "Exams" },
-                { icon: "⭐", val: bestScore > 0 ? `${bestScore}%` : "—", label: "Best" },
-              ].map(({ icon, val, label }) => (
+                { icon: "🔥", val: `${streak}d`, label: "Streak", tint: "rgba(255,136,0,0.10)", bdr: "rgba(255,136,0,0.22)", color: ORANGE },
+                { icon: <BarChart3 className="w-[18px] h-[18px]" style={{ color: B1 }} strokeWidth={2.2} />, val: `${attempts.length}`, label: "Exams", tint: "rgba(0,85,255,0.08)", bdr: "rgba(0,85,255,0.20)", color: B1 },
+                { icon: "⭐", val: bestScore > 0 ? `${bestScore}%` : "—", label: "Best", tint: "rgba(255,204,34,0.12)", bdr: "rgba(255,204,34,0.28)", color: GOLD },
+              ].map(({ icon, val, label, tint, bdr, color }) => (
                 <div key={label} className="rounded-[16px] py-[13px] px-[10px] flex flex-col items-center gap-[5px]"
-                  style={{ background: "rgba(255,255,255,0.14)", border: "0.5px solid rgba(255,255,255,0.22)", backdropFilter: "blur(8px)" }}>
+                  style={{ background: tint, border: `0.5px solid ${bdr}` }}>
                   <div className="h-[22px] flex items-center justify-center text-[18px] leading-none mb-[2px]">
                     {typeof icon === "string" ? icon : icon}
                   </div>
-                  <div className="text-[20px] font-bold text-white leading-none" style={{ letterSpacing: "-0.5px" }}>{val}</div>
-                  <div className="text-[8px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(255,255,255,0.50)" }}>{label}</div>
+                  <div className="text-[20px] font-bold leading-none" style={{ color: T1, letterSpacing: "-0.5px" }}>{val}</div>
+                  <div className="text-[8px] font-bold uppercase tracking-[0.10em]" style={{ color }}>{label}</div>
                 </div>
               ))}
             </div>
@@ -856,51 +855,50 @@ const AIPracticePage = () => {
         </div>
       </div>
 
-      {/* ── Hero Row: Big blue hero (col-2) + Streak card (col-1) ── */}
+      {/* ── Hero Row: Big hero (col-2) + Streak card (col-1) — dashboard 4-stat-card vibe ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
         {/* Hero (col-2) */}
-        <div className="lg:col-span-2 rounded-[26px] px-8 py-8 relative overflow-hidden"
-          style={{ background: "linear-gradient(140deg, #0033CC 0%, #0055FF 40%, #2277FF 70%, #55AAFF 100%)", boxShadow: SH_BTN_D }}>
-          <div className="absolute -top-11 -right-8 w-[280px] h-[280px] rounded-full pointer-events-none"
-            style={{ background: "radial-gradient(circle, rgba(255,255,255,0.16) 0%, transparent 65%)" }} />
-          <div className="absolute -bottom-9 -left-5 w-[200px] h-[200px] rounded-full pointer-events-none"
-            style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.10)" }} />
-          <div className="absolute inset-0 pointer-events-none" style={{
-            backgroundImage: "linear-gradient(rgba(255,255,255,0.016) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.016) 1px, transparent 1px)",
-            backgroundSize: "22px 22px"
-          }} />
+        <div className="lg:col-span-2 rounded-[24px] px-8 py-8 relative overflow-hidden"
+          style={{
+            background: "linear-gradient(135deg, rgba(0,85,255,0.10) 0%, rgba(0,85,255,0.03) 100%)",
+            boxShadow: SH_LG_D,
+            border: "0.5px solid rgba(0,85,255,0.20)",
+          }}>
+          <div className="absolute pointer-events-none" style={{ top: 18, right: 22 }}>
+            <Sparkles style={{ width: 110, height: 110, color: B1, opacity: 0.14, strokeWidth: 1.6 }} />
+          </div>
           <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
             <div>
               <div className="inline-flex items-center gap-[5px] px-3 py-[5px] rounded-full mb-4 text-[10px] font-bold uppercase tracking-[0.12em]"
-                style={{ background: "rgba(255,255,255,0.18)", border: "0.5px solid rgba(255,255,255,0.28)", color: "rgba(255,255,255,0.80)", backdropFilter: "blur(8px)" }}>
+                style={{ background: "rgba(0,85,255,0.10)", border: "0.5px solid rgba(0,85,255,0.22)", color: B1 }}>
                 <Sparkles className="w-[12px] h-[12px]" strokeWidth={2.5} />
                 AI Powered
               </div>
-              <h2 className="text-[44px] font-bold text-white leading-[1.05] mb-3" style={{ letterSpacing: "-1px" }}>
+              <h2 className="text-[44px] font-bold leading-[1.05] mb-3" style={{ color: T1, letterSpacing: "-1px" }}>
                 Practice<br />Smart.
               </h2>
-              <p className="text-[14px] leading-[1.6]" style={{ color: "rgba(255,255,255,0.7)" }}>
+              <p className="text-[14px] leading-[1.6]" style={{ color: T3 }}>
                 Upload your syllabus and let AI generate personalised exams. Grade yourself, learn from mistakes, build streaks.
               </p>
               <button onClick={() => setView("upload")}
                 className="mt-5 h-12 px-6 rounded-[14px] text-[14px] font-bold flex items-center gap-2 transition-transform hover:scale-[1.02]"
-                style={{ background: "#fff", color: B1, boxShadow: "0 4px 14px rgba(0,0,0,0.12)", letterSpacing: "-0.1px" }}>
+                style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, color: "#fff", boxShadow: SH_BTN_D, letterSpacing: "-0.1px" }}>
                 <Plus className="w-4 h-4" strokeWidth={2.5} /> New Practice Exam
               </button>
             </div>
             <div className="grid grid-cols-3 gap-3">
               {[
-                { icon: "🔥", val: `${streak}d`, label: "Streak" },
-                { icon: <BarChart3 className="w-[20px] h-[20px]" style={{ color: "rgba(255,255,255,0.80)" }} strokeWidth={2.2} />, val: `${attempts.length}`, label: "Exams" },
-                { icon: "⭐", val: bestScore > 0 ? `${bestScore}%` : "—", label: "Best" },
-              ].map(({ icon, val, label }) => (
+                { icon: "🔥", val: `${streak}d`, label: "Streak", tint: "rgba(255,136,0,0.10)", bdr: "rgba(255,136,0,0.22)", color: ORANGE_D },
+                { icon: <BarChart3 className="w-[20px] h-[20px]" style={{ color: B1 }} strokeWidth={2.2} />, val: `${attempts.length}`, label: "Exams", tint: "rgba(0,85,255,0.08)", bdr: "rgba(0,85,255,0.20)", color: B1 },
+                { icon: "⭐", val: bestScore > 0 ? `${bestScore}%` : "—", label: "Best", tint: "rgba(255,204,34,0.12)", bdr: "rgba(255,204,34,0.30)", color: GOLD_D },
+              ].map(({ icon, val, label, tint, bdr, color }) => (
                 <div key={label} className="rounded-[18px] py-5 px-3 flex flex-col items-center gap-1"
-                  style={{ background: "rgba(255,255,255,0.14)", border: "0.5px solid rgba(255,255,255,0.22)", backdropFilter: "blur(8px)" }}>
+                  style={{ background: tint, border: `0.5px solid ${bdr}` }}>
                   <div className="h-[26px] flex items-center justify-center text-[22px] leading-none mb-1">
                     {typeof icon === "string" ? icon : icon}
                   </div>
-                  <div className="text-[22px] font-bold text-white leading-none" style={{ letterSpacing: "-0.6px" }}>{val}</div>
-                  <div className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(255,255,255,0.50)" }}>{label}</div>
+                  <div className="text-[22px] font-bold leading-none" style={{ color: T1, letterSpacing: "-0.6px" }}>{val}</div>
+                  <div className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color }}>{label}</div>
                 </div>
               ))}
             </div>
