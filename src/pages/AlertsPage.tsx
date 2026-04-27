@@ -493,8 +493,6 @@ const AlertsPage = () => {
     const SH_BTN = "0 6px 22px rgba(0,85,255,0.40), 0 2px 5px rgba(0,85,255,0.20)";
     const FONT = "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif";
 
-    const avatarChar = (studentData?.name?.[0] || "S").toUpperCase();
-
     const isRecent = (ts: any) => {
       const d = ts?.toDate?.() || null;
       if (!d) return false;
@@ -569,27 +567,6 @@ const AlertsPage = () => {
     return (
       <div className="-mx-3 -mt-3 md:mx-0 md:mt-0 animate-in fade-in duration-500"
         style={{ background: BG, minHeight: "100vh", fontFamily: FONT }}>
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-[22px] pt-[14px]">
-          <div className="flex items-center gap-[7px]">
-            <div className="w-[7px] h-[7px] rounded-full animate-pulse" style={{ background: "#00CC55", boxShadow: "0 0 0 2.5px rgba(0,204,85,0.2)" }} />
-            <span className="text-[16px] font-bold" style={{ color: B1 }}>EduIntellect</span>
-          </div>
-          <div className="flex items-center gap-[10px]">
-            <div className="w-9 h-9 rounded-full flex items-center justify-center relative"
-              style={{ background: "rgba(255,255,255,0.88)", border: "0.5px solid rgba(0,85,255,0.16)", boxShadow: SH }}>
-              <BellRing className="w-[17px] h-[17px]" style={{ color: "rgba(0,85,255,0.60)" }} strokeWidth={1.8} />
-              {unreadCount > 0 && (
-                <span className="absolute top-[1px] right-[1px] w-2 h-2 rounded-full" style={{ background: "#FF3355", border: "1.5px solid white" }} />
-              )}
-            </div>
-            <div className="w-9 h-9 rounded-full flex items-center justify-center text-[13px] font-bold text-white"
-              style={{ background: `linear-gradient(140deg, ${B1}, ${B2})`, boxShadow: "0 4px 16px rgba(0,85,255,0.38), 0 0 0 2.5px rgba(255,255,255,0.85)" }}>
-              {avatarChar}
-            </div>
-          </div>
-        </div>
 
         {/* Page head */}
         <div className="pt-[18px] px-[22px]">

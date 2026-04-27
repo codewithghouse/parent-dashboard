@@ -1,4 +1,5 @@
 import { Bell, Menu } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../lib/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -11,7 +12,11 @@ const IND = "#30306E";
 export const ParentTopbar = ({ onMenuClick }: ParentTopbarProps) => {
   const { studentData, user } = useAuth();
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
+  const location = useLocation();
   const initial = studentData?.name?.[0] || user?.displayName?.[0] || "P";
+  const onAlerts = location.pathname === "/alerts";
+  const goAlerts = () => { if (!onAlerts) navigate("/alerts"); };
 
   // ══════════════════════════════
   // MOBILE — Indigo Apple-style header
@@ -66,6 +71,7 @@ export const ParentTopbar = ({ onMenuClick }: ParentTopbarProps) => {
         {/* Right — bell + avatar */}
         <div className="flex items-center gap-[10px] flex-shrink-0">
           <button
+            onClick={goAlerts}
             className="relative w-[38px] h-[38px] rounded-full flex items-center justify-center active:scale-90 transition-transform"
             style={{
               background: "rgba(255,255,255,0.8)",
@@ -125,7 +131,7 @@ export const ParentTopbar = ({ onMenuClick }: ParentTopbarProps) => {
       </div>
 
       <div className="flex items-center gap-3 md:gap-6 flex-shrink-0">
-        <button className="relative w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center hover:bg-slate-100 transition-all group">
+        <button onClick={goAlerts} aria-label="Notifications" className="relative w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center hover:bg-slate-100 transition-all group">
           <Bell className="w-5 h-5 text-slate-400 group-hover:text-primary transition-colors" />
           <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
         </button>
