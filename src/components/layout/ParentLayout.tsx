@@ -9,8 +9,10 @@ export const ParentLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    /* h-screen + overflow-hidden = fixed viewport shell, scroll lives in <main> */
-    <div className="flex h-screen w-full overflow-hidden">
+    /* h-screen + overflow-hidden = fixed viewport shell, scroll lives in <main>.
+       bg-[#EEF4FF] fills the 10px gaps around the floating sidebar so its
+       elevation/shadow reads against a non-sidebar surface. */
+    <div className="flex h-screen w-full overflow-hidden bg-[#EEF4FF]">
 
       {/* Mobile overlay */}
       {sidebarOpen && (
@@ -22,8 +24,9 @@ export const ParentLayout = () => {
 
       <ParentSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      {/* Right column — topbar (fixed height) + scrollable main */}
-      <div className="flex-1 flex flex-col lg:ml-[280px] min-w-0 h-full overflow-hidden">
+      {/* Right column — topbar (fixed height) + scrollable main.
+         lg:ml-[300px] = 10px left gap + 280px sidebar + 10px right gap (shadow room). */}
+      <div className="flex-1 flex flex-col lg:ml-[300px] min-w-0 h-full overflow-hidden">
         <ParentTopbar onMenuClick={() => setSidebarOpen(true)} />
 
         {/* ── Scrollable content area ─────────────────────────────────────

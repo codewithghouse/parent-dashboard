@@ -94,28 +94,6 @@ function getInitials(name: string): string {
     .join("");
 }
 
-/** Donut ring — used for attendance & score */
-function DonutRing({ pct, color, size = 80, stroke = 9, label }: { pct: number; color: string; size?: number; stroke?: number; label?: string }) {
-  const r = (size - stroke * 2) / 2;
-  const circ = 2 * Math.PI * r;
-  const offset = circ - (Math.min(pct, 100) / 100) * circ;
-  const c = size / 2;
-  return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
-        <circle cx={c} cy={c} r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={stroke} />
-        <circle cx={c} cy={c} r={r} fill="none" stroke={color} strokeWidth={stroke}
-          strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
-          style={{ transition: "stroke-dashoffset 1s ease", filter: `drop-shadow(0 0 6px ${color}90)` }} />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-sm font-black text-white leading-none">{pct}%</span>
-        {label && <span className="text-[8px] text-slate-500 font-medium mt-0.5">{label}</span>}
-      </div>
-    </div>
-  );
-}
-
 /** Thin horizontal bar */
 function MiniBar({ pct, color }: { pct: number; color: string }) {
   return (
@@ -616,8 +594,6 @@ const DashboardPage = () => {
     const ROSE = "#FF3355";
     const ROSE_S = "rgba(255,51,85,0.10)";
     const IND_DARK_GRAD = "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)";
-    const DK = "linear-gradient(140deg, #0A0A0F 0%, #16161F 48%, #1F1F2A 100%)";
-    const DK_CELL = "rgba(255,255,255,0.03)";
     const SH = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.09), 0 10px 28px rgba(0,85,255,0.11)";
     const SH_LG = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 20px 48px rgba(0,85,255,0.14)";
     const SH_BTN = "0 4px 14px rgba(0,85,255,0.32), 0 1px 4px rgba(0,85,255,0.18)";
@@ -756,169 +732,108 @@ const DashboardPage = () => {
           <ArrowRight className="w-[16px] h-[16px] flex-shrink-0 relative" style={{ color: IND }} />
         </div>
 
-        {/* ── AI Live Dark Card ── */}
-        <div className="mx-5 mt-4 rounded-[28px] overflow-hidden relative"
-          style={{ background: DK, boxShadow: "0 0 0 0.5px rgba(0,85,255,0.16), 0 12px 44px rgba(0,0,0,0.22), 0 4px 12px rgba(0,0,0,0.14)" }}>
-          {/* Indigo ambient glow overlays */}
-          <div className="absolute inset-0 pointer-events-none" style={{
-            background: "radial-gradient(ellipse 300px 200px at 85% 0%, rgba(255,255,255,0.18) 0%, transparent 60%), radial-gradient(ellipse 220px 220px at -20% 85%, rgba(255,255,255,0.10) 0%, transparent 60%), radial-gradient(ellipse 180px 180px at 50% 52%, rgba(255,255,255,0.06) 0%, transparent 60%)"
-          }} />
-          <div className="absolute inset-0 pointer-events-none" style={{
-            backgroundImage: "linear-gradient(rgba(180,180,230,0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(180,180,230,0.018) 1px, transparent 1px)",
-            backgroundSize: "30px 30px"
-          }} />
+        {/* ── AI Live Summary Card (light, dashboard 4-stat-card vibe) ── */}
+        <div className="mx-5 mt-4 rounded-[22px] overflow-hidden relative bg-white"
+          style={{ boxShadow: SH_LG, border: `0.5px solid ${IND_BDR}` }}>
 
           {/* Header */}
-          <div className="relative z-10 flex items-center justify-between px-5 pt-[18px] pb-[14px]" style={{ borderBottom: "0.5px solid rgba(180,180,230,0.08)" }}>
+          <div className="flex items-center justify-between px-5 pt-[14px] pb-[12px]" style={{ borderBottom: `0.5px solid ${IND_BDR}` }}>
             <div className="flex items-center gap-2">
-              <span className="text-[14px]" style={{ color: "rgba(180,180,230,0.7)" }}>✦</span>
-              <span className="text-[11px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.6)" }}>Edullent AI · Live</span>
+              <Sparkles className="w-[12px] h-[12px]" style={{ color: IND }} strokeWidth={2.4} />
+              <span className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: T4 }}>Edullent AI · Live Summary</span>
             </div>
-            <div className="flex items-center gap-[5px] px-[11px] py-1 rounded-full" style={{ background: "rgba(18,192,78,0.10)", border: "0.5px solid rgba(18,192,78,0.24)" }}>
-              <div className="w-[5px] h-[5px] rounded-full animate-pulse" style={{ background: GREEN, boxShadow: "0 0 0 2px rgba(18,192,78,0.2)" }} />
+            <div className="flex items-center gap-[5px] px-[10px] py-[3px] rounded-full" style={{ background: GREEN_S, border: `0.5px solid ${GREEN_B}` }}>
+              <div className="w-[5px] h-[5px] rounded-full animate-pulse" style={{ background: GREEN, boxShadow: `0 0 0 2px ${GREEN_S}` }} />
               <span className="text-[10px] font-bold tracking-[0.06em]" style={{ color: GREEN }}>LIVE</span>
             </div>
           </div>
 
           {dataLoading ? (
-            <div className="relative z-10 flex items-center gap-3 py-10 justify-center">
-              <Loader2 className="w-5 h-5 animate-spin" style={{ color: IND3 }} />
-              <span className="text-xs" style={{ color: "rgba(180,180,230,0.4)" }}>Loading {childFirstName}'s data...</span>
+            <div className="flex items-center gap-3 py-10 justify-center">
+              <Loader2 className="w-5 h-5 animate-spin" style={{ color: IND }} />
+              <span className="text-xs" style={{ color: T4 }}>Loading {childFirstName}'s data...</span>
             </div>
           ) : (
             <>
-              {/* 2×2 Metrics Grid */}
-              <div className="relative z-10 grid grid-cols-2" style={{ gap: "1px", background: "rgba(180,180,230,0.07)" }}>
-                {/* Attendance */}
-                <div
-                  role="button"
-                  tabIndex={0}
-                  aria-label="Open attendance page"
-                  onClick={() => navigate("/attendance")}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/attendance"); } }}
-                  className="p-[14px] flex flex-col gap-[8px] cursor-pointer active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50" style={{ background: DK_CELL }}>
-                  <span className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Attendance</span>
-                  <div className="flex items-center gap-[8px]">
-                    <DonutRing pct={liveStats.attendance ?? 0} color={attOnTrack ? GREEN : "#FF453A"} size={50} stroke={5} />
-                    <div className="flex flex-col gap-[3px]">
-                      <span className="text-[9px]" style={{ color: "rgba(255,255,255,0.28)" }}>Target</span>
-                      <span className="text-[11px] font-semibold" style={{ color: "rgba(255,255,255,0.58)" }}>85%</span>
-                      <div className="w-[52px] h-[3px] rounded-full mt-[2px] overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
-                        <div className="h-full rounded-full" style={{ width: `${Math.min(liveStats.attendance ?? 0, 100)}%`, background: attOnTrack ? GREEN : "#FF453A" }} />
-                      </div>
-                      <div className="inline-flex items-center gap-[3px] px-[9px] py-[3px] rounded-full mt-1 w-fit text-[10px] font-bold"
-                        style={{
-                          background: liveStats.attendance === null ? "rgba(255,255,255,0.05)" : attOnTrack ? "rgba(18,192,78,0.15)" : "rgba(232,51,74,0.15)",
-                          color: liveStats.attendance === null ? "rgba(180,180,230,0.5)" : attOnTrack ? "#38DC78" : "#FF85AA",
-                          border: `0.5px solid ${liveStats.attendance === null ? "rgba(180,180,230,0.10)" : attOnTrack ? "rgba(18,192,78,0.20)" : "rgba(232,51,74,0.20)"}`
-                        }}>
-                        {liveStats.attendance === null ? "No data" : attOnTrack ? "✓ On Track" : "Needs Work"}
-                      </div>
+              {/* 2×2 pastel mini-cards */}
+              <div className="grid grid-cols-2 gap-[10px] p-[14px]">
+                {[
+                  {
+                    label: "Attendance",
+                    value: liveStats.attendance !== null ? `${liveStats.attendance}%` : "—",
+                    status: liveStats.attendance === null ? "No data" : attOnTrack ? "✓ On Track" : "Below 85% target",
+                    statusColor: liveStats.attendance === null ? T4 : attOnTrack ? GREEN : ORANGE,
+                    icon: CheckCircle, iconColor: GREEN,
+                    cardBg: "linear-gradient(135deg, rgba(0,200,83,0.13) 0%, rgba(0,200,83,0.04) 100%)",
+                    cardBdr: "rgba(0,200,83,0.20)",
+                    iconBoxBg: "rgba(0,200,83,0.18)", iconBoxBdr: "rgba(0,200,83,0.30)",
+                    route: "/attendance",
+                  },
+                  {
+                    label: "Avg Score",
+                    value: liveStats.avgScore > 0 ? `${liveStats.avgScore}%` : "—",
+                    status: liveStats.avgScore >= 80 ? "Excellent" : liveStats.avgScore >= 60 ? "Good" : liveStats.avgScore > 0 ? "Needs Work" : "No Data",
+                    statusColor: liveStats.avgScore >= 80 ? GREEN : liveStats.avgScore >= 60 ? IND : liveStats.avgScore > 0 ? ORANGE : T4,
+                    icon: TrendingUp, iconColor: IND,
+                    cardBg: "linear-gradient(135deg, rgba(0,85,255,0.10) 0%, rgba(0,85,255,0.03) 100%)",
+                    cardBdr: "rgba(0,85,255,0.20)",
+                    iconBoxBg: "rgba(0,85,255,0.14)", iconBoxBdr: "rgba(0,85,255,0.28)",
+                    route: "/performance",
+                  },
+                  {
+                    label: "Assignments",
+                    value: pendingDisplay,
+                    status: liveStats.pending === null ? "No assignments yet" : noPending ? "✓ All Done" : `${liveStats.pending} to complete`,
+                    statusColor: liveStats.pending === null ? T4 : noPending ? GREEN : ORANGE,
+                    icon: AlertCircle, iconColor: ORANGE,
+                    cardBg: "linear-gradient(135deg, rgba(255,136,0,0.13) 0%, rgba(255,136,0,0.04) 100%)",
+                    cardBdr: "rgba(255,136,0,0.22)",
+                    iconBoxBg: "rgba(255,136,0,0.18)", iconBoxBdr: "rgba(255,136,0,0.32)",
+                    route: "/assignments",
+                  },
+                  {
+                    label: "Recent Test",
+                    value: liveStats.recentGrade !== "N/A" ? liveStats.recentGrade : "—",
+                    status: liveStats.recentSubject || "No tests yet",
+                    statusColor: T4,
+                    icon: Star, iconColor: ROSE,
+                    cardBg: "linear-gradient(135deg, rgba(255,51,85,0.10) 0%, rgba(255,51,85,0.03) 100%)",
+                    cardBdr: "rgba(255,51,85,0.20)",
+                    iconBoxBg: "rgba(255,51,85,0.14)", iconBoxBdr: "rgba(255,51,85,0.30)",
+                    route: "/tests",
+                  },
+                ].map(({ label, value, status, statusColor, icon: Icon, iconColor, cardBg, cardBdr, iconBoxBg, iconBoxBdr, route }) => (
+                  <div key={label}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Open ${label} page`}
+                    onClick={() => navigate(route)}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(route); } }}
+                    className="rounded-[16px] px-[14px] pt-[14px] pb-[14px] cursor-pointer active:scale-[0.96] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/30"
+                    style={{ background: cardBg, border: `0.5px solid ${cardBdr}`, transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
+                    <div className="w-[30px] h-[30px] rounded-[10px] flex items-center justify-center mb-[10px]"
+                      style={{ background: iconBoxBg, border: `0.5px solid ${iconBoxBdr}` }}>
+                      <Icon className="w-[15px] h-[15px]" style={{ color: iconColor }} strokeWidth={2.4} />
                     </div>
+                    <div className="text-[9px] font-bold uppercase tracking-[0.08em]" style={{ color: T4 }}>{label}</div>
+                    <div className="text-[24px] font-bold mt-[2px] leading-none" style={{ color: T1, letterSpacing: "-0.7px" }}>{value}</div>
+                    <div className="text-[10px] font-medium mt-[5px] truncate" style={{ color: statusColor }}>{status}</div>
                   </div>
-                </div>
-
-                {/* Avg Score */}
-                <div
-                  role="button"
-                  tabIndex={0}
-                  aria-label="Open performance page"
-                  onClick={() => navigate("/performance")}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/performance"); } }}
-                  className="p-[14px] flex flex-col gap-[8px] cursor-pointer active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50" style={{ background: DK_CELL }}>
-                  <span className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Avg Score</span>
-                  <div className="flex items-center gap-[8px]">
-                    <DonutRing pct={liveStats.avgScore} color={liveStats.avgScore >= 80 ? GREEN : liveStats.avgScore >= 60 ? IND3 : "#FF6961"} size={50} stroke={5} />
-                    <div>
-                      <div className="inline-flex items-center px-[9px] py-[3px] rounded-full text-[10px] font-bold"
-                        style={{
-                          background: liveStats.avgScore >= 80 ? "rgba(18,192,78,0.15)" : liveStats.avgScore >= 60 ? "rgba(170,170,220,0.15)" : "rgba(232,51,74,0.15)",
-                          color: liveStats.avgScore >= 80 ? "#38DC78" : liveStats.avgScore >= 60 ? "#AAAADC" : "#FF85AA",
-                          border: `0.5px solid ${liveStats.avgScore >= 80 ? "rgba(18,192,78,0.20)" : liveStats.avgScore >= 60 ? "rgba(170,170,220,0.24)" : "rgba(232,51,74,0.20)"}`
-                        }}>
-                        {liveStats.avgScore >= 80 ? "Excellent" : liveStats.avgScore >= 60 ? "Good" : liveStats.avgScore > 0 ? "Needs Work" : "No Data"}
-                      </div>
-                      <div className="flex gap-1 mt-2">
-                        {["C", "B", "A", "A+"].map(g => {
-                          const active = liveStats.avgScore >= (g === "A+" ? 90 : g === "A" ? 80 : g === "B" ? 60 : 0);
-                          return (
-                            <div key={g} className="w-[22px] h-[22px] rounded-[6px] flex items-center justify-center text-[10px] font-bold"
-                              style={{ background: active ? "rgba(0,85,255,0.20)" : "rgba(255,255,255,0.05)", color: active ? "#7FAEFF" : "rgba(255,255,255,0.18)" }}>
-                              {g}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Assignments */}
-                <div
-                  role="button"
-                  tabIndex={0}
-                  aria-label="Open assignments page"
-                  onClick={() => navigate("/assignments")}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/assignments"); } }}
-                  className="p-[14px] flex flex-col gap-[8px] cursor-pointer active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50" style={{ background: DK_CELL }}>
-                  <span className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Assignments</span>
-                  <div className="text-[28px] font-bold leading-none text-white" style={{ letterSpacing: "-1px" }}>{pendingDisplay}</div>
-                  <div className="text-[11px]" style={{ color: "rgba(255,255,255,0.32)", letterSpacing: "-0.1px" }}>
-                    {liveStats.pending === null ? "no data" : "pending"}
-                  </div>
-                  <div className="inline-flex items-center gap-[3px] px-[9px] py-[3px] rounded-full w-fit text-[10px] font-bold"
-                    style={{
-                      background: liveStats.pending === null ? "rgba(255,255,255,0.05)" : noPending ? "rgba(18,192,78,0.15)" : "rgba(0,85,255,0.15)",
-                      color: liveStats.pending === null ? "rgba(180,180,230,0.5)" : noPending ? "#38DC78" : "#7FAEFF",
-                      border: `0.5px solid ${liveStats.pending === null ? "rgba(180,180,230,0.10)" : noPending ? "rgba(18,192,78,0.20)" : "rgba(0,85,255,0.25)"}`
-                    }}>
-                    {liveStats.pending === null ? "No assignments yet" : noPending ? "✓ All Done" : `${liveStats.pending} to complete`}
-                  </div>
-                </div>
-
-                {/* Recent Test */}
-                <div
-                  role="button"
-                  tabIndex={0}
-                  aria-label="Open tests page"
-                  onClick={() => navigate("/tests")}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/tests"); } }}
-                  className="p-[14px] flex flex-col gap-[8px] cursor-pointer active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50" style={{ background: DK_CELL }}>
-                  <span className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Recent Test</span>
-                  <div className="text-[28px] font-bold leading-none text-white" style={{ letterSpacing: "-1px" }}>
-                    {liveStats.recentGrade !== "N/A" ? liveStats.recentGrade : "—"}
-                  </div>
-                  <div className="text-[11px] truncate" style={{ color: "rgba(255,255,255,0.32)", letterSpacing: "-0.1px" }}>{liveStats.recentSubject}</div>
-                  <div className="flex gap-1">
-                    {["C", "B", "A", "A+"].map(g => {
-                      const gradeSteps = ["C", "B", "A-", "A", "A+"];
-                      const gradeIdx = gradeSteps.indexOf(liveStats.recentGrade);
-                      const chipMap: Record<string, number> = { C: 0, B: 1, A: 3, "A+": 4 };
-                      const chipIdx = chipMap[g];
-                      const active = gradeIdx >= 0 && chipIdx <= gradeIdx;
-                      return (
-                        <div key={g} className="w-[22px] h-[22px] rounded-[6px] flex items-center justify-center text-[10px] font-bold"
-                          style={{ background: active ? "rgba(0,85,255,0.20)" : "rgba(255,255,255,0.05)", color: active ? "#7FAEFF" : "rgba(255,255,255,0.18)" }}>
-                          {g}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                ))}
               </div>
 
-              {/* AI Insight Strip */}
-              <div className="relative z-10 px-[18px] py-[14px] flex items-start gap-[10px]" style={{ borderTop: "0.5px solid rgba(180,180,230,0.07)", background: "rgba(255,255,255,0.016)" }}>
-                <span className="text-[16px] mt-0.5">🤖</span>
+              {/* AI Insight Strip (light) */}
+              <div className="px-[18px] py-[12px] flex items-start gap-[10px]" style={{ borderTop: `0.5px solid ${IND_BDR}`, background: IND_SOFT }}>
+                <BrainCircuit className="w-4 h-4 shrink-0 mt-[1px]" style={{ color: IND }} />
                 {aiInsights?.child_summary_narrative ? (
-                  <p className="text-[12px] leading-[1.65]" style={{ color: "rgba(180,180,230,0.52)", letterSpacing: "-0.1px" }}>
-                    <strong style={{ color: "rgba(255,255,255,0.86)", fontWeight: 600 }}>{studentData?.name}</strong>{" "}
+                  <p className="text-[12px] leading-[1.65]" style={{ color: T3, letterSpacing: "-0.1px" }}>
+                    <strong style={{ color: T1, fontWeight: 700 }}>{studentData?.name}</strong>{" "}
                     {aiInsights.child_summary_narrative.replace(studentData?.name || "", "").trim()}
                   </p>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <Loader2 className="w-3 h-3 animate-spin" style={{ color: IND3 }} />
-                    <p className="text-[11px] italic" style={{ color: "rgba(180,180,230,0.4)" }}>AI summary generating...</p>
+                    <Loader2 className="w-3 h-3 animate-spin" style={{ color: IND }} />
+                    <p className="text-[11px] italic" style={{ color: T4 }}>AI summary generating...</p>
                   </div>
                 )}
               </div>
@@ -1271,8 +1186,6 @@ const DashboardPage = () => {
     const ROSE = "#FF3355";
     const ROSE_S = "rgba(255,51,85,0.10)";
     const IND_DARK_GRAD = "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)";
-    const DK = "linear-gradient(140deg, #0A0A0F 0%, #16161F 48%, #1F1F2A 100%)";
-    const DK_CELL = "rgba(255,255,255,0.03)";
     const SH = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.09), 0 10px 28px rgba(0,85,255,0.11)";
     const SH_LG = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 20px 48px rgba(0,85,255,0.14)";
     const SH_BTN = "0 4px 14px rgba(0,85,255,0.32), 0 1px 4px rgba(0,85,255,0.18)";
@@ -1479,167 +1392,107 @@ const DashboardPage = () => {
             <ArrowRight className="w-[20px] h-[20px] flex-shrink-0 relative" style={{ color: IND }} />
           </div>
 
-          {/* ── AI Live Dark Card ── */}
-          <div className="rounded-[28px] overflow-hidden relative mb-5"
-            style={{ background: DK, boxShadow: "0 0 0 0.5px rgba(0,85,255,0.16), 0 12px 44px rgba(0,0,0,0.22), 0 4px 12px rgba(0,0,0,0.14)" }}>
-            <div className="absolute inset-0 pointer-events-none" style={{
-              background: "radial-gradient(ellipse 500px 300px at 85% 0%, rgba(255,255,255,0.18) 0%, transparent 60%), radial-gradient(ellipse 360px 360px at -10% 85%, rgba(255,255,255,0.10) 0%, transparent 60%), radial-gradient(ellipse 300px 300px at 50% 52%, rgba(255,255,255,0.06) 0%, transparent 60%)"
-            }} />
-            <div className="absolute inset-0 pointer-events-none" style={{
-              backgroundImage: "linear-gradient(rgba(180,180,230,0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(180,180,230,0.018) 1px, transparent 1px)",
-              backgroundSize: "30px 30px"
-            }} />
+          {/* ── AI Live Summary Card (light, dashboard 4-stat-card vibe) ── */}
+          <div className="rounded-[22px] overflow-hidden relative mb-5 bg-white"
+            style={{ boxShadow: SH_LG, border: `0.5px solid ${IND_BDR}` }}>
 
             {/* Header */}
-            <div className="relative z-10 flex items-center justify-between px-7 pt-5 pb-[14px]" style={{ borderBottom: "0.5px solid rgba(180,180,230,0.08)" }}>
+            <div className="flex items-center justify-between px-6 pt-[14px] pb-[12px]" style={{ borderBottom: `0.5px solid ${IND_BDR}` }}>
               <div className="flex items-center gap-2">
-                <span className="text-[15px]" style={{ color: "rgba(180,180,230,0.7)" }}>✦</span>
-                <span className="text-[12px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.6)" }}>Edullent AI · Live Summary</span>
+                <Sparkles className="w-[13px] h-[13px]" style={{ color: IND }} strokeWidth={2.4} />
+                <span className="text-[11px] font-bold uppercase tracking-[0.12em]" style={{ color: T4 }}>Edullent AI · Live Summary</span>
               </div>
-              <div className="flex items-center gap-[5px] px-3 py-[5px] rounded-full" style={{ background: "rgba(18,192,78,0.10)", border: "0.5px solid rgba(18,192,78,0.24)" }}>
-                <div className="w-[6px] h-[6px] rounded-full animate-pulse" style={{ background: GREEN, boxShadow: "0 0 0 2px rgba(18,192,78,0.2)" }} />
+              <div className="flex items-center gap-[5px] px-3 py-[4px] rounded-full" style={{ background: GREEN_S, border: `0.5px solid ${GREEN_B}` }}>
+                <div className="w-[6px] h-[6px] rounded-full animate-pulse" style={{ background: GREEN, boxShadow: `0 0 0 2px ${GREEN_S}` }} />
                 <span className="text-[10px] font-bold tracking-[0.06em]" style={{ color: GREEN }}>LIVE</span>
               </div>
             </div>
 
             {dataLoading ? (
-              <div className="relative z-10 flex items-center gap-3 py-14 justify-center">
-                <Loader2 className="w-6 h-6 animate-spin" style={{ color: IND3 }} />
-                <span className="text-sm" style={{ color: "rgba(180,180,230,0.4)" }}>Loading {childFirstName}'s data...</span>
+              <div className="flex items-center gap-3 py-14 justify-center">
+                <Loader2 className="w-6 h-6 animate-spin" style={{ color: IND }} />
+                <span className="text-sm" style={{ color: T4 }}>Loading {childFirstName}'s data...</span>
               </div>
             ) : (
               <>
-                <div className="relative z-10 grid grid-cols-2 lg:grid-cols-4" style={{ gap: "1px", background: "rgba(180,180,230,0.07)" }}>
-                  {/* Attendance */}
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    aria-label="Open attendance page"
-                    onClick={() => navigate("/attendance")}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/attendance"); } }}
-                    className="p-5 flex flex-col gap-3 cursor-pointer transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50" style={{ background: DK_CELL }}>
-                    <span className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Attendance</span>
-                    <div className="flex items-center gap-3">
-                      <DonutRing pct={liveStats.attendance ?? 0} color={attOnTrack ? GREEN : ORANGE} size={72} stroke={6} />
-                      <div className="flex flex-col gap-[3px]">
-                        <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.28)" }}>Target</span>
-                        <span className="text-[12px] font-semibold" style={{ color: "rgba(255,255,255,0.58)" }}>85%</span>
-                        <div className="w-[60px] h-[3px] rounded-full mt-1 overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
-                          <div className="h-full rounded-full" style={{ width: `${Math.min(liveStats.attendance ?? 0, 100)}%`, background: attOnTrack ? GREEN : "#FF453A" }} />
-                        </div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 p-4">
+                  {[
+                    {
+                      label: "Attendance",
+                      value: liveStats.attendance !== null ? `${liveStats.attendance}%` : "—",
+                      status: liveStats.attendance === null ? "No data" : attOnTrack ? "✓ On Track" : "Below 85% target",
+                      statusColor: liveStats.attendance === null ? T4 : attOnTrack ? GREEN : ORANGE,
+                      icon: CheckCircle, iconColor: GREEN,
+                      cardBg: "linear-gradient(135deg, rgba(0,200,83,0.13) 0%, rgba(0,200,83,0.04) 100%)",
+                      cardBdr: "rgba(0,200,83,0.20)",
+                      iconBoxBg: "rgba(0,200,83,0.18)", iconBoxBdr: "rgba(0,200,83,0.30)",
+                      route: "/attendance",
+                    },
+                    {
+                      label: "Avg Score",
+                      value: liveStats.avgScore > 0 ? `${liveStats.avgScore}%` : "—",
+                      status: liveStats.avgScore >= 80 ? "Excellent" : liveStats.avgScore >= 60 ? "Good" : liveStats.avgScore > 0 ? "Needs Work" : "No Data",
+                      statusColor: liveStats.avgScore >= 80 ? GREEN : liveStats.avgScore >= 60 ? IND : liveStats.avgScore > 0 ? ORANGE : T4,
+                      icon: TrendingUp, iconColor: IND,
+                      cardBg: "linear-gradient(135deg, rgba(0,85,255,0.10) 0%, rgba(0,85,255,0.03) 100%)",
+                      cardBdr: "rgba(0,85,255,0.20)",
+                      iconBoxBg: "rgba(0,85,255,0.14)", iconBoxBdr: "rgba(0,85,255,0.28)",
+                      route: "/performance",
+                    },
+                    {
+                      label: "Assignments",
+                      value: pendingDisplay,
+                      status: liveStats.pending === null ? "No assignments yet" : noPending ? "✓ All Done" : `${liveStats.pending} to complete`,
+                      statusColor: liveStats.pending === null ? T4 : noPending ? GREEN : ORANGE,
+                      icon: AlertCircle, iconColor: ORANGE,
+                      cardBg: "linear-gradient(135deg, rgba(255,136,0,0.13) 0%, rgba(255,136,0,0.04) 100%)",
+                      cardBdr: "rgba(255,136,0,0.22)",
+                      iconBoxBg: "rgba(255,136,0,0.18)", iconBoxBdr: "rgba(255,136,0,0.32)",
+                      route: "/assignments",
+                    },
+                    {
+                      label: "Recent Test",
+                      value: liveStats.recentGrade !== "N/A" ? liveStats.recentGrade : "—",
+                      status: liveStats.recentSubject || "No tests yet",
+                      statusColor: T4,
+                      icon: Star, iconColor: ROSE,
+                      cardBg: "linear-gradient(135deg, rgba(255,51,85,0.10) 0%, rgba(255,51,85,0.03) 100%)",
+                      cardBdr: "rgba(255,51,85,0.20)",
+                      iconBoxBg: "rgba(255,51,85,0.14)", iconBoxBdr: "rgba(255,51,85,0.30)",
+                      route: "/tests",
+                    },
+                  ].map(({ label, value, status, statusColor, icon: Icon, iconColor, cardBg, cardBdr, iconBoxBg, iconBoxBdr, route }) => (
+                    <div key={label}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Open ${label} page`}
+                      onClick={() => navigate(route)}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(route); } }}
+                      className="rounded-[18px] px-5 pt-5 pb-5 cursor-pointer transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/30"
+                      style={{ background: cardBg, border: `0.5px solid ${cardBdr}` }}>
+                      <div className="w-[36px] h-[36px] rounded-[12px] flex items-center justify-center mb-[14px]"
+                        style={{ background: iconBoxBg, border: `0.5px solid ${iconBoxBdr}` }}>
+                        <Icon className="w-[18px] h-[18px]" style={{ color: iconColor }} strokeWidth={2.3} />
                       </div>
+                      <div className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: T4 }}>{label}</div>
+                      <div className="text-[32px] font-bold mt-1 leading-none" style={{ color: T1, letterSpacing: "-1px" }}>{value}</div>
+                      <div className="text-[12px] font-medium mt-[8px] truncate" style={{ color: statusColor }}>{status}</div>
                     </div>
-                    <div className="inline-flex items-center gap-[3px] px-[9px] py-[3px] rounded-full w-fit text-[10px] font-bold"
-                      style={{
-                        background: liveStats.attendance === null ? "rgba(255,255,255,0.05)" : attOnTrack ? "rgba(18,192,78,0.15)" : "rgba(232,51,74,0.15)",
-                        color: liveStats.attendance === null ? "rgba(180,180,230,0.5)" : attOnTrack ? "#38DC78" : "#FF85AA",
-                        border: `0.5px solid ${liveStats.attendance === null ? "rgba(180,180,230,0.10)" : attOnTrack ? "rgba(18,192,78,0.20)" : "rgba(232,51,74,0.20)"}`
-                      }}>
-                      {liveStats.attendance === null ? "No data" : attOnTrack ? "✓ On Track" : "Needs Work"}
-                    </div>
-                  </div>
-
-                  {/* Avg Score */}
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    aria-label="Open performance page"
-                    onClick={() => navigate("/performance")}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/performance"); } }}
-                    className="p-5 flex flex-col gap-3 cursor-pointer transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50" style={{ background: DK_CELL }}>
-                    <span className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Avg Score</span>
-                    <div className="flex items-center gap-3">
-                      <DonutRing pct={liveStats.avgScore} color={liveStats.avgScore >= 80 ? GREEN : liveStats.avgScore >= 60 ? IND3 : "#FF6961"} size={72} stroke={6} />
-                      <div>
-                        <div className="inline-flex items-center px-[10px] py-[4px] rounded-full text-[11px] font-bold"
-                          style={{
-                            background: liveStats.avgScore >= 80 ? "rgba(18,192,78,0.15)" : liveStats.avgScore >= 60 ? "rgba(170,170,220,0.15)" : "rgba(232,51,74,0.15)",
-                            color: liveStats.avgScore >= 80 ? "#38DC78" : liveStats.avgScore >= 60 ? "#AAAADC" : "#FF85AA",
-                            border: `0.5px solid ${liveStats.avgScore >= 80 ? "rgba(18,192,78,0.20)" : liveStats.avgScore >= 60 ? "rgba(170,170,220,0.24)" : "rgba(232,51,74,0.20)"}`
-                          }}>
-                          {liveStats.avgScore >= 80 ? "Excellent" : liveStats.avgScore >= 60 ? "Good" : liveStats.avgScore > 0 ? "Needs Work" : "No Data"}
-                        </div>
-                        <div className="flex gap-1 mt-2">
-                          {["C", "B", "A", "A+"].map(g => {
-                            const active = liveStats.avgScore >= (g === "A+" ? 90 : g === "A" ? 80 : g === "B" ? 60 : 0);
-                            return (
-                              <div key={g} className="w-[28px] h-[28px] rounded-[8px] flex items-center justify-center text-[11px] font-bold"
-                                style={{ background: active ? "rgba(0,85,255,0.20)" : "rgba(255,255,255,0.05)", color: active ? "#7FAEFF" : "rgba(255,255,255,0.18)" }}>
-                                {g}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Assignments */}
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    aria-label="Open assignments page"
-                    onClick={() => navigate("/assignments")}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/assignments"); } }}
-                    className="p-5 flex flex-col gap-3 cursor-pointer transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50" style={{ background: DK_CELL }}>
-                    <span className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Assignments</span>
-                    <div className="text-[42px] font-bold leading-none text-white" style={{ letterSpacing: "-1.4px" }}>{pendingDisplay}</div>
-                    <div className="text-[12px]" style={{ color: "rgba(255,255,255,0.32)", letterSpacing: "-0.1px" }}>
-                      {liveStats.pending === null ? "no data" : "pending"}
-                    </div>
-                    <div className="inline-flex items-center gap-[3px] px-[9px] py-[3px] rounded-full w-fit text-[10px] font-bold"
-                      style={{
-                        background: liveStats.pending === null ? "rgba(255,255,255,0.05)" : noPending ? "rgba(18,192,78,0.15)" : "rgba(245,160,0,0.15)",
-                        color: liveStats.pending === null ? "rgba(180,180,230,0.5)" : noPending ? "#38DC78" : "#F5A000",
-                        border: `0.5px solid ${liveStats.pending === null ? "rgba(180,180,230,0.10)" : noPending ? "rgba(18,192,78,0.20)" : "rgba(0,85,255,0.25)"}`
-                      }}>
-                      {liveStats.pending === null ? "No assignments yet" : noPending ? "✓ All Done" : `${liveStats.pending} to complete`}
-                    </div>
-                  </div>
-
-                  {/* Recent Test */}
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    aria-label="Open tests page"
-                    onClick={() => navigate("/tests")}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/tests"); } }}
-                    className="p-5 flex flex-col gap-3 cursor-pointer transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50" style={{ background: DK_CELL }}>
-                    <span className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: "rgba(180,180,230,0.36)" }}>Recent Test</span>
-                    <div className="text-[42px] font-bold leading-none text-white" style={{ letterSpacing: "-1.4px" }}>
-                      {liveStats.recentGrade !== "N/A" ? liveStats.recentGrade : "—"}
-                    </div>
-                    <div className="text-[12px] truncate" style={{ color: "rgba(255,255,255,0.32)", letterSpacing: "-0.1px" }}>{liveStats.recentSubject}</div>
-                    <div className="flex gap-1">
-                      {["C", "B", "A", "A+"].map(g => {
-                        const gradeSteps = ["C", "B", "A-", "A", "A+"];
-                        const gradeIdx = gradeSteps.indexOf(liveStats.recentGrade);
-                        const chipMap: Record<string, number> = { C: 0, B: 1, A: 3, "A+": 4 };
-                        const chipIdx = chipMap[g];
-                        const active = gradeIdx >= 0 && chipIdx <= gradeIdx;
-                        return (
-                          <div key={g} className="w-[28px] h-[28px] rounded-[8px] flex items-center justify-center text-[11px] font-bold"
-                            style={{ background: active ? "rgba(0,85,255,0.20)" : "rgba(255,255,255,0.05)", color: active ? "#7FAEFF" : "rgba(255,255,255,0.18)" }}>
-                            {g}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  ))}
                 </div>
 
-                {/* AI Insight Strip */}
-                <div className="relative z-10 px-7 py-[14px] flex items-start gap-3" style={{ borderTop: "0.5px solid rgba(180,180,230,0.07)", background: "rgba(255,255,255,0.016)" }}>
-                  <BrainCircuit className="w-4 h-4 shrink-0 mt-[2px]" style={{ color: IND3 }} />
+                {/* AI Insight Strip (light) */}
+                <div className="px-7 py-[14px] flex items-start gap-3" style={{ borderTop: `0.5px solid ${IND_BDR}`, background: IND_SOFT }}>
+                  <BrainCircuit className="w-4 h-4 shrink-0 mt-[2px]" style={{ color: IND }} />
                   {aiInsights?.child_summary_narrative ? (
-                    <p className="text-[13px] leading-[1.65]" style={{ color: "rgba(180,180,230,0.62)", letterSpacing: "-0.1px" }}>
-                      <strong style={{ color: "rgba(255,255,255,0.90)", fontWeight: 600 }}>{studentData?.name}</strong>{" "}
+                    <p className="text-[13px] leading-[1.65]" style={{ color: T3, letterSpacing: "-0.1px" }}>
+                      <strong style={{ color: T1, fontWeight: 700 }}>{studentData?.name}</strong>{" "}
                       {aiInsights.child_summary_narrative.replace(studentData?.name || "", "").trim()}
                     </p>
                   ) : (
                     <div className="flex items-center gap-2">
-                      <Loader2 className="w-3 h-3 animate-spin" style={{ color: IND3 }} />
-                      <p className="text-[12px] italic" style={{ color: "rgba(180,180,230,0.4)" }}>AI summary generating...</p>
+                      <Loader2 className="w-3 h-3 animate-spin" style={{ color: IND }} />
+                      <p className="text-[12px] italic" style={{ color: T4 }}>AI summary generating...</p>
                     </div>
                   )}
                 </div>
