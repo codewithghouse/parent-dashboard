@@ -45,10 +45,12 @@ export const ParentSidebar = ({ open, onClose }: ParentSidebarProps) => {
     >
       {/* Logo + close button (mobile) */}
       <div className="flex items-center gap-3 px-6 py-5">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-          style={{ background: "#170C79" }}>
-          <GraduationCap className="w-5 h-5 text-white" />
-        </div>
+        <img
+          src="/edullent-icon.png"
+          alt="Edullent"
+          className="w-8 h-8 rounded-lg object-contain flex-shrink-0"
+          draggable={false}
+        />
         <div className="flex flex-col leading-none flex-1 min-w-0">
           <span className="font-bold text-lg tracking-wide uppercase" style={{ color: "#170C79" }}>EDULLENT</span>
           <span className="text-[10px] font-bold uppercase tracking-widest mt-1" style={{ color: "#7A85B8" }}>Parent Portal</span>
