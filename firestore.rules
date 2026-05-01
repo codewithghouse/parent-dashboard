@@ -133,12 +133,55 @@ service cloud.firestore {
           );
     }
 
+    // ── Platform-level admin (main-website /admin console) ──────────────
+    // Distinct from the school-level hasAdminRole() (which is owner/principal
+    // CLAIM-based). Platform admin lives in /admins/{uid}.role and powers
+    // the main-website's /admin pages; the permanent superadmin email is
+    // hardcoded so a fresh project always has a recovery path.
+    // MUST stay in sync with PERMANENT_SUPERADMIN_EMAILS in src/lib/auth.tsx.
+    function isPermanentSuperadmin() {
+      return signedIn()
+          && request.auth.token.email_verified == true
+          && email() == 'edullentofficial@gmail.com';
+    }
+
+    function platformAdminPath() {
+      return /databases/$(database)/documents/admins/$(uid());
+    }
+
+    function hasPlatformAdminDoc() {
+      return signedIn() && exists(platformAdminPath());
+    }
+
+    function platformAdminRole() {
+      return get(platformAdminPath()).data.role;
+    }
+
+    function isPlatformAdmin() {
+      return isPermanentSuperadmin()
+          || (hasPlatformAdminDoc()
+              && (platformAdminRole() == 'admin' || platformAdminRole() == 'superadmin'));
+    }
+
+    function isPlatformSuper() {
+      return isPermanentSuperadmin()
+          || (hasPlatformAdminDoc() && platformAdminRole() == 'superadmin');
+    }
+
 
     // ═══════════════════════════════════════════════════════════════════════
     // ── 1. OWNER SUBTREE — /schools/{ownerUid}/** ────────────────────────
-    // ═══════════════════════════════════════════════════════════════════════
+    // ═══��═══════════════════════════════════════════════════════════════════
     match /schools/{schoolId} {
+      // Owners retain full access to their own school doc.
       allow read, write: if isOwnerOf(schoolId);
+
+      // Platform admins (main-website /admin console) can also read/list
+      // schools and toggle status; only platform-superadmin can hard-delete.
+      // These are additive — no school-tenant capability is removed.
+      allow get, list: if isPlatformAdmin();
+      allow update:    if isPlatformAdmin();
+      allow delete:    if isPlatformSuper();
 
       match /{subPath=**} {
         // Owner reads everything under their tree.
@@ -178,7 +221,7 @@ service cloud.firestore {
     }
 
 
-    // ═══════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════════��
     // ── 3. TEACHERS ─────────────────────────────────────────────────────
     // ═══════════════════════════════════════════════════════════════════════
     match /teachers/{docId} {
@@ -256,7 +299,7 @@ service cloud.firestore {
 
 
     // ═══════════════════════════════════════════════════════════════════════
-    // ── 6. ACCESS REQUESTS — public intake, hardened ─────────────────────
+    // ── 6. ACCESS REQUESTS ��� public intake, hardened ─────────────────────
     //     Anyone can submit, but field whitelist + size caps prevent DoS.
     // ═══════════════════════════════════════════════════════════════════════
     match /access_requests/{docId} {
@@ -306,7 +349,7 @@ service cloud.firestore {
 
     // ═══════════════════════════════════════════════════════════════════════
     // ── 8. AUDIT LOGS — append-only, owner-only read ────────────────────
-    // ═══════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════��════════════════════════════
     match /audit_logs/{logId} {
       // Owner reads only their own school's audit trail.
       allow get, list: if signedIn() && hasOwnerRole()
@@ -324,7 +367,7 @@ service cloud.firestore {
 
     // ═══════════════════════════════════════════════════════════════════════
     // ── 9. GRADING JOBS — queue-based AI grading ────────────────────────
-    // ═══════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════���════════════
     match /grading_jobs/{jobId} {
       allow get:  if signedIn() && inSameSchool();
       allow list: if signedIn();  // TEMPORARY PHASE-1: relaxed while client queries migrate. Re-tighten to inSameSchool() once all pages filter by schoolId.
@@ -448,6 +491,23 @@ service cloud.firestore {
       allow create:    if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
       allow update:    if signedIn() && inSameSchool() && schoolIdImmutable() && hasStaffRole();
       allow delete:    if signedIn() && inSameSchool() && hasAdminRole();
+    }
+    // ── Behavioural tracking (StudentBehaviour page) ─────────────────────
+    // Added 2026-05-01: rules were missing for these two collections, which
+    // caused the "Save failed" toast on Add improvement area / record rating.
+    match /improvement_areas/{id} {
+      allow get:  if signedIn() && inSameSchool();
+      allow list: if signedIn();  // TEMPORARY PHASE-1
+      allow create:    if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
+      allow update:    if signedIn() && inSameSchool() && schoolIdImmutable() && hasStaffRole();
+      allow delete:    if signedIn() && inSameSchool() && hasStaffRole();
+    }
+    match /student_ratings/{id} {
+      allow get:  if signedIn() && inSameSchool();
+      allow list: if signedIn();  // TEMPORARY PHASE-1
+      allow create:    if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
+      allow update:    if signedIn() && inSameSchool() && schoolIdImmutable() && hasStaffRole();
+      allow delete:    if signedIn() && inSameSchool() && hasStaffRole();
     }
     match /discipline/{id} {
       allow get:  if signedIn() && inSameSchool();
@@ -753,6 +813,90 @@ service cloud.firestore {
       allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && hasStaffRole()
                        && (request.resource.data.studentId == studentId);
       allow delete: if signedIn() && inSameSchool() && hasAdminRole();
+    }
+
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ── 11.6. PLATFORM ADMIN — main-website /admin console ──────────────
+    //     Distinct from school-tenant collections: these collections power
+    //     the cross-tenant admin operator console. Two doc shapes live in
+    //     /admins:
+    //       1. Real admin records: doc id = uid, fields { email, role, ... }
+    //       2. Pending invites:    doc id = "invite_<sanitized_email>",
+    //                              fields { inviteEmail, role, ... }
+    //     accessRequests/{uid} is the camelCase platform-admin request flow
+    //     and is intentionally distinct from /access_requests/ above (which
+    //     is school-level join requests).
+    // ═══════════════════════════════════════════════════════════════════════
+    match /admins/{adminId} {
+
+      // Self-read; platform-admin-read-all; or read a pending invite that
+      // matches the caller's verified email (so first-login promotion works).
+      allow get: if signedIn() && (
+        adminId == uid()
+        || isPlatformAdmin()
+        || (resource.data.inviteEmail is string
+            && resource.data.inviteEmail.lower() == email())
+      );
+
+      allow list: if isPlatformAdmin();
+
+      // Self-create paths:
+      //   a) Permanent superadmin bootstrap (first sign-in)
+      //   b) Invite consumption — an invite addressed to caller's email exists
+      //      and the new doc inherits its role
+      // Otherwise only platform-superadmin can create (e.g. invites).
+      allow create: if signedIn() && (
+        (adminId == uid()
+          && isPermanentSuperadmin()
+          && request.resource.data.role == 'superadmin')
+
+        || (adminId == uid()
+          && exists(/databases/$(database)/documents/admins/$('invite_' + email().replace('[^a-z0-9]', '_')))
+          && (request.resource.data.role == 'admin'
+              || request.resource.data.role == 'superadmin'))
+
+        || isPlatformSuper()
+      );
+
+      // Self-update only with role unchanged; superadmins can update anyone
+      // except cannot change their own role.
+      allow update: if signedIn() && (
+        (adminId == uid()
+          && request.resource.data.role == resource.data.role)
+        || (isPlatformSuper()
+          && !(adminId == uid()
+                && request.resource.data.role != resource.data.role))
+      );
+
+      // Only superadmins can revoke. Cannot delete self (lock-out
+      // protection). The permanent: true flag also blocks deletion.
+      allow delete: if isPlatformSuper()
+        && adminId != uid()
+        && !(resource.data.permanent == true);
+    }
+
+    match /accessRequests/{requestId} {
+      allow get:  if signedIn() && (requestId == uid() || isPlatformAdmin());
+      allow list: if isPlatformAdmin();
+
+      allow create: if signedIn()
+        && requestId == uid()
+        && request.resource.data.uid == uid()
+        && request.resource.data.status == 'pending'
+        && (request.resource.data.email == null
+            || (request.resource.data.email is string
+                && request.resource.data.email.lower() == email()))
+        && (!('reason' in request.resource.data)
+            || request.resource.data.reason == null
+            || (request.resource.data.reason is string
+                && request.resource.data.reason.size() <= 500));
+
+      // Requests are immutable once submitted — accept/reject = delete.
+      allow update: if false;
+
+      // The user can withdraw their own; platform-superadmin can act on it.
+      allow delete: if signedIn() && (requestId == uid() || isPlatformSuper());
     }
 
 
