@@ -24,8 +24,21 @@ const ADMIN_ROLES = new Set(["owner", "principal"]);
 
 const ALLOWED_OPENAI_MODELS = new Set([
   "gpt-4o-mini",
+  "gpt-4o",
   "gpt-4.1-mini",
+  "gpt-4-turbo",
+  "gpt-3.5-turbo",
 ]);
+
+// Fallback chain — if the requested model returns "model_not_found"
+// (account/key doesn't have access to the newest one), step down through
+// progressively older + universally-available models. The order is by
+// quality preference; we stop at the first model the OpenAI key can serve.
+const MODEL_FALLBACK_CHAIN = [
+  "gpt-4o-mini",
+  "gpt-4.1-mini",
+  "gpt-3.5-turbo",
+];
 
 const MAX_PROMPT_CHARS = 8000;
 const MAX_IMAGE_B64_BYTES = 8 * 1024 * 1024;   // ~6 MB raw image
@@ -236,15 +249,46 @@ export const parentAIProxy = functions
         messages.push({ role: "user", content: prompt });
       }
 
-      const completion = await openai.chat.completions.create({
-        model: resolvedModel,
-        messages,
-        max_tokens: 1500,
-        ...(jsonMode && !hasImage ? { response_format: { type: "json_object" } } : {}),
-      });
+      // Build the model attempt sequence. Start with the resolved choice,
+      // then walk the fallback chain. We dedupe to avoid retrying the same
+      // model. Vision requests stay locked to gpt-4o-mini (fallback chain
+      // doesn't apply because non-vision models can't process the image).
+      const modelsToTry: string[] = hasImage
+        ? [resolvedModel]
+        : Array.from(new Set<string>([resolvedModel, ...MODEL_FALLBACK_CHAIN]));
 
-      const content = completion.choices[0]?.message?.content ?? "";
-      return { content };
+      let lastErr: any = null;
+      for (const candidate of modelsToTry) {
+        try {
+          const completion = await openai.chat.completions.create({
+            model: candidate,
+            messages,
+            max_tokens: 1500,
+            ...(jsonMode && !hasImage ? { response_format: { type: "json_object" } } : {}),
+          });
+          const content = completion.choices[0]?.message?.content ?? "";
+          if (candidate !== modelsToTry[0]) {
+            // Surface a single info log when fallback succeeded so we can
+            // see in production logs which model is actually serving.
+            console.info(`parentAIProxy: succeeded with fallback model "${candidate}"`);
+          }
+          return { content };
+        } catch (innerErr: any) {
+          const innerCode = innerErr?.error?.code ?? innerErr?.code;
+          const innerStatus = innerErr?.status ?? innerErr?.response?.status;
+          // ONLY retry the next model on model_not_found / 404. Every other
+          // error (rate limit, auth, invalid request) is real and should
+          // surface immediately — retrying would just delay the truth.
+          const shouldFallback = innerCode === "model_not_found" || innerStatus === 404;
+          if (!shouldFallback) {
+            throw innerErr;
+          }
+          console.warn(`parentAIProxy: model "${candidate}" not available — trying next in chain`);
+          lastErr = innerErr;
+        }
+      }
+      // Exhausted the chain — surface the last error to the outer catch.
+      throw lastErr ?? new Error("All AI models in fallback chain returned not_found");
     } catch (error: any) {
       // Surface a SPECIFIC error code so the client can show a useful message
       // (and we can debug from production logs without poking around). Never
