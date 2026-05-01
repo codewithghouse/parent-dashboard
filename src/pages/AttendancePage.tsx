@@ -42,11 +42,24 @@ const AttendancePage = () => {
     const u = subscribePerStudent({
       collection: "attendance",
       student: studentData,
-      filters: [where("date", ">=", yearStart)],
+      // Date range goes ONLY on the studentId listener (the
+      // `schoolId + studentId + date` composite index exists). The email
+      // listener fetches all docs by equality and we post-filter below to
+      // keep the same academic-year window. Once the
+      // `schoolId + studentEmail + date` index is deployed (added to
+      // firestore.indexes.json same change), this can move back into `filters`.
+      studentIdOnlyFilters: [where("date", ">=", yearStart)],
       onChange: (docs) => {
         if (!mountedRef.current) return;
+        // TEMP diagnostic — confirms email-side merge is firing. Remove once
+        // teacher → parent attendance sync is verified end-to-end in your env.
+        console.log(`[Attendance] merged ${docs.length} docs (sample):`,
+          docs.slice(0, 3).map(d => { const x: any = d.data(); return { id: d.id, date: x.date, status: x.status, studentEmail: x.studentEmail, studentId: x.studentId }; }));
         const uniqueLogs = docs
           .map((d) => ({ id: d.id, ...d.data() as any }))
+          // Apply the date floor client-side so email-matched docs older than
+          // the academic year don't slip in.
+          .filter((l: any) => !l.date || l.date >= yearStart)
           // Null-safe: an attendance doc missing `date` used to crash the sort
           // with `TypeError: cannot read 'localeCompare' of undefined`.
           .sort((a: any, b: any) => (b.date || "").localeCompare(a.date || ""));
@@ -71,7 +84,10 @@ const AttendancePage = () => {
         setLoading(false);
       },
       onError: (err) => {
-        console.warn("[Attendance] listener error:", err);
+        // FAILED_PRECONDITION here means a composite index is still missing.
+        // Look for "needs an index" in the error message and click the link
+        // Firestore prints to auto-create it.
+        console.error("[Attendance] listener error (often a missing index):", err);
         setLoading(false);
       },
     });

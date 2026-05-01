@@ -78,8 +78,24 @@ export type PerStudentDoc = {
 interface SubscribeOpts {
   collection: string;
   student: StudentLike | null | undefined;
-  /** Extra Firestore constraints (e.g. `where("date", ">=", ...)`, `limit(...)`). Applied to BOTH listeners. */
+  /**
+   * Equality filters and `limit()` constraints — applied to BOTH listeners.
+   * Safe to use anything that doesn't require a NEW composite index beyond
+   * `schoolId + studentEmail` and `schoolId + studentId`.
+   */
   filters?: QueryConstraint[];
+  /**
+   * Range filters (`where(... ">=", ...)`, `orderBy(...)`, etc.) that only
+   * have a composite index on the studentId side. Applied to the studentId
+   * listener only. The email listener fetches by equality and the caller's
+   * `onChange` handler must post-filter the merged result if it needs the
+   * range applied to email-matched docs.
+   *
+   * Use this when the corresponding `schoolId + studentEmail + <range_field>`
+   * composite index is NOT yet deployed. Without it, the email listener
+   * would FAILED_PRECONDITION and silently miss data.
+   */
+  studentIdOnlyFilters?: QueryConstraint[];
   onChange: (docs: PerStudentDoc[]) => void;
   onError?: (err: Error) => void;
 }
@@ -111,7 +127,7 @@ const mergeUnique = (
  * If the student has no email, only the studentId listener runs (still safe).
  */
 export function subscribePerStudent(opts: SubscribeOpts): Unsubscribe {
-  const { collection, student, filters = [], onChange, onError } = opts;
+  const { collection, student, filters = [], studentIdOnlyFilters = [], onChange, onError } = opts;
 
   if (!student?.id) {
     onChange([]);
@@ -126,15 +142,19 @@ export function subscribePerStudent(opts: SubscribeOpts): Unsubscribe {
 
   const emit = () => onChange(mergeUnique(snapById, snapByEmail));
 
-  // Listener 1 — by canonical studentId
+  // Listener 1 — by canonical studentId. Gets BOTH `filters` and
+  // `studentIdOnlyFilters` applied; the studentId-side composite indexes
+  // typically cover the range queries.
   const u1 = onSnapshot(
-    scopedQuery(collection, schoolId, where("studentId", "==", student.id), ...filters),
+    scopedQuery(collection, schoolId, where("studentId", "==", student.id), ...filters, ...studentIdOnlyFilters),
     (s) => { snapById = s; emit(); },
     onError,
   );
 
   // Listener 2 — by studentEmail (catches docs whose studentId field
-  // doesn't match the parent's auth doc id)
+  // doesn't match the parent's auth doc id). Range filters are deliberately
+  // NOT applied here when the matching composite index is missing — the
+  // caller post-filters in onChange instead.
   let u2: Unsubscribe = () => {};
   if (email) {
     u2 = onSnapshot(
@@ -155,16 +175,19 @@ export function subscribePerStudent(opts: SubscribeOpts): Unsubscribe {
 export async function fetchPerStudent(opts: {
   collection: string;
   student: StudentLike | null | undefined;
+  /** Equality / limit filters applied to BOTH queries. */
   filters?: QueryConstraint[];
+  /** Range filters applied only to the studentId query (see SubscribeOpts.studentIdOnlyFilters). */
+  studentIdOnlyFilters?: QueryConstraint[];
 }): Promise<PerStudentDoc[]> {
-  const { collection, student, filters = [] } = opts;
+  const { collection, student, filters = [], studentIdOnlyFilters = [] } = opts;
   if (!student?.id) return [];
 
   const schoolId = student.schoolId;
   const email = resolveEmail(student);
 
   const queries = [
-    getDocs(scopedQuery(collection, schoolId, where("studentId", "==", student.id), ...filters)),
+    getDocs(scopedQuery(collection, schoolId, where("studentId", "==", student.id), ...filters, ...studentIdOnlyFilters)),
   ];
   if (email) {
     queries.push(getDocs(scopedQuery(collection, schoolId, where("studentEmail", "==", email), ...filters)));

@@ -352,14 +352,19 @@ const DashboardPage = () => {
       const { thisWeekKey: weekCacheKey } = getWeekConfig();
 
       // Dual-query (studentId + studentEmail) helper — see lib/perStudentQuery.ts
-      // for why this matters. Without it, the weekly report misses every record
-      // teachers wrote against the student-email-only enrollment.
-      const fetchWeek = (collName: string, extraFilters: any[] = []) =>
-        fetchPerStudent({ collection: collName, student: studentData, filters: extraFilters });
+      // for why this matters. Range filters go via studentIdOnlyFilters so the
+      // email listener doesn't FAILED_PRECONDITION on missing composite indexes;
+      // we post-filter the email-matched docs client-side.
 
-      // Fetch only this week's attendance — date range filter avoids fetching years of history
-      const attDocsRaw = await fetchWeek("attendance", [where("date", ">=", weekStartStr)]);
-      const attDocs = attDocsRaw.map(d => d.data());
+      // Attendance — fetch broadly, post-filter to this week
+      const attDocsRaw = await fetchPerStudent({
+        collection: "attendance",
+        student: studentData,
+        studentIdOnlyFilters: [where("date", ">=", weekStartStr)],
+      });
+      const attDocs = attDocsRaw
+        .map(d => d.data())
+        .filter((d: any) => !d.date || d.date >= weekStartStr);
       const attPresent = attDocs.filter((d: any) => d.status === "present").length;
       const attLate = attDocs.filter((d: any) => d.status === "late").length;
       const attAbsent = attDocs.filter((d: any) => d.status === "absent").length;
@@ -368,8 +373,8 @@ const DashboardPage = () => {
       // 0 conveys "no data" without misleading the parent.
       const attPct = attTotal === 0 ? 0 : Math.round(((attPresent + attLate) / attTotal) * 100);
 
-      // Fetch this week's results (scoped, no full history scan)
-      const resDocsRaw = await fetchWeek("results");
+      // Results — no range filter, post-filter on date string
+      const resDocsRaw = await fetchPerStudent({ collection: "results", student: studentData });
       const resDocs = resDocsRaw.map(d => d.data());
       const weekTests = resDocs
         .filter((d: any) => { const dt = d.date || d.createdAt?.toDate?.()?.toISOString?.()?.split?.("T")?.[0] || ""; return dt >= weekStartStr; })
@@ -380,9 +385,17 @@ const DashboardPage = () => {
           return { subject: d.subject || d.className || "General", score, max, grade: pct >= 90 ? "A+" : pct >= 80 ? "A" : pct >= 70 ? "B+" : pct >= 60 ? "B" : "C" };
         });
 
-      // Fetch this week's submissions to get accurate counts (no hardcoded "+2").
-      const subDocsRaw = await fetchWeek("submissions", [where("submittedAt", ">=", Timestamp.fromDate(weekStart))]);
-      const submittedThisWeek = subDocsRaw.length;
+      // Submissions this week (range filter on studentId side, post-filter on email side)
+      const subDocsRaw = await fetchPerStudent({
+        collection: "submissions",
+        student: studentData,
+        studentIdOnlyFilters: [where("submittedAt", ">=", Timestamp.fromDate(weekStart))],
+      });
+      const submittedThisWeek = subDocsRaw.filter((d) => {
+        const sa = (d.data() as any).submittedAt;
+        const ms = sa?.toMillis?.() ?? (sa?.seconds ? sa.seconds * 1000 : 0);
+        return ms >= weekStart.getTime();
+      }).length;
       const pendingNow = liveStats.pending ?? 0;
 
       const reportData = {
