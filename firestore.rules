@@ -876,6 +876,42 @@ service cloud.firestore {
         && !(resource.data.permanent == true);
     }
 
+    // ── Public contact-form submissions (main-website /contact page) ──
+    //   Anyone can submit (public form), platform admins read/list/manage,
+    //   only platform-superadmin can hard-delete. Strict schema validation
+    //   + size caps prevent spam payload abuse.
+    match /contact_submissions/{docId} {
+      allow get, list: if isPlatformAdmin();
+
+      allow create: if request.resource.data.keys().hasOnly([
+                        'name','schoolName','email','phone','location',
+                        'status','createdAt'
+                      ])
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() > 0
+                    && request.resource.data.name.size() < 200
+                    && request.resource.data.schoolName is string
+                    && request.resource.data.schoolName.size() > 0
+                    && request.resource.data.schoolName.size() < 300
+                    && request.resource.data.email is string
+                    && request.resource.data.email.size() > 0
+                    && request.resource.data.email.size() < 300
+                    && request.resource.data.phone is string
+                    && request.resource.data.phone.size() > 0
+                    && request.resource.data.phone.size() < 40
+                    && request.resource.data.location is string
+                    && request.resource.data.location.size() > 0
+                    && request.resource.data.location.size() < 500
+                    && request.resource.data.status == 'new';
+
+      allow update: if isPlatformAdmin()
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['status','statusUpdatedAt'])
+                    && request.resource.data.status in ['new','contacted','closed'];
+
+      allow delete: if isPlatformSuper();
+    }
+
     match /accessRequests/{requestId} {
       allow get:  if signedIn() && (requestId == uid() || isPlatformAdmin());
       allow list: if isPlatformAdmin();

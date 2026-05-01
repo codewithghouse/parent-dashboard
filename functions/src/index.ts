@@ -246,8 +246,49 @@ export const parentAIProxy = functions
       const content = completion.choices[0]?.message?.content ?? "";
       return { content };
     } catch (error: any) {
-      console.error("parentAIProxy error:", error);
-      throw new functions.https.HttpsError("internal", "AI call failed.");
+      // Surface a SPECIFIC error code so the client can show a useful message
+      // (and we can debug from production logs without poking around). Never
+      // expose the OpenAI API key path, prompts, or raw error body to the
+      // caller — only error code + a short safe message.
+      const status = error?.status ?? error?.response?.status;
+      const openaiCode = error?.error?.code ?? error?.code;
+      console.error("parentAIProxy error:", {
+        status, openaiCode,
+        message: error?.message,
+        type: error?.error?.type,
+      });
+
+      // Map common OpenAI failure modes to canonical Firebase HttpsError codes.
+      // The codes are what FirebaseError.code becomes on the client (e.g.
+      // "functions/resource-exhausted") so the UI can render targeted copy.
+      if (status === 401 || openaiCode === "invalid_api_key") {
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "AI service is not configured correctly. Please contact support.",
+        );
+      }
+      if (status === 429 || openaiCode === "rate_limit_exceeded" || openaiCode === "insufficient_quota") {
+        throw new functions.https.HttpsError(
+          "resource-exhausted",
+          "AI service is at capacity right now — please try again in a minute.",
+        );
+      }
+      if (status === 408 || openaiCode === "ETIMEDOUT" || openaiCode === "ECONNRESET") {
+        throw new functions.https.HttpsError(
+          "deadline-exceeded",
+          "AI request timed out — please retry.",
+        );
+      }
+      if (status && status >= 500) {
+        throw new functions.https.HttpsError(
+          "unavailable",
+          "AI service is temporarily unavailable — please retry in a moment.",
+        );
+      }
+      throw new functions.https.HttpsError(
+        "internal",
+        `AI call failed${openaiCode ? ` (${openaiCode})` : ""}. Please retry.`,
+      );
     }
   });
 
