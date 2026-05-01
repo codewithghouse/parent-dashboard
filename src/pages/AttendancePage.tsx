@@ -51,10 +51,6 @@ const AttendancePage = () => {
       studentIdOnlyFilters: [where("date", ">=", yearStart)],
       onChange: (docs) => {
         if (!mountedRef.current) return;
-        // TEMP diagnostic — confirms email-side merge is firing. Remove once
-        // teacher → parent attendance sync is verified end-to-end in your env.
-        console.log(`[Attendance] merged ${docs.length} docs (sample):`,
-          docs.slice(0, 3).map(d => { const x: any = d.data(); return { id: d.id, date: x.date, status: x.status, studentEmail: x.studentEmail, studentId: x.studentId }; }));
         const uniqueLogs = docs
           .map((d) => ({ id: d.id, ...d.data() as any }))
           // Apply the date floor client-side so email-matched docs older than
@@ -414,10 +410,14 @@ const AttendancePage = () => {
                 return (
                   <div key={day} className="aspect-square rounded-[12px] flex items-center justify-center text-[13px] relative" style={cellStyle}>
                     {day}
-                    {!isToday && (status === "present" || status === "absent" || status === "late") && (
+                    {(status === "present" || status === "absent" || status === "late") && (
                       <span
-                        className="absolute bottom-[3px] left-1/2 -translate-x-1/2 w-[5px] h-[5px] rounded-full"
-                        style={{ background: status === "present" ? GREEN : status === "absent" ? RED : ORANGE }}
+                        className="absolute bottom-[3px] left-1/2 -translate-x-1/2 w-[6px] h-[6px] rounded-full"
+                        style={{
+                          background: status === "present" ? GREEN : status === "absent" ? RED : ORANGE,
+                          // Tiny white ring on today so the status dot stays visible against the blue gradient.
+                          boxShadow: isToday ? "0 0 0 1.5px rgba(255,255,255,0.85)" : undefined,
+                        }}
                       />
                     )}
                   </div>
@@ -928,10 +928,14 @@ const AttendancePage = () => {
                   return (
                     <div key={day} className="aspect-square rounded-[14px] flex items-center justify-center text-[15px] relative" style={cellStyle}>
                       {day}
-                      {!isToday && (status === "present" || status === "absent" || status === "late") && (
+                      {(status === "present" || status === "absent" || status === "late") && (
                         <span
-                          className="absolute bottom-[4px] left-1/2 -translate-x-1/2 w-[6px] h-[6px] rounded-full"
-                          style={{ background: status === "present" ? GREEN : status === "absent" ? RED : ORANGE }}
+                          className="absolute bottom-[4px] left-1/2 -translate-x-1/2 w-[7px] h-[7px] rounded-full"
+                          style={{
+                            background: status === "present" ? GREEN : status === "absent" ? RED : ORANGE,
+                            // Tiny white ring on today so the status dot stays visible against the blue gradient.
+                            boxShadow: isToday ? "0 0 0 1.5px rgba(255,255,255,0.85)" : undefined,
+                          }}
                         />
                       )}
                     </div>
