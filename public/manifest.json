@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "Edullent Parent",
-  "short_name": "Edullent",
+  "name": "edullent-parent",
+  "short_name": "edullent-parent",
   "description": "Track your child's academic progress, attendance, assignments and more in real time",
   "theme_color": "#0B1F3A",
   "background_color": "#0B1F3A",
