@@ -334,13 +334,69 @@ service cloud.firestore {
 
     // ═══════════════════════════════════════════════════════════════════════
     // ── 7. PARENT TOKENS — public-by-design share links ─────────────────
-    //     GET is public (token == auth). LIST is DENIED — no enumeration.
+    //     GET is public (token IS the credential — UUID v4 entropy makes
+    //     enumeration infeasible). LIST is DENIED — no listing/scanning.
+    //
+    //     Architecture (hardened 2026-05-03):
+    //       • Doc ID == token. Writer uses setDoc(doc(...token)),
+    //         reader uses getDoc(doc(...token)). NO collection queries.
+    //         A previous design wrote via addDoc (random docId) and read
+    //         via query+where (a list operation), which the rule below
+    //         correctly denied — surfaced as "Missing or insufficient
+    //         permissions" until the writer/reader were aligned.
+    //       • Snapshot fields written by AIPredictorPage.generateParentLink:
+    //           token, studentId, studentName, schoolId, branchId, branch,
+    //           grade, attendance, avgScore, recentScores, recentScoreDates,
+    //           feeDefaulted, feePendingAmount, failProbability, riskLevel,
+    //           riskFactors, recommendation, schoolContact, expiresAt,
+    //           expiresAtMs, createdAt
+    //       • Validation enforced below — required fields, size caps,
+    //         expiry must be in future and ≤ 370 days out.
+    //       • TTL: configure Firestore TTL policy on `expiresAtMs` via
+    //         Firebase Console → Firestore → TTL → parent_tokens, otherwise
+    //         the collection grows unbounded (every link kept forever).
     // ═══════════════════════════════════════════════════════════════════════
     match /parent_tokens/{token} {
       allow get:  if true;
       allow list: if false;
 
-      allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
+      allow create: if signedIn() && hasStaffRole() && hasSchoolId() && writingToOwnSchool()
+                    // Doc-id integrity: the token field MUST equal the doc
+                    // path's {token} wildcard. Defense-in-depth — a writer
+                    // with valid auth could otherwise create
+                    // /parent_tokens/X with field token=Y, breaking the
+                    // get(doc(token)) lookup contract for readers.
+                    && 'token' in request.resource.data
+                    && request.resource.data.token is string
+                    && request.resource.data.token == token
+                    // UUID v4 is 36 chars; allow 16..128 to accommodate
+                    // future token formats while bounding payload size.
+                    && token.size() >= 16
+                    && token.size() <= 128
+                    // Required snapshot identity fields — without these the
+                    // public doc is meaningless, and the reader's `??`
+                    // fallbacks would render an empty card to the parent.
+                    && 'studentId' in request.resource.data
+                    && request.resource.data.studentId is string
+                    && request.resource.data.studentId.size() > 0
+                    && request.resource.data.studentId.size() < 200
+                    && 'studentName' in request.resource.data
+                    && request.resource.data.studentName is string
+                    && request.resource.data.studentName.size() > 0
+                    && request.resource.data.studentName.size() < 200
+                    // Expiry MUST be a future ms timestamp AND within 370
+                    // days. Without an upper bound a buggy/compromised
+                    // client could mint forever-tokens, and the TTL policy
+                    // wouldn't help. 370d is generous for any reasonable
+                    // semester / academic-year link.
+                    && 'expiresAtMs' in request.resource.data
+                    && request.resource.data.expiresAtMs is number
+                    && request.resource.data.expiresAtMs > request.time.toMillis()
+                    // 370 days = 31968000000 ms. Inlined as a constant
+                    // because Firestore rules' duration/timestamp arithmetic
+                    // doesn't reliably round-trip through .toMillis() on all
+                    // emulator versions — a literal int is portable.
+                    && request.resource.data.expiresAtMs < request.time.toMillis() + 31968000000;
       allow update: if false;   // tokens are write-once
       allow delete: if isOwnerOf(resource.data.schoolId)
                     || (hasAdminRole() && resource.data.schoolId == claimSchoolId());
