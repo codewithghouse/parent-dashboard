@@ -70,6 +70,13 @@ export default function BehaviourPage() {
             const matched = snap.docs
               .map(d => ({ id: d.id, ...(d.data() as any) }))
               .filter(d => {
+                // Hide resolved/closed incidents — parents shouldn't see
+                // issues that have already been closed by the principal.
+                // Status casing is normalised since principal writes
+                // "Resolved" while teacher writes "resolved".
+                const stRaw = String(d.status || "").toLowerCase();
+                if (stRaw === "resolved" || stRaw === "closed") return false;
+                // Identity match: studentId / studentEmail / legacy nested name.
                 if (d.studentId && String(d.studentId) === studentIdStr) return true;
                 if (d.studentEmail && studentEmailLower && String(d.studentEmail).toLowerCase() === studentEmailLower) return true;
                 const nm = (d.student?.name || d.studentName || "").toLowerCase().trim();
