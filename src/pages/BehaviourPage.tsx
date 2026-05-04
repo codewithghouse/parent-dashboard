@@ -103,7 +103,32 @@ export default function BehaviourPage() {
   };
 
   const positiveNotes = teacherNotes.filter(n => classifyNote(n) === "positive");
-  const improvementNotes = teacherNotes.filter(n => classifyNote(n) === "improvement");
+  const teacherImprovementNotes = teacherNotes.filter(n => classifyNote(n) === "improvement");
+
+  // Merge teacher-flagged improvement notes with principal-logged discipline
+  // incidents into a single "improvement" stream so they actually RENDER on
+  // the page (was: incidents only counted, never shown). Each discipline
+  // incident is mapped to the same shape as a teacher note so the existing
+  // render code below works without changes — the `_isDiscipline` flag is
+  // available if we later want a different icon/badge.
+  const improvementNotes = (() => {
+    const fromIncidents = disciplineIncidents.map((inc) => {
+      const title = inc.title || inc.type || "Incident";
+      const desc = inc.description || "";
+      const sev = inc.severity ? ` · ${inc.severity}` : "";
+      return {
+        id: inc.id,
+        content: desc ? `${title}${sev} — ${desc}` : `${title}${sev}`,
+        category: "improvement",
+        createdAt: inc.createdAt,
+        teacherName: inc.reportedBy || inc.principalName || "Principal",
+        _isDiscipline: true,
+      };
+    });
+    return [...fromIncidents, ...teacherImprovementNotes].sort(
+      (a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0),
+    );
+  })();
 
   const getIconForPositive = (index: number) => {
     const icons = [Star, HandHeart, Lightbulb, Trophy];
@@ -245,7 +270,8 @@ export default function BehaviourPage() {
     const rateNum = ratingNum ?? 0;
     // Count both teacher-flagged improvement notes AND principal-logged
     // discipline incidents — principal incidents were previously invisible.
-    const incidents = improvementNotes.length + disciplineIncidents.length;
+    // improvementNotes already merges teacher notes + discipline incidents above.
+    const incidents = improvementNotes.length;
 
     // Derive sub-metrics from available data. When there's no behaviour
     // signal at all, surface "—" instead of fabricating grades / percentages.
@@ -601,7 +627,7 @@ export default function BehaviourPage() {
   const SH_LG_D = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 18px 44px rgba(0,85,255,0.14)";
 
   const rateNumD = ratingNum ?? 0;
-  const incidentsD = improvementNotes.length + disciplineIncidents.length;
+  const incidentsD = improvementNotes.length;
   const conductGradeD = !hasBehaviourSignal ? "—" :
     rateNumD >= 4.8 ? "A+" :
     rateNumD >= 4.5 ? "A"  :
