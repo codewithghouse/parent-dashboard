@@ -6,7 +6,8 @@ import {
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useAuth } from "@/lib/AuthContext";
-import { limit } from "firebase/firestore";
+import { collection, onSnapshot, query, where, limit } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { subscribeEnrollments } from "@/lib/enrollmentQuery";
 import { subscribePerStudent } from "@/lib/perStudentQuery";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -16,6 +17,7 @@ export default function BehaviourPage() {
   const isMobile = useIsMobile();
   const [loading, setLoading] = useState(true);
   const [teacherNotes, setTeacherNotes] = useState<any[]>([]);
+  const [disciplineIncidents, setDisciplineIncidents] = useState<any[]>([]);
   const [manualRating, setManualRating] = useState<number | null>(null);
 
   useEffect(() => {
@@ -51,8 +53,43 @@ export default function BehaviourPage() {
       },
     });
 
-    return () => { unsubEnroll(); unsubNotes(); };
-  }, [studentData?.id, studentData?.schoolId, studentData?.email]);
+    // 3. Discipline incidents — was: not read at all, so principal-created
+    // discipline incidents were COMPLETELY invisible to parents. School-
+    // scoped server-side query, then in-memory match against the modern
+    // root-level studentId/email schema AND the legacy nested student.name
+    // path that older principal writes used.
+    const schoolId = studentData?.schoolId;
+    const studentNameLower = (studentData?.name || "").toLowerCase().trim();
+    const studentEmailLower = (studentData?.email || "").toLowerCase().trim();
+    const studentIdStr = String(studentData?.id || "");
+
+    const unsubIncidents = schoolId
+      ? onSnapshot(
+          query(collection(db, "incidents"), where("schoolId", "==", schoolId)),
+          (snap) => {
+            const matched = snap.docs
+              .map(d => ({ id: d.id, ...(d.data() as any) }))
+              .filter(d => {
+                if (d.studentId && String(d.studentId) === studentIdStr) return true;
+                if (d.studentEmail && studentEmailLower && String(d.studentEmail).toLowerCase() === studentEmailLower) return true;
+                const nm = (d.student?.name || d.studentName || "").toLowerCase().trim();
+                if (nm && studentNameLower && nm === studentNameLower) return true;
+                return false;
+              })
+              .sort((a, b) =>
+                (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0),
+              );
+            setDisciplineIncidents(matched);
+          },
+          (err) => {
+            console.warn("[Behaviour] incidents listener error:", err);
+            setDisciplineIncidents([]);
+          },
+        )
+      : () => {};
+
+    return () => { unsubEnroll(); unsubNotes(); unsubIncidents(); };
+  }, [studentData?.id, studentData?.schoolId, studentData?.email, studentData?.name]);
 
   // Determine positive vs improvement notes heuristics
   const classifyNote = (note: any) => {
@@ -206,7 +243,9 @@ export default function BehaviourPage() {
     // of the display string — that path turned "—" into NaN and silently
     // painted every sub-metric with junk values.
     const rateNum = ratingNum ?? 0;
-    const incidents = improvementNotes.length;
+    // Count both teacher-flagged improvement notes AND principal-logged
+    // discipline incidents — principal incidents were previously invisible.
+    const incidents = improvementNotes.length + disciplineIncidents.length;
 
     // Derive sub-metrics from available data. When there's no behaviour
     // signal at all, surface "—" instead of fabricating grades / percentages.
@@ -562,7 +601,7 @@ export default function BehaviourPage() {
   const SH_LG_D = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 18px 44px rgba(0,85,255,0.14)";
 
   const rateNumD = ratingNum ?? 0;
-  const incidentsD = improvementNotes.length;
+  const incidentsD = improvementNotes.length + disciplineIncidents.length;
   const conductGradeD = !hasBehaviourSignal ? "—" :
     rateNumD >= 4.8 ? "A+" :
     rateNumD >= 4.5 ? "A"  :
