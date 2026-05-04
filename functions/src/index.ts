@@ -367,6 +367,55 @@ export const syncUserClaims = functions
     const db = admin.firestore();
     const auth = admin.auth();
 
+    // ── Caller hints ──
+    // Frontends with multiple-role / multiple-school users can pass a
+    // preference to override the default priority order.
+    //   data.preferredRole       — e.g. "principal" / "teacher"
+    //   data.preferredSchoolId   — exact schoolId to scope to
+    // Used by the principal-dashboard School Picker after the user picks
+    // which school to enter when their email matches more than one record
+    // (e.g. a multi-school principal, or someone who accidentally
+    // registered as owner AND was invited as principal).
+    const preferredRole = typeof (data as any)?.preferredRole === "string"
+      ? (data as any).preferredRole : null;
+    const preferredSchoolId = typeof (data as any)?.preferredSchoolId === "string"
+      ? (data as any).preferredSchoolId : null;
+
+    // 0) Honor caller preference FIRST — only if both role and schoolId
+    //    are provided AND we can verify the user is actually that role at
+    //    that school. This is the only way for a user with multiple
+    //    roles to choose which one to activate.
+    if (preferredRole === "principal" && preferredSchoolId) {
+      const sn = await db.collection("principals")
+        .where("email", "==", email)
+        .where("schoolId", "==", preferredSchoolId)
+        .limit(1).get();
+      if (!sn.empty) {
+        const d = sn.docs[0].data();
+        await auth.setCustomUserClaims(uid, {
+          schoolId: d.schoolId,
+          role: "principal",
+          branchId: d.branchId || null,
+        });
+        return { role: "principal", schoolId: d.schoolId, branchId: d.branchId || null };
+      }
+    }
+    if (preferredRole === "teacher" && preferredSchoolId) {
+      const sn = await db.collection("teachers")
+        .where("email", "==", email)
+        .where("schoolId", "==", preferredSchoolId)
+        .limit(1).get();
+      if (!sn.empty) {
+        const d = sn.docs[0].data();
+        await auth.setCustomUserClaims(uid, {
+          schoolId: d.schoolId,
+          role: "teacher",
+          branchId: d.branchId || null,
+        });
+        return { role: "teacher", schoolId: d.schoolId, branchId: d.branchId || null };
+      }
+    }
+
     // 1) Owner — user's own uid is a school doc under /schools/{uid}
     const schoolDoc = await db.collection("schools").doc(uid).get();
     if (schoolDoc.exists) {
@@ -377,11 +426,25 @@ export const syncUserClaims = functions
       return { role: "owner", schoolId: uid };
     }
 
-    // 2) Principal
+    // 2) Principal — pick the BEST record when same email maps to multiple
+    //    schools (accidental duplicate, or a real multi-school principal).
+    //    Tie-breakers: Active status > Invited > others, then most recent
+    //    lastActive. The principal-dashboard School Picker UI lets users
+    //    override this default by passing preferredSchoolId.
     const principalSnap = await db.collection("principals")
-      .where("email", "==", email).limit(1).get();
+      .where("email", "==", email).get();
     if (!principalSnap.empty) {
-      const d = principalSnap.docs[0].data();
+      const sorted = principalSnap.docs.slice().sort((a, b) => {
+        const aD = a.data() as any, bD = b.data() as any;
+        const rank = (s: any) => s === "Active" ? 2 : s === "Invited" ? 1 : 0;
+        const aRank = rank(aD.status);
+        const bRank = rank(bD.status);
+        if (aRank !== bRank) return bRank - aRank;
+        const aT = new Date(aD.lastActive || 0).getTime();
+        const bT = new Date(bD.lastActive || 0).getTime();
+        return bT - aT;
+      });
+      const d = sorted[0].data();
       await auth.setCustomUserClaims(uid, {
         schoolId: d.schoolId,
         role: "principal",
