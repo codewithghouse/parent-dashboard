@@ -194,6 +194,10 @@ const splashStyles = `
   white-space: nowrap;
   line-height: 1;
 }
+.edu-splash__wordmark,
+.edu-splash__wordmark span {
+  font-family: 'Mokoto', 'Audiowide', 'Arial Black', sans-serif;
+}
 .edu-splash__wordmark span {
   display: inline-block;
   opacity: 0;
