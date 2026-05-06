@@ -136,15 +136,15 @@ service firebase.storage {
     //   Path: alumni/{schoolId}/{branchId}/{fileName}
     //   Read: signed-in same-school (teachers + parents view).
     //   Write: principal/owner only — alumni docs are school-branding
-    //          artefacts, not teacher-authored. PDF mime type, 30 MB cap.
+    //          artefacts, not teacher-authored. Uses isPdf() helper which
+    //          guards request.resource != null (resumable uploads have a
+    //          session-init phase where request.resource is null; missing
+    //          this guard caused 403 on every upload attempt).
     //   Delete: principal/owner only.
     // ═════════════════════════════════════════════════════════════════════
     match /alumni/{schoolId}/{branchId}/{fileName} {
       allow read:   if sameSchool(schoolId);
-      allow write:  if sameSchool(schoolId)
-                       && hasAdminRole()
-                       && request.resource.contentType == "application/pdf"
-                       && request.resource.size < 30 * 1024 * 1024;
+      allow write:  if sameSchool(schoolId) && hasAdminRole() && isPdf();
       allow delete: if sameSchool(schoolId) && hasAdminRole();
     }
 
