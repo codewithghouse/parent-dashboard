@@ -131,6 +131,23 @@ service firebase.storage {
       allow delete: if sameSchool(schoolId) && hasStaffRole();
     }
 
+    // ═════════════════════════════════════════════════════════════════════
+    // ── Alumni PDFs ─────────────────────────────────────────────────────
+    //   Path: alumni/{schoolId}/{branchId}/{fileName}
+    //   Read: signed-in same-school (teachers + parents view).
+    //   Write: principal/owner only — alumni docs are school-branding
+    //          artefacts, not teacher-authored. PDF mime type, 30 MB cap.
+    //   Delete: principal/owner only.
+    // ═════════════════════════════════════════════════════════════════════
+    match /alumni/{schoolId}/{branchId}/{fileName} {
+      allow read:   if sameSchool(schoolId);
+      allow write:  if sameSchool(schoolId)
+                       && hasAdminRole()
+                       && request.resource.contentType == "application/pdf"
+                       && request.resource.size < 30 * 1024 * 1024;
+      allow delete: if sameSchool(schoolId) && hasAdminRole();
+    }
+
 
     // ═════════════════════════════════════════════════════════════════════
     // ── Assignment submissions ──────────────────────────────────────────

@@ -29,6 +29,7 @@ const navItems: { title: string; path: string; icon: any; badge?: string | numbe
   { title: "Teacher Notes", path: "/teacher-notes", icon: StickyNote },
   { title: "Principal Notes", path: "/principal-notes", icon: School },
   { title: "Reports", path: "/reports", icon: FileText },
+  { title: "Alumni", path: "/alumni", icon: Award },
   { title: "Alerts", path: "/alerts", icon: Bell },
   { title: "Settings", path: "/settings", icon: Settings },
 ];

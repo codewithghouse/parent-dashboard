@@ -745,6 +745,18 @@ service cloud.firestore {
       allow delete:    if signedIn() && inSameSchool() && hasAdminRole();
     }
 
+    // ── Alumni documents (PDF newsletters / showcases) ───────────────────
+    //   Principal/owner uploads PDFs; teachers + parents in same school
+    //   read them. Doc body has top-level schoolId so inSameSchool() works.
+    //   `get` allows null resource (cache-style miss returns cleanly).
+    match /alumni_documents/{id} {
+      allow get:    if signedIn() && (resource == null || inSameSchool());
+      allow list:   if signedIn();  // PHASE-1 relaxation; clients filter by schoolId.
+      allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasAdminRole();
+      allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && hasAdminRole();
+      allow delete: if signedIn() && inSameSchool() && hasAdminRole();
+    }
+
     // ── AI insight cache for branch + principal leaderboards (weekly TTL) ─
     //   Doc ID format: {schoolId}_{type}_{id}_W{weekNumber}
     //   Body stamps schoolId at top level so inSameSchool() can scope reads.
