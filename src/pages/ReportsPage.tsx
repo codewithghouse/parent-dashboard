@@ -22,22 +22,38 @@ const ReportsPage = () => {
     if (!studentData?.id) return;
     setLoading(true);
     const schoolId = studentData.schoolId;
+    const branchId = (studentData as any)?.branchId as string | undefined;
 
-    // Single scoped query — "all" grade-level reports + personal reports
+    // Single scoped query — "all" grade-level reports + personal reports.
+    // Branch isolation is in-memory (memory:
+    // bug_pattern_branch_filter_on_event_streams) — server-side branchId
+    // filter on principal-broadcast reports silently drops them when the
+    // doc's branchId is missing/lagging. Explicit onError handler surfaces
+    // the previously-silent "missing composite index" failure mode.
     const reportsQ = scopedQuery("reports", schoolId, where("studentId", "in", [studentData.id, "all"]));
+    const inBranch = (raw: any) => !branchId || !raw?.branchId || raw.branchId === branchId;
 
-    const unsub = onSnapshot(reportsQ, (snap) => {
-      const filtered = snap.docs
-        .map(d => ({ id: d.id, ...d.data() as any }))
-        .filter(r => (r.grade === studentData.grade || r.studentId === studentData.id || r.studentId === "all") &&
-                     (r.status === "Sent" || r.status === "Sent & Reported" || r.publishedToParent === true))
-        .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
-      setReports(filtered);
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      reportsQ,
+      (snap) => {
+        const filtered = snap.docs
+          .map(d => ({ id: d.id, ...d.data() as any }))
+          .filter(inBranch)
+          .filter(r => (r.grade === studentData.grade || r.studentId === studentData.id || r.studentId === "all") &&
+                       (r.status === "Sent" || r.status === "Sent & Reported" || r.publishedToParent === true))
+          .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+        setReports(filtered);
+        setLoading(false);
+      },
+      (err) => {
+        console.error("[ReportsPage] reports listener failed:", err);
+        toast.error("Failed to load reports — refresh and try again.");
+        setLoading(false);
+      },
+    );
 
     return () => unsub();
-  }, [studentData?.id, studentData?.schoolId]);
+  }, [studentData?.id, studentData?.schoolId, (studentData as any)?.branchId]);
 
   const filteredReports = reports.filter(r => 
     r.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
