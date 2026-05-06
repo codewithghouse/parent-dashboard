@@ -12,7 +12,8 @@ import { db } from "@/lib/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
 import { Calendar, Loader2 } from "lucide-react";
 
-interface TimetableSheet { name: string; headers: string[]; rows: any[][]; }
+// Rows wrapped in {cells} objects to satisfy Firestore's no-nested-arrays rule.
+interface TimetableSheet { name: string; headers: string[]; rows: { cells: string[] }[]; }
 interface TimetableDoc {
   schoolId?: string;
   branchId?: string | null;
@@ -187,25 +188,28 @@ const SheetTable = ({ sheet }: { sheet: TimetableSheet }) => {
             </thead>
           )}
           <tbody>
-            {sheet.rows.map((row, ri) => (
-              <tr key={ri} style={{ borderTop: "0.5px solid rgba(0,85,255,.06)" }}>
-                {Array.from({ length: Math.max(sheet.headers.length, row.length) }, (_, ci) => {
-                  const cell = String(row[ci] ?? "");
-                  return (
-                    <td key={ci} style={{
-                      fontSize: 12, color: T.T1,
-                      padding: "9px 12px",
-                      borderRight: "0.5px solid rgba(0,85,255,.06)",
-                      background: T.CARD,
-                      verticalAlign: "top",
-                      whiteSpace: "pre-wrap",
-                    }}>
-                      {cell === "" ? <span style={{ color: T.T4 }}>—</span> : cell}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
+            {sheet.rows.map((row, ri) => {
+              const cells = row.cells || [];
+              return (
+                <tr key={ri} style={{ borderTop: "0.5px solid rgba(0,85,255,.06)" }}>
+                  {Array.from({ length: Math.max(sheet.headers.length, cells.length) }, (_, ci) => {
+                    const cell = String(cells[ci] ?? "");
+                    return (
+                      <td key={ci} style={{
+                        fontSize: 12, color: T.T1,
+                        padding: "9px 12px",
+                        borderRight: "0.5px solid rgba(0,85,255,.06)",
+                        background: T.CARD,
+                        verticalAlign: "top",
+                        whiteSpace: "pre-wrap",
+                      }}>
+                        {cell === "" ? <span style={{ color: T.T4 }}>—</span> : cell}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
