@@ -118,13 +118,19 @@ const ReportsPage = () => {
         generatedBy: r.generatedBy || "Principal",
         logoUrl: r.logoUrl || "",
         themeColor: r.themeColor || "#0055FF",
-        heroStats: [
-          { label: "Total Students", value: d.totalStudents ?? "—" },
-          { label: "Avg Attendance", value: `${d.avgAttendance ?? 0}%`, color: (d.avgAttendance ?? 0) >= 85 ? "#4ade80" : "#fbbf24" },
-          { label: "Avg Marks",      value: `${d.avgMarks ?? 0}%`,      color: (d.avgMarks ?? 0)      >= 75 ? "#4ade80" : "#fbbf24" },
-          { label: "At-Risk",        value: d.atRisk ?? "—",            color: (d.atRisk ?? 0)         > 0  ? "#f87171" : "#4ade80" },
-        ],
-        sections: [
+        // Prefer template-specific heroStats + sections saved by principal
+        // (NEW flow). Fall back to legacy hardcoded shape for OLD reports.
+        heroStats: Array.isArray(d.heroStats) && d.heroStats.length > 0
+          ? d.heroStats
+          : [
+              { label: "Total Students", value: d.totalStudents ?? "—" },
+              { label: "Avg Attendance", value: `${d.avgAttendance ?? 0}%`, color: (d.avgAttendance ?? 0) >= 85 ? "#4ade80" : "#fbbf24" },
+              { label: "Avg Marks",      value: `${d.avgMarks ?? 0}%`,      color: (d.avgMarks ?? 0)      >= 75 ? "#4ade80" : "#fbbf24" },
+              { label: "At-Risk",        value: d.atRisk ?? "—",            color: (d.atRisk ?? 0)         > 0  ? "#f87171" : "#4ade80" },
+            ],
+        sections: Array.isArray(d.sections) && d.sections.length > 0
+          ? d.sections
+          : [
           {
             title: "Performance Overview",
             type: "bars",
