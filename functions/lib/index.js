@@ -1,11 +1,47 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.seedSampleData = exports._processClassForTesting = exports.triggerLeaderboardManually = exports.updateActionProgress = exports.generateInsights = exports.calculateWeeklyLeaderboard = exports.aggregateSchoolStats = exports.syncUserClaims = exports.parentAIProxy = exports.getParentAITutor = void 0;
-const functions = require("firebase-functions");
+const functions = __importStar(require("firebase-functions"));
 const params_1 = require("firebase-functions/params");
-const admin = require("firebase-admin");
-const openai_1 = require("openai");
-const axios_1 = require("axios");
+const admin = __importStar(require("firebase-admin"));
+const openai_1 = __importDefault(require("openai"));
+const axios_1 = __importDefault(require("axios"));
 const pdf = require('pdf-parse');
 admin.initializeApp();
 // Tell Firestore Admin SDK to silently drop fields whose value is undefined,
@@ -303,6 +339,53 @@ exports.syncUserClaims = functions
     }
     const db = admin.firestore();
     const auth = admin.auth();
+    // ── Caller hints ──
+    // Frontends with multiple-role / multiple-school users can pass a
+    // preference to override the default priority order.
+    //   data.preferredRole       — e.g. "principal" / "teacher"
+    //   data.preferredSchoolId   — exact schoolId to scope to
+    // Used by the principal-dashboard School Picker after the user picks
+    // which school to enter when their email matches more than one record
+    // (e.g. a multi-school principal, or someone who accidentally
+    // registered as owner AND was invited as principal).
+    const preferredRole = typeof data?.preferredRole === "string"
+        ? data.preferredRole : null;
+    const preferredSchoolId = typeof data?.preferredSchoolId === "string"
+        ? data.preferredSchoolId : null;
+    // 0) Honor caller preference FIRST — only if both role and schoolId
+    //    are provided AND we can verify the user is actually that role at
+    //    that school. This is the only way for a user with multiple
+    //    roles to choose which one to activate.
+    if (preferredRole === "principal" && preferredSchoolId) {
+        const sn = await db.collection("principals")
+            .where("email", "==", email)
+            .where("schoolId", "==", preferredSchoolId)
+            .limit(1).get();
+        if (!sn.empty) {
+            const d = sn.docs[0].data();
+            await auth.setCustomUserClaims(uid, {
+                schoolId: d.schoolId,
+                role: "principal",
+                branchId: d.branchId || null,
+            });
+            return { role: "principal", schoolId: d.schoolId, branchId: d.branchId || null };
+        }
+    }
+    if (preferredRole === "teacher" && preferredSchoolId) {
+        const sn = await db.collection("teachers")
+            .where("email", "==", email)
+            .where("schoolId", "==", preferredSchoolId)
+            .limit(1).get();
+        if (!sn.empty) {
+            const d = sn.docs[0].data();
+            await auth.setCustomUserClaims(uid, {
+                schoolId: d.schoolId,
+                role: "teacher",
+                branchId: d.branchId || null,
+            });
+            return { role: "teacher", schoolId: d.schoolId, branchId: d.branchId || null };
+        }
+    }
     // 1) Owner — user's own uid is a school doc under /schools/{uid}
     const schoolDoc = await db.collection("schools").doc(uid).get();
     if (schoolDoc.exists) {
@@ -312,11 +395,26 @@ exports.syncUserClaims = functions
         });
         return { role: "owner", schoolId: uid };
     }
-    // 2) Principal
+    // 2) Principal — pick the BEST record when same email maps to multiple
+    //    schools (accidental duplicate, or a real multi-school principal).
+    //    Tie-breakers: Active status > Invited > others, then most recent
+    //    lastActive. The principal-dashboard School Picker UI lets users
+    //    override this default by passing preferredSchoolId.
     const principalSnap = await db.collection("principals")
-        .where("email", "==", email).limit(1).get();
+        .where("email", "==", email).get();
     if (!principalSnap.empty) {
-        const d = principalSnap.docs[0].data();
+        const sorted = principalSnap.docs.slice().sort((a, b) => {
+            const aD = a.data(), bD = b.data();
+            const rank = (s) => s === "Active" ? 2 : s === "Invited" ? 1 : 0;
+            const aRank = rank(aD.status);
+            const bRank = rank(bD.status);
+            if (aRank !== bRank)
+                return bRank - aRank;
+            const aT = new Date(aD.lastActive || 0).getTime();
+            const bT = new Date(bD.lastActive || 0).getTime();
+            return bT - aT;
+        });
+        const d = sorted[0].data();
         await auth.setCustomUserClaims(uid, {
             schoolId: d.schoolId,
             role: "principal",

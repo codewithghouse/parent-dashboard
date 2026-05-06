@@ -1,6 +1,11 @@
 {
   "compilerOptions": {
     "module": "commonjs",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
     "noImplicitAny": false,
     "outDir": "lib",
     "sourceMap": true,
@@ -10,7 +15,6 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "compileOnSave": true,
   "include": [
     "src"
   ]
