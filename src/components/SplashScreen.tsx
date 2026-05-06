@@ -111,14 +111,6 @@ export function SplashScreen() {
 }
 
 const splashStyles = `
-@font-face {
-  font-family: 'Mokoto';
-  src: url('/fonts/mokoto.regular.ttf') format('truetype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: block;
-}
-
 .edu-splash {
   position: fixed;
   inset: 0;
