@@ -1,31 +1,26 @@
 /**
- * TimetablePage.tsx (parent) — read-only view of the child's class timetable.
+ * TimetablePage.tsx (parent) — read-only WYSIWYG view of the school timetable.
  *
- * Source: `timetable_entries` collection (written by principal-dashboard's
- * TimetableSetup). Auto-filtered by the student's `className`. Falls back
- * to "all classes" filter if the parent wants to browse other classes.
+ * Source: `timetable_documents/{schoolId}_{branchSeg}` singleton (written by
+ * principal-dashboard's TimetableSetup). Auto-prefers the sheet whose name
+ * matches the child's class (lenient match), falls back to first sheet.
  */
 
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
-import { Calendar, Loader2, Filter } from "lucide-react";
+import { doc, onSnapshot } from "firebase/firestore";
+import { Calendar, Loader2 } from "lucide-react";
 
-interface TimetableEntry {
-  id: string;
+interface TimetableSheet { name: string; headers: string[]; rows: any[][]; }
+interface TimetableDoc {
   schoolId?: string;
   branchId?: string | null;
-  className: string;
-  day: string;
-  period: number;
-  startTime: string;
-  endTime: string;
-  subject: string;
-  teacher: string;
+  fileName?: string;
+  sheets: TimetableSheet[];
+  uploadedAt?: any;
+  uploadedByName?: string;
 }
-
-const DAYS_ORDER = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 const T = {
   FONT: "'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif",
@@ -36,28 +31,24 @@ const T = {
   BDR: "0.5px solid rgba(0,85,255,0.10)",
 };
 
+const normalize = (s: string): string => String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
+
 export default function TimetablePage() {
   const { studentData } = useAuth();
-  const [entries, setEntries] = useState<TimetableEntry[]>([]);
+  const [tt, setTt] = useState<TimetableDoc | null>(null);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"my-class" | "all">("my-class");
+  const [activeSheet, setActiveSheet] = useState<string>("");
 
   const childClass = String((studentData as any)?.className || "").trim();
-  const childName = String((studentData as any)?.name || (studentData as any)?.studentName || "child").trim();
 
   useEffect(() => {
-    if (!studentData?.schoolId) { setLoading(false); return; }
-    const schoolId = studentData.schoolId as string;
-    const branchId = (studentData as any)?.branchId as string | undefined;
-    const inBranch = (raw: any) => !branchId || !raw?.branchId || raw.branchId === branchId;
-
+    const schoolId = studentData?.schoolId as string | undefined;
+    if (!schoolId) { setLoading(false); return; }
+    const branchSeg = ((studentData as any)?.branchId as string | undefined) || "_default";
     const unsub = onSnapshot(
-      query(collection(db, "timetable_entries"), where("schoolId", "==", schoolId)),
-      (snap) => {
-        const rows = snap.docs
-          .map(d => ({ id: d.id, ...(d.data() as any) }))
-          .filter(inBranch) as TimetableEntry[];
-        setEntries(rows);
+      doc(db, "timetable_documents", `${schoolId}_${branchSeg}`),
+      (s) => {
+        setTt(s.exists() ? (s.data() as TimetableDoc) : null);
         setLoading(false);
       },
       (err) => {
@@ -68,36 +59,16 @@ export default function TimetablePage() {
     return () => unsub();
   }, [studentData?.schoolId, (studentData as any)?.branchId]);
 
-  // Lenient class match: case-insensitive, trim, normalize whitespace
-  const matchesChildClass = (cls: string): boolean => {
-    if (!childClass) return false;
-    const a = childClass.toLowerCase().replace(/\s+/g, " ").trim();
-    const b = String(cls || "").toLowerCase().replace(/\s+/g, " ").trim();
-    return a === b;
-  };
+  // Auto-pick: child's class sheet (lenient match) → first sheet
+  useEffect(() => {
+    if (!tt || tt.sheets.length === 0) return;
+    if (tt.sheets.some(s => s.name === activeSheet)) return; // already valid
+    const childN = normalize(childClass);
+    const match = tt.sheets.find(s => normalize(s.name) === childN);
+    setActiveSheet(match?.name || tt.sheets[0].name);
+  }, [tt, childClass, activeSheet]);
 
-  const filteredEntries = useMemo(() => {
-    if (filter === "all") return entries;
-    return entries.filter(e => matchesChildClass(e.className));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entries, filter, childClass]);
-
-  const byClass = useMemo(() => {
-    const m = new Map<string, TimetableEntry[]>();
-    filteredEntries.forEach(e => {
-      if (!m.has(e.className)) m.set(e.className, []);
-      m.get(e.className)!.push(e);
-    });
-    m.forEach(arr => arr.sort((a, b) => {
-      const da = DAYS_ORDER.indexOf(a.day);
-      const db_ = DAYS_ORDER.indexOf(b.day);
-      if (da !== db_) return (da === -1 ? 99 : da) - (db_ === -1 ? 99 : db_);
-      return a.period - b.period;
-    }));
-    return m;
-  }, [filteredEntries]);
-
-  const childClassHasEntries = entries.some(e => matchesChildClass(e.className));
+  const current = useMemo(() => tt?.sheets.find(s => s.name === activeSheet) || null, [tt, activeSheet]);
 
   return (
     <div style={{ background: T.BG, minHeight: "100vh", padding: "24px 16px 40px", fontFamily: T.FONT }}>
@@ -111,36 +82,10 @@ export default function TimetablePage() {
         </h1>
         <p style={{ fontSize: 12, color: T.T3, fontWeight: 500, marginTop: 6, margin: "6px 0 0", lineHeight: 1.5 }}>
           {childClass
-            ? <>Weekly periods for {childName}'s class — <strong style={{ color: T.T1 }}>{childClass}</strong>.</>
-            : <>Weekly periods published by your child's school.</>}
+            ? <>Auto-showing your child's class — <strong style={{ color: T.T1 }}>{childClass}</strong>. Tap another tab to view a different class.</>
+            : <>School's published periods.</>}
         </p>
       </div>
-
-      {/* Filter pills */}
-      {entries.length > 0 && childClass && (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14, alignItems: "center" }}>
-          <Filter size={14} color={T.T4} />
-          {([
-            { key: "my-class" as const, label: childClass },
-            { key: "all" as const, label: "All classes" },
-          ]).map(opt => {
-            const active = filter === opt.key;
-            return (
-              <button key={opt.key} onClick={() => setFilter(opt.key)}
-                style={{
-                  padding: "6px 12px", borderRadius: 999,
-                  background: active ? T.P : T.CARD,
-                  color: active ? "#fff" : T.T2,
-                  border: active ? "0.5px solid transparent" : T.BDR,
-                  fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: T.FONT,
-                  letterSpacing: "0.04em",
-                }}>
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
 
       {loading && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "60px 0" }}>
@@ -148,24 +93,18 @@ export default function TimetablePage() {
         </div>
       )}
 
-      {!loading && entries.length === 0 && (
+      {!loading && !tt && (
         <EmptyState title="No timetable published yet" body="Your child's school hasn't uploaded the term timetable yet. It'll appear here automatically once they do." />
       )}
 
-      {!loading && entries.length > 0 && filter === "my-class" && !childClassHasEntries && (
-        <EmptyState
-          title={childClass ? `No periods found for "${childClass}"` : "No class linked to your account"}
-          body={childClass
-            ? `The school's timetable doesn't include this class yet. Try the "All classes" filter to see other classes' schedules.`
-            : "Ask the school admin to set your child's class so the timetable filters correctly."}
-        />
+      {!loading && tt && tt.sheets.length === 0 && (
+        <EmptyState title="Timetable is empty" body="The published file had no sheets with data." />
       )}
 
-      {!loading && byClass.size > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {Array.from(byClass.keys()).sort().map(className => (
-            <ClassGrid key={className} className={className} rows={byClass.get(className) || []} highlightChild={matchesChildClass(className)} />
-          ))}
+      {!loading && tt && tt.sheets.length > 0 && (
+        <div style={{ background: T.CARD, borderRadius: 18, padding: 16, boxShadow: T.SH, border: T.BDR }}>
+          <SheetTabs sheets={tt.sheets} active={activeSheet} onChange={setActiveSheet} childClass={childClass} />
+          {current && <SheetTable sheet={current} />}
         </div>
       )}
     </div>
@@ -182,67 +121,86 @@ const EmptyState = ({ title, body }: { title: string; body: string }) => (
   </div>
 );
 
-const ClassGrid = ({ className, rows, highlightChild }: {
-  className: string; rows: TimetableEntry[]; highlightChild: boolean;
+const SheetTabs = ({ sheets, active, onChange, childClass }: {
+  sheets: TimetableSheet[]; active: string; onChange: (n: string) => void; childClass: string;
 }) => {
-  const days = Array.from(new Set(rows.map(r => r.day)))
-    .sort((a, b) => DAYS_ORDER.indexOf(a) - DAYS_ORDER.indexOf(b));
-  const periods = Array.from(new Set(rows.map(r => r.period))).sort((a, b) => a - b);
-  const cell = (d: string, p: number) => rows.find(r => r.day === d && r.period === p);
-
+  const childN = normalize(childClass);
   return (
-    <div style={{
-      background: T.CARD,
-      borderRadius: 14,
-      overflow: "hidden",
-      boxShadow: T.SH,
-      border: highlightChild ? `1px solid ${T.P}` : T.BDR,
-    }}>
-      <div style={{
-        padding: "12px 14px",
-        background: highlightChild ? "rgba(0,85,255,.10)" : "rgba(0,85,255,.04)",
-        borderBottom: "0.5px solid rgba(0,85,255,.10)",
-        display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ fontSize: 14, fontWeight: 800, color: T.T1 }}>{className}</div>
-          {highlightChild && (
-            <span style={{ padding: "2px 8px", borderRadius: 999, background: T.P, color: "#fff", fontSize: 9, fontWeight: 800, letterSpacing: "0.4px", textTransform: "uppercase" }}>
-              Your child's class
-            </span>
-          )}
-        </div>
-        <div style={{ fontSize: 10, fontWeight: 700, color: T.T3 }}>{rows.length} periods · {days.length} days</div>
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+      {sheets.map(s => {
+        const isActive = s.name === active;
+        const isMyChild = !!childN && normalize(s.name) === childN;
+        return (
+          <button key={s.name} onClick={() => onChange(s.name)}
+            style={{
+              padding: "7px 14px", borderRadius: 999,
+              background: isActive ? `linear-gradient(135deg, ${T.P}, #1166FF)` : T.BG,
+              color: isActive ? "#fff" : T.T2,
+              border: isActive ? "0.5px solid transparent" : T.BDR,
+              fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: T.FONT,
+              letterSpacing: "0.04em",
+              boxShadow: isActive ? "0 4px 12px rgba(0,85,255,0.28)" : "none",
+              display: "inline-flex", alignItems: "center", gap: 6,
+            }}>
+            {s.name}
+            {isMyChild && (
+              <span style={{
+                fontSize: 8, fontWeight: 800, letterSpacing: "0.4px", textTransform: "uppercase",
+                padding: "1px 6px", borderRadius: 999,
+                background: isActive ? "rgba(255,255,255,.20)" : T.P, color: "#fff",
+              }}>
+                Your child
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+const SheetTable = ({ sheet }: { sheet: TimetableSheet }) => {
+  if (sheet.rows.length === 0 && sheet.headers.length === 0) {
+    return (
+      <div style={{ padding: 24, textAlign: "center", color: T.T3, fontSize: 12, fontWeight: 600 }}>
+        This sheet is empty.
       </div>
+    );
+  }
+  return (
+    <div style={{ background: "rgba(0,85,255,.04)", border: "0.5px solid rgba(0,85,255,.10)", borderRadius: 14, overflow: "hidden" }}>
       <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr style={{ background: "rgba(0,85,255,.04)" }}>
-              <th style={th()}>Period</th>
-              {days.map(d => <th key={d} style={th()}>{d}</th>)}
-            </tr>
-          </thead>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: T.FONT, minWidth: "max-content" }}>
+          {sheet.headers.length > 0 && (
+            <thead>
+              <tr style={{ background: "rgba(0,85,255,.08)" }}>
+                {sheet.headers.map((h, i) => (
+                  <th key={i} style={{
+                    fontSize: 11, fontWeight: 800, letterSpacing: "0.4px", color: T.T1,
+                    padding: "10px 12px", textAlign: "left", borderRight: "0.5px solid rgba(0,85,255,.10)",
+                    whiteSpace: "nowrap", textTransform: "uppercase",
+                  }}>
+                    {h || "—"}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+          )}
           <tbody>
-            {periods.map(p => (
-              <tr key={p} style={{ borderTop: "0.5px solid rgba(0,85,255,.06)" }}>
-                <td style={td(true)}>
-                  <div style={{ fontWeight: 800, color: T.P }}>P{p}</div>
-                  {(() => {
-                    const sample = rows.find(r => r.period === p);
-                    return sample?.startTime ? (
-                      <div style={{ fontSize: 9, color: T.T4, fontWeight: 600 }}>
-                        {sample.startTime}{sample.endTime ? `–${sample.endTime}` : ""}
-                      </div>
-                    ) : null;
-                  })()}
-                </td>
-                {days.map(d => {
-                  const c = cell(d, p);
-                  if (!c) return <td key={d} style={td()}><span style={{ color: T.T4, fontSize: 11 }}>—</span></td>;
+            {sheet.rows.map((row, ri) => (
+              <tr key={ri} style={{ borderTop: "0.5px solid rgba(0,85,255,.06)" }}>
+                {Array.from({ length: Math.max(sheet.headers.length, row.length) }, (_, ci) => {
+                  const cell = String(row[ci] ?? "");
                   return (
-                    <td key={d} style={td()}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: T.T1, marginBottom: 2 }}>{c.subject}</div>
-                      {c.teacher && <div style={{ fontSize: 10, color: T.T3, fontWeight: 600 }}>{c.teacher}</div>}
+                    <td key={ci} style={{
+                      fontSize: 12, color: T.T1,
+                      padding: "9px 12px",
+                      borderRight: "0.5px solid rgba(0,85,255,.06)",
+                      background: T.CARD,
+                      verticalAlign: "top",
+                      whiteSpace: "pre-wrap",
+                    }}>
+                      {cell === "" ? <span style={{ color: T.T4 }}>—</span> : cell}
                     </td>
                   );
                 })}
@@ -254,14 +212,3 @@ const ClassGrid = ({ className, rows, highlightChild }: {
     </div>
   );
 };
-
-const th = (): React.CSSProperties => ({
-  fontSize: 9, fontWeight: 800, letterSpacing: "1.2px", color: T.T4, textTransform: "uppercase",
-  padding: "8px 10px", textAlign: "left", borderRight: "0.5px solid rgba(0,85,255,.06)",
-});
-const td = (firstCol = false): React.CSSProperties => ({
-  fontSize: 12, color: T.T1, padding: "8px 10px",
-  borderRight: "0.5px solid rgba(0,85,255,.06)",
-  background: firstCol ? "rgba(0,85,255,.03)" : T.CARD,
-  verticalAlign: "top", minWidth: 100,
-});

@@ -745,22 +745,14 @@ service cloud.firestore {
       allow delete:    if signedIn() && inSameSchool() && hasAdminRole();
     }
 
-    // ── Timetable: per-period entries ───────────────────────────────────
-    //   Doc: { schoolId, branchId, className, day, period, startTime,
-    //          endTime, subject, teacher, ... }. Replaced as a batch on
-    //          every Excel upload (delete-then-write). Anyone signed-in in
-    //          the same school reads; only owner/principal writes.
-    match /timetable_entries/{id} {
-      allow get:    if signedIn() && (resource == null || inSameSchool());
-      allow list:   if signedIn();
-      allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasAdminRole();
-      allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && hasAdminRole();
-      allow delete: if signedIn() && inSameSchool() && hasAdminRole();
-    }
-
-    // ── Timetable: singleton metadata (last-upload info) ─────────────────
-    //   Doc id format: {schoolId}_{branchSeg}. One per school+branch.
-    match /timetable_metadata/{id} {
+    // ── Timetable: WYSIWYG singleton (one doc per school+branch) ────────
+    //   Doc id format: {schoolId}_{branchSeg}.
+    //   Doc shape: { schoolId, branchId, fileName, sheets:[{name,headers,rows}],
+    //                uploadedAt, uploadedBy, uploadedByName }.
+    //   Whatever Excel the principal uploads is preserved verbatim (no
+    //   schema enforcement) — every school's timetable format is honoured.
+    //   Anyone signed-in in the same school reads; only owner/principal writes.
+    match /timetable_documents/{id} {
       allow get:    if signedIn() && (resource == null || inSameSchool());
       allow list:   if signedIn();
       allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasAdminRole();
