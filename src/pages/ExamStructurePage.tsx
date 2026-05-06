@@ -13,7 +13,15 @@ import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { Loader2, Award, FileWarning } from "lucide-react";
 
-interface GradeRule { grade: string; min: number; max: number; }
+// Mirror of principal-dashboard's GradeRule shape (ExamStructure.tsx).
+// Field names MUST match the persisted shape: label / minPct / maxPct / color.
+interface GradeRule {
+  id?: string;
+  label: string;
+  minPct: number;
+  maxPct: number;
+  color?: string;
+}
 interface ExamType {
   id: string;
   name: string;
@@ -181,21 +189,25 @@ const ExamTypeCard = ({ ex }: { ex: ExamType }) => {
             Grading scale
           </div>
           <div style={{
-            display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(74px, 1fr))", gap: 6,
+            display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(78px, 1fr))", gap: 6,
           }}>
-            {grading.map((g, i) => (
-              <div key={i} style={{
-                background: "rgba(0,85,255,.05)", border: "0.5px solid rgba(0,85,255,.10)",
-                borderRadius: 10, padding: "8px 10px", textAlign: "center",
-              }}>
-                <div style={{ fontSize: 14, fontWeight: 800, color: T.P, lineHeight: 1, marginBottom: 4 }}>
-                  {g.grade}
+            {grading.map((g, i) => {
+              const tierColor = g.color || T.P;
+              return (
+                <div key={i} style={{
+                  background: `${tierColor}1A`,
+                  border: `0.5px solid ${tierColor}33`,
+                  borderRadius: 10, padding: "8px 10px", textAlign: "center",
+                }}>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: tierColor, lineHeight: 1, marginBottom: 4 }}>
+                    {g.label}
+                  </div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: T.T4, letterSpacing: "0.4px" }}>
+                    {g.minPct}–{g.maxPct}%
+                  </div>
                 </div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: T.T4, letterSpacing: "0.4px" }}>
-                  {g.min}–{g.max}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
