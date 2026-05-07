@@ -382,7 +382,25 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
       return { cls: "blue", bg: "rgba(0,85,255,0.10)", color: B1, border: "rgba(0,85,255,0.20)", label: "Pending" };
     };
 
+    // Past-due check — once an assignment's deadline has elapsed, submission
+    // is closed. The teacher's UI greys out the assignment too. Submitted
+    // assignments stay viewable, just no new uploads.
+    const isAssignmentPastDue = (a: any): boolean => {
+      const due = parseDue(a);
+      if (!due) return false;
+      // Late-window: assignments are submittable up to 23:59:59 of the due
+      // date in the user's local time. If due was 2026-05-01, they can
+      // submit until 2026-05-01 23:59:59 local. After that, closed.
+      const endOfDay = new Date(due);
+      endOfDay.setHours(23, 59, 59, 999);
+      return Date.now() > endOfDay.getTime();
+    };
+
     const openSubmit = (a: any) => {
+      if (isAssignmentPastDue(a)) {
+        toast.error("Submission closed — this assignment's deadline has passed.");
+        return;
+      }
       setSelectedTask(a);
       setInstantFeedback(null);
       setUploadFile(null);
@@ -509,19 +527,29 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
                 // For completed items, opening the submitted file gives the
                 // parent an immediate, meaningful action instead of a silent
                 // no-op. For open items, the tap starts the submission flow.
+                const closed = isAssignmentPastDue(a);
                 const handleRowClick = () => {
                   if (mySub?.fileUrl) { window.open(mySub.fileUrl, "_blank", "noopener,noreferrer"); return; }
+                  if (closed) {
+                    toast.error("Submission closed — this assignment's deadline has passed.");
+                    return;
+                  }
                   if (!mySub) openSubmit(a);
                 };
+                const lockedOut = closed && !mySub;
                 return (
                   <div key={a.id}
                     role="button"
                     tabIndex={0}
-                    aria-label={mySub ? `View submission for ${a.title || "assignment"}` : `Submit ${a.title || "assignment"}`}
+                    aria-label={
+                      mySub ? `View submission for ${a.title || "assignment"}` :
+                      lockedOut ? `${a.title || "assignment"} — submission closed (past due)` :
+                      `Submit ${a.title || "assignment"}`
+                    }
                     onClick={handleRowClick}
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleRowClick(); } }}
                     className="bg-white rounded-[20px] p-4 flex items-center gap-[14px] relative overflow-hidden active:scale-[0.97] transition-transform cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
-                    style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)", transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
+                    style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)", transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)", opacity: lockedOut ? 0.55 : 1, filter: lockedOut ? "grayscale(0.5)" : "none" }}>
                     <div className="absolute left-0 top-0 bottom-0 w-[3.5px] rounded-l-[2px]" style={{ background: accentBar(accent.cls) }} />
                     <div className="w-[42px] h-[42px] rounded-[14px] flex items-center justify-center shrink-0"
                       style={{ background: accent.ico, boxShadow: accent.icoSh }}>
@@ -1094,17 +1122,28 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
                 // Whole-row activation: completed → opens uploaded file; open
                 // → starts submission. Inner buttons stopPropagation so they
                 // keep working independently.
+                const closed = isAssignmentPastDue(a);
                 const handleRowClick = () => {
                   if (mySub?.fileUrl) { window.open(mySub.fileUrl, "_blank", "noopener,noreferrer"); return; }
+                  if (closed) {
+                    toast.error("Submission closed — this assignment's deadline has passed.");
+                    return;
+                  }
                   if (!mySub) { setSelectedTask(a); setInstantFeedback(null); setUploadFile(null); setStudentNote(""); setIsSubmitOpen(true); }
                 };
+                const lockedOut = closed && !mySub;
                 return (
                   <div key={a.id}
                     role="button"
                     tabIndex={0}
-                    aria-label={mySub ? `View submission for ${a.title || "assignment"}` : `Submit ${a.title || "assignment"}`}
+                    aria-label={
+                      mySub ? `View submission for ${a.title || "assignment"}` :
+                      lockedOut ? `${a.title || "assignment"} — submission closed (past due)` :
+                      `Submit ${a.title || "assignment"}`
+                    }
                     onClick={handleRowClick}
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleRowClick(); } }}
+                    style={{ opacity: lockedOut ? 0.55 : 1, filter: lockedOut ? "grayscale(0.5)" : "none" }}
                     className="bg-white rounded-[20px] p-5 flex items-center gap-5 relative overflow-hidden transition-all hover:-translate-y-[1px] hover:shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
                     style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
                     <div className="absolute left-0 top-0 bottom-0 w-[4px] rounded-l-[2px]" style={{ background: accent.bar }} />
@@ -1147,6 +1186,14 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
                           style={{ background: "rgba(0,200,83,0.08)", border: "0.5px solid rgba(0,200,83,0.22)" }}>
                           <CheckCircle2 className="w-[14px] h-[14px]" style={{ color: GREEN }} strokeWidth={2.5} />
                           <span className="text-[12px] font-bold" style={{ color: "#007830" }}>Handed In</span>
+                        </div>
+                      ) : closed ? (
+                        // Past-due unsubmitted: hide the Submit button entirely
+                        // and show a static "Closed" pill instead so the row
+                        // still has visual closure.
+                        <div className="flex items-center gap-2 px-4 py-[10px] rounded-[14px]"
+                          style={{ background: "rgba(140,146,164,0.10)", border: "0.5px solid rgba(140,146,164,0.22)" }}>
+                          <span className="text-[12px] font-bold" style={{ color: "#5070B0" }}>Closed</span>
                         </div>
                       ) : (
                         <>
@@ -1191,7 +1238,14 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
                   const d: Date = x.d;
                   const days = daysUntilD(d);
                   const urgent = days <= 3;
-                  const openSubmitDesktop = () => { setSelectedTask(a); setInstantFeedback(null); setUploadFile(null); setStudentNote(""); setIsSubmitOpen(true); };
+                  const closedDesktop = isAssignmentPastDue(a);
+                  const openSubmitDesktop = () => {
+                    if (closedDesktop) {
+                      toast.error("Submission closed — this assignment's deadline has passed.");
+                      return;
+                    }
+                    setSelectedTask(a); setInstantFeedback(null); setUploadFile(null); setStudentNote(""); setIsSubmitOpen(true);
+                  };
                   return (
                     <div key={a.id}
                       role="button"
