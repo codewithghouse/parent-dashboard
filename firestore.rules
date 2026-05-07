@@ -994,7 +994,7 @@ service cloud.firestore {
       allow get, list: if isPlatformAdmin();
 
       allow create: if request.resource.data.keys().hasOnly([
-                        'name','schoolName','email','phone','location',
+                        'name','schoolName','position','email','phone','location',
                         'status','createdAt'
                       ])
                     && request.resource.data.name is string
@@ -1003,6 +1003,9 @@ service cloud.firestore {
                     && request.resource.data.schoolName is string
                     && request.resource.data.schoolName.size() > 0
                     && request.resource.data.schoolName.size() < 300
+                    && request.resource.data.position is string
+                    && request.resource.data.position.size() > 0
+                    && request.resource.data.position.size() < 100
                     && request.resource.data.email is string
                     && request.resource.data.email.size() > 0
                     && request.resource.data.email.size() < 300
