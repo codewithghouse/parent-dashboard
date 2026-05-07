@@ -19,6 +19,13 @@ export default function BehaviourPage() {
   const [teacherNotes, setTeacherNotes] = useState<any[]>([]);
   const [disciplineIncidents, setDisciplineIncidents] = useState<any[]>([]);
   const [manualRating, setManualRating] = useState<number | null>(null);
+  // Teacher Quick-Rate ratings — written by teacher dashboard's StudentBehaviour
+  // page. Each doc carries a 1-5 star rating + optional note. Parent can see
+  // every rating as it lands.
+  const [teacherRatings, setTeacherRatings] = useState<any[]>([]);
+  // Improvement areas — also written by teacher dashboard. Each is a
+  // titled goal with priority + active/resolved status.
+  const [improvementAreas, setImprovementAreas] = useState<any[]>([]);
 
   useEffect(() => {
     if (!studentData?.id) return;
@@ -95,7 +102,42 @@ export default function BehaviourPage() {
         )
       : () => {};
 
-    return () => { unsubEnroll(); unsubNotes(); unsubIncidents(); };
+    // 4. Teacher Quick-Rate ratings — dual-key (studentId + studentEmail) via
+    // subscribePerStudent so legacy id-as-email enrollments still match.
+    const unsubRatings = subscribePerStudent({
+      collection: "student_ratings",
+      student: studentData,
+      filters: [limit(40)],
+      onChange: (docs) => {
+        const arr = docs
+          .map(d => ({ id: d.id, ...(d.data() as any) }))
+          .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+        setTeacherRatings(arr);
+      },
+      onError: (err) => {
+        console.warn("[Behaviour] ratings listener error:", err);
+        setTeacherRatings([]);
+      },
+    });
+
+    // 5. Improvement areas — dual-key, sorted newest-first.
+    const unsubImprovements = subscribePerStudent({
+      collection: "improvement_areas",
+      student: studentData,
+      filters: [limit(40)],
+      onChange: (docs) => {
+        const arr = docs
+          .map(d => ({ id: d.id, ...(d.data() as any) }))
+          .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+        setImprovementAreas(arr);
+      },
+      onError: (err) => {
+        console.warn("[Behaviour] improvements listener error:", err);
+        setImprovementAreas([]);
+      },
+    });
+
+    return () => { unsubEnroll(); unsubNotes(); unsubIncidents(); unsubRatings(); unsubImprovements(); };
   }, [studentData?.id, studentData?.schoolId, studentData?.email, studentData?.name]);
 
   // Determine positive vs improvement notes heuristics
@@ -111,6 +153,18 @@ export default function BehaviourPage() {
 
   const positiveNotes = teacherNotes.filter(n => classifyNote(n) === "positive");
   const teacherImprovementNotes = teacherNotes.filter(n => classifyNote(n) === "improvement");
+
+  // Teacher Quick-Rate aggregates. Filter null `rating` fields so a
+  // half-formed write doesn't drag the average to 0.
+  const validRatings = teacherRatings.filter(r => typeof r.rating === "number" && !Number.isNaN(r.rating));
+  const teacherAvgRating = validRatings.length > 0
+    ? validRatings.reduce((a, r) => a + r.rating, 0) / validRatings.length
+    : null;
+
+  // Improvement areas split by status (case-normalised).
+  const isResolvedStatus = (s?: string) => String(s || "").toLowerCase() === "resolved";
+  const activeImprovements = improvementAreas.filter(i => !isResolvedStatus(i.status));
+  const resolvedImprovements = improvementAreas.filter(i => isResolvedStatus(i.status));
 
   // Merge teacher-flagged improvement notes with principal-logged discipline
   // incidents into a single "improvement" stream so they actually RENDER on
@@ -517,6 +571,129 @@ export default function BehaviourPage() {
               )}
             </div>
 
+            {/* ── Teacher Quick-Ratings (synced from teacher Behaviour page) ── */}
+            {teacherRatings.length > 0 && (
+              <div className="mx-5 mt-3 bg-white rounded-[24px] p-5"
+                style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-[10px] flex items-center justify-center"
+                      style={{ background: "rgba(255,170,0,0.14)", border: "0.5px solid rgba(255,170,0,0.24)" }}>
+                      <Star className="w-[15px] h-[15px]" style={{ color: GOLD }} strokeWidth={2.5} fill={GOLD} />
+                    </div>
+                    <div>
+                      <div className="text-[14px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>Teacher Ratings</div>
+                      <div className="text-[10px] font-semibold mt-[1px]" style={{ color: T3 }}>
+                        {teacherAvgRating != null ? `${teacherAvgRating.toFixed(1)} avg · ${teacherRatings.length} rating${teacherRatings.length === 1 ? "" : "s"}` : "No ratings yet"}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-[1px]">
+                    {[1,2,3,4,5].map(n => (
+                      <Star key={n} className="w-3 h-3"
+                        style={{
+                          color: teacherAvgRating != null && n <= Math.round(teacherAvgRating) ? GOLD : "#D5DEEC",
+                          fill:  teacherAvgRating != null && n <= Math.round(teacherAvgRating) ? GOLD : "transparent",
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {teacherRatings.slice(0, 5).map(r => (
+                    <div key={r.id} className="flex items-start gap-3 px-3 py-2 rounded-[12px]"
+                      style={{ background: "#F4F7FE", border: "0.5px solid rgba(0,85,255,0.06)" }}>
+                      <div className="flex gap-[1px] flex-shrink-0 mt-[2px]">
+                        {[1,2,3,4,5].map(n => (
+                          <Star key={n} className="w-3 h-3"
+                            style={{
+                              color: typeof r.rating === "number" && n <= r.rating ? GOLD : "#D5DEEC",
+                              fill:  typeof r.rating === "number" && n <= r.rating ? GOLD : "transparent",
+                            }}
+                          />
+                        ))}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        {r.note && <p className="text-[12px] font-medium m-0 leading-[1.5]" style={{ color: T1 }}>{r.note}</p>}
+                        <div className="text-[9px] font-semibold flex items-center gap-[3px] mt-[2px]" style={{ color: T4 }}>
+                          <Clock className="w-[9px] h-[9px]" strokeWidth={2.5} />
+                          {formatNoteDate(r)}
+                          {r.teacherName && (
+                            <>
+                              <span className="w-1 h-1 rounded-full" style={{ background: T4 }} />
+                              <span className="truncate">{r.teacherName}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── Areas of Improvement (synced from teacher Behaviour page) ── */}
+            {improvementAreas.length > 0 && (
+              <div className="mx-5 mt-3 bg-white rounded-[24px] p-5"
+                style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-[10px] flex items-center justify-center"
+                      style={{ background: "rgba(123,63,244,0.10)", border: "0.5px solid rgba(123,63,244,0.20)" }}>
+                      <Lightbulb className="w-[15px] h-[15px]" style={{ color: VIOLET }} strokeWidth={2.5} />
+                    </div>
+                    <div>
+                      <div className="text-[14px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>Areas of Improvement</div>
+                      <div className="text-[10px] font-semibold mt-[1px]" style={{ color: T3 }}>
+                        {activeImprovements.length} active · {resolvedImprovements.length} resolved
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {improvementAreas.slice(0, 6).map(imp => {
+                    const resolved = isResolvedStatus(imp.status);
+                    const pri = String(imp.priority || "low").toLowerCase();
+                    const priColor = pri === "high" ? RED : pri === "medium" ? ORANGE : B1;
+                    const priBg    = pri === "high" ? "rgba(255,51,85,0.10)" : pri === "medium" ? "rgba(255,136,0,0.12)" : "rgba(0,85,255,0.10)";
+                    return (
+                      <div key={imp.id} className="flex items-start gap-3 px-3 py-2 rounded-[12px]"
+                        style={{ background: "#F4F7FE", border: "0.5px solid rgba(0,85,255,0.06)", opacity: resolved ? 0.6 : 1 }}>
+                        <div className="w-[18px] h-[18px] rounded-[6px] flex items-center justify-center flex-shrink-0 mt-[2px]"
+                          style={{ background: resolved ? GREEN : "transparent", border: `1.5px solid ${resolved ? GREEN : "rgba(0,85,255,0.25)"}` }}>
+                          {resolved && <CheckCircle className="w-[12px] h-[12px] text-white" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[13px] font-bold" style={{ color: T1, letterSpacing: "-0.15px", textDecoration: resolved ? "line-through" : "none" }}>
+                              {imp.title || "Untitled"}
+                            </span>
+                            <span className="px-[7px] py-[1px] rounded-[5px] text-[9px] font-bold uppercase tracking-[0.06em]"
+                              style={{ background: priBg, color: priColor }}>
+                              {pri}
+                            </span>
+                          </div>
+                          {imp.description && (
+                            <p className="text-[11px] font-medium m-0 mt-[2px] leading-[1.5]" style={{ color: T3 }}>{imp.description}</p>
+                          )}
+                          <div className="text-[9px] font-semibold flex items-center gap-[3px] mt-[3px]" style={{ color: T4 }}>
+                            <Clock className="w-[9px] h-[9px]" strokeWidth={2.5} />
+                            {formatNoteDate(imp)}
+                            {imp.teacherName && (
+                              <>
+                                <span className="w-1 h-1 rounded-full" style={{ background: T4 }} />
+                                <span className="truncate">{imp.teacherName}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* ── Behavior Trend Chart ── */}
             {trendData.length > 1 && (
               <div className="mx-5 mt-3 bg-white rounded-[24px] p-5"
@@ -895,6 +1072,131 @@ export default function BehaviourPage() {
                 )}
               </div>
             </div>
+
+            {/* ── Teacher Ratings + Improvement Areas (synced from teacher Behaviour page) ── */}
+            {(teacherRatings.length > 0 || improvementAreas.length > 0) && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {teacherRatings.length > 0 && (
+                  <div className="bg-white rounded-[22px] p-6"
+                    style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-[12px] flex items-center justify-center"
+                          style={{ background: "rgba(255,170,0,0.14)", border: "0.5px solid rgba(255,170,0,0.24)" }}>
+                          <Star className="w-[18px] h-[18px]" style={{ color: GOLD }} strokeWidth={2.5} fill={GOLD} />
+                        </div>
+                        <div>
+                          <div className="text-[16px] font-bold" style={{ color: T1, letterSpacing: "-0.25px" }}>Teacher Ratings</div>
+                          <div className="text-[11px] font-semibold mt-[1px]" style={{ color: T3 }}>
+                            {teacherAvgRating != null ? `${teacherAvgRating.toFixed(1)} avg · ${teacherRatings.length} rating${teacherRatings.length === 1 ? "" : "s"}` : "No ratings yet"}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-[2px]">
+                        {[1,2,3,4,5].map(n => (
+                          <Star key={n} className="w-4 h-4"
+                            style={{
+                              color: teacherAvgRating != null && n <= Math.round(teacherAvgRating) ? GOLD : "#D5DEEC",
+                              fill:  teacherAvgRating != null && n <= Math.round(teacherAvgRating) ? GOLD : "transparent",
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {teacherRatings.slice(0, 6).map(r => (
+                        <div key={r.id} className="flex items-start gap-3 px-3 py-[10px] rounded-[12px]"
+                          style={{ background: "#F4F7FE", border: "0.5px solid rgba(0,85,255,0.06)" }}>
+                          <div className="flex gap-[2px] flex-shrink-0 mt-[2px]">
+                            {[1,2,3,4,5].map(n => (
+                              <Star key={n} className="w-3.5 h-3.5"
+                                style={{
+                                  color: typeof r.rating === "number" && n <= r.rating ? GOLD : "#D5DEEC",
+                                  fill:  typeof r.rating === "number" && n <= r.rating ? GOLD : "transparent",
+                                }}
+                              />
+                            ))}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            {r.note && <p className="text-[13px] font-medium m-0 leading-[1.5]" style={{ color: T1 }}>{r.note}</p>}
+                            <div className="text-[10px] font-semibold flex items-center gap-[4px] mt-[3px]" style={{ color: T4 }}>
+                              <Clock className="w-[10px] h-[10px]" strokeWidth={2.5} />
+                              {formatNoteDate(r)}
+                              {r.teacherName && (
+                                <>
+                                  <span className="w-1 h-1 rounded-full" style={{ background: T4 }} />
+                                  <span className="truncate max-w-[140px]">{r.teacherName}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {improvementAreas.length > 0 && (
+                  <div className="bg-white rounded-[22px] p-6"
+                    style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-[12px] flex items-center justify-center"
+                          style={{ background: "rgba(123,63,244,0.10)", border: "0.5px solid rgba(123,63,244,0.20)" }}>
+                          <Lightbulb className="w-[18px] h-[18px]" style={{ color: VIOLET }} strokeWidth={2.5} />
+                        </div>
+                        <div>
+                          <div className="text-[16px] font-bold" style={{ color: T1, letterSpacing: "-0.25px" }}>Areas of Improvement</div>
+                          <div className="text-[11px] font-semibold mt-[1px]" style={{ color: T3 }}>
+                            {activeImprovements.length} active · {resolvedImprovements.length} resolved
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {improvementAreas.slice(0, 7).map(imp => {
+                        const resolved = isResolvedStatus(imp.status);
+                        const pri = String(imp.priority || "low").toLowerCase();
+                        const priColor = pri === "high" ? RED : pri === "medium" ? ORANGE : B1;
+                        const priBg    = pri === "high" ? "rgba(255,51,85,0.10)" : pri === "medium" ? "rgba(255,136,0,0.12)" : "rgba(0,85,255,0.10)";
+                        return (
+                          <div key={imp.id} className="flex items-start gap-3 px-3 py-[10px] rounded-[12px]"
+                            style={{ background: "#F4F7FE", border: "0.5px solid rgba(0,85,255,0.06)", opacity: resolved ? 0.6 : 1 }}>
+                            <div className="w-[20px] h-[20px] rounded-[6px] flex items-center justify-center flex-shrink-0 mt-[2px]"
+                              style={{ background: resolved ? GREEN : "transparent", border: `1.5px solid ${resolved ? GREEN : "rgba(0,85,255,0.25)"}` }}>
+                              {resolved && <CheckCircle className="w-[13px] h-[13px] text-white" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-[14px] font-bold" style={{ color: T1, letterSpacing: "-0.15px", textDecoration: resolved ? "line-through" : "none" }}>
+                                  {imp.title || "Untitled"}
+                                </span>
+                                <span className="px-[7px] py-[1px] rounded-[5px] text-[9px] font-bold uppercase tracking-[0.06em]"
+                                  style={{ background: priBg, color: priColor }}>
+                                  {pri}
+                                </span>
+                              </div>
+                              {imp.description && (
+                                <p className="text-[12px] font-medium m-0 mt-[3px] leading-[1.5]" style={{ color: T3 }}>{imp.description}</p>
+                              )}
+                              <div className="text-[10px] font-semibold flex items-center gap-[4px] mt-[3px]" style={{ color: T4 }}>
+                                <Clock className="w-[10px] h-[10px]" strokeWidth={2.5} />
+                                {formatNoteDate(imp)}
+                                {imp.teacherName && (
+                                  <>
+                                    <span className="w-1 h-1 rounded-full" style={{ background: T4 }} />
+                                    <span className="truncate max-w-[140px]">{imp.teacherName}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* ── Bottom Row: Trend Chart + Dark Summary ── */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
