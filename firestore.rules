@@ -575,6 +575,17 @@ service cloud.firestore {
       allow update:    if signedIn() && inSameSchool() && schoolIdImmutable() && hasStaffRole();
       allow delete:    if signedIn() && inSameSchool() && hasStaffRole();
     }
+    // ── AI Paper Correction (PaperCorrection.tsx) ───────────────────────
+    // Added 2026-05-13: teacher uploads scanned student paper → AI vision
+    // call → result auto-saved here. Read by parent dashboard (per
+    // student) and principal/owner (school-level).
+    match /paper_corrections/{id} {
+      allow get:  if signedIn() && inSameSchool();
+      allow list: if signedIn();  // TEMPORARY PHASE-1
+      allow create:    if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
+      allow update:    if signedIn() && inSameSchool() && schoolIdImmutable() && hasStaffRole();
+      allow delete:    if signedIn() && inSameSchool() && hasAdminRole();
+    }
     match /discipline/{id} {
       allow get:  if signedIn() && inSameSchool();
       allow list: if signedIn();  // TEMPORARY PHASE-1: relaxed while client queries migrate. Re-tighten to inSameSchool() once all pages filter by schoolId.
