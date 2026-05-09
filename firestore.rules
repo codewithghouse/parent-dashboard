@@ -551,7 +551,19 @@ service cloud.firestore {
       allow list: if signedIn();  // TEMPORARY PHASE-1: relaxed while client queries migrate. Re-tighten to inSameSchool() once all pages filter by schoolId.
       allow create:    if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
       allow update:    if signedIn() && inSameSchool() && schoolIdImmutable() && hasStaffRole();
-      allow delete:    if signedIn() && inSameSchool() && hasAdminRole();
+      // Teacher can remove a student from their OWN class (matched via
+      // `teacherEmail` field on the enrollment doc — written by the invite
+      // flow at Students.tsx). Old enrollments without `teacherEmail` remain
+      // admin-only. Admins (owner / principal) can always delete any enrollment.
+      allow delete:    if signedIn() && inSameSchool() && (
+                          hasAdminRole()
+                          || (
+                            claimRole() == 'teacher'
+                            && 'teacherEmail' in resource.data
+                            && resource.data.teacherEmail is string
+                            && resource.data.teacherEmail.lower() == email()
+                          )
+                        );
     }
     match /fees/{id} {
       allow get:  if signedIn() && inSameSchool();
