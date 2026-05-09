@@ -527,6 +527,18 @@ service cloud.firestore {
       allow update:    if signedIn() && inSameSchool() && schoolIdImmutable() && hasStaffRole();
       allow delete:    if signedIn() && inSameSchool() && hasStaffRole();
     }
+    // Added 2026-05-21: Firestore-backed weekly cache for Leaderboard AI plans
+    // (class / student / self action plans). Doc id is deterministic per
+    // (teacherId + kind + contextId + ISO week) so AI fires once per week per
+    // teacher across all devices. Staff-only writes scoped by schoolId; teacher
+    // reads the cache before calling the AI.
+    match /leaderboard_ai_plans/{id} {
+      allow get:  if signedIn() && inSameSchool();
+      allow list: if signedIn();  // TEMPORARY PHASE-1
+      allow create:    if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
+      allow update:    if signedIn() && inSameSchool() && schoolIdImmutable() && hasStaffRole();
+      allow delete:    if signedIn() && inSameSchool() && hasStaffRole();
+    }
     match /classes/{id} {
       allow get:  if signedIn() && inSameSchool();
       allow list: if signedIn();  // TEMPORARY PHASE-1: relaxed while client queries migrate. Re-tighten to inSameSchool() once all pages filter by schoolId.
