@@ -512,13 +512,20 @@ async function generateInsightsForLeaderboard(leaderboard, openaiApiKey) {
         await Promise.all(batch.map(async (entry) => {
             const insightRef = db.doc(`student_insights/${entry.studentId}/weeks/${weekId}`);
             // Idempotency: skip if a NON-FALLBACK insight doc already exists
-            // for this student+week. Fallback docs ARE retried — they signal
-            // a transient OpenAI failure that may now succeed (e.g., after a
-            // model-access issue is fixed or the SDK is replaced with axios).
+            // AND it was generated from the SAME underlying leaderboard run.
+            // The leaderboard-stamp comparison is critical — without it, a
+            // re-run cron (e.g., after a metrics fix) writes fresh leaderboard
+            // data but the existing insights doc from the old buggy run silently
+            // masks it. User caught this 2026-05-21 ("AI same hai har baar").
+            // Fallback docs ARE retried — they signal a transient OpenAI failure.
             const existing = await insightRef.get();
+            const lbGenAt = leaderboard.generatedAt ?? 0;
+            const lbTopperScore = topperEntry.compositeScore;
             if (existing.exists) {
                 const existingData = existing.data();
-                if (existingData?.aiModel !== "fallback") {
+                const sameLeaderboardRun = (existingData?.leaderboardGeneratedAt ?? 0) === lbGenAt &&
+                    (existingData?.leaderboardTopperScore ?? -1) === lbTopperScore;
+                if (existingData?.aiModel !== "fallback" && sameLeaderboardRun) {
                     skipped++;
                     return;
                 }
@@ -543,7 +550,14 @@ async function generateInsightsForLeaderboard(leaderboard, openaiApiKey) {
                     subjectMetrics,
                     rankHistory,
                 });
-                await insightRef.set(insights);
+                // Stamp leaderboard fingerprint so the next idempotency check can
+                // detect stale insights and trigger regeneration when leaderboard
+                // is re-run with updated metrics.
+                await insightRef.set({
+                    ...insights,
+                    leaderboardGeneratedAt: lbGenAt,
+                    leaderboardTopperScore: lbTopperScore,
+                });
                 generated++;
             }
             catch (err) {

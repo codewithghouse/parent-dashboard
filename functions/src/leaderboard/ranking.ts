@@ -7,6 +7,7 @@ import type {
   DerivedStudentSnapshot,
   RankingEntry,
   RankHistoryDoc,
+  SubjectRankingEntry,
   TrendDirection,
 } from "./types";
 
@@ -121,6 +122,49 @@ export function buildRanking(
       avatarText: avatar.text,
     };
   });
+}
+
+/**
+ * Build a per-subject ranking map. For each subject any student in the class
+ * has a score in, sort students by that subject's score descending and
+ * assign per-subject ranks. Students without a score in a given subject are
+ * NOT included in that subject's ranking (subject leaderboards only contain
+ * students who have data — keeps the leaderboard meaningful, not padded
+ * with zeros).
+ *
+ * Output keyed by the normalised subject string (matches what readSubject()
+ * in metrics.ts produces — "mathematics", "science", "english", "hindi",
+ * "social", or the raw lowercased subject for anything else).
+ */
+export function buildSubjectRankings(
+  snapshots: DerivedStudentSnapshot[],
+): Record<string, SubjectRankingEntry[]> {
+  // Collect every distinct subject across all students.
+  const allSubjects = new Set<string>();
+  for (const s of snapshots) {
+    for (const sub of Object.keys(s.subjectScores)) allSubjects.add(sub);
+  }
+
+  const out: Record<string, SubjectRankingEntry[]> = {};
+  for (const subject of allSubjects) {
+    const entries = snapshots
+      .filter((s) => subject in s.subjectScores)
+      .map((s) => {
+        const avatar = avatarFor(s.studentId);
+        return {
+          studentId: s.studentId,
+          name: s.name,
+          initials: initialsFor(s.name),
+          score: s.subjectScores[subject],
+          avatarBg: avatar.bg,
+          avatarText: avatar.text,
+        };
+      })
+      .sort((a, b) => b.score - a.score)
+      .map((e, i) => ({ ...e, rank: i + 1 } satisfies SubjectRankingEntry));
+    if (entries.length > 0) out[subject] = entries;
+  }
+  return out;
 }
 
 /**

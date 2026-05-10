@@ -20,7 +20,7 @@ import {
   weekIdToRange,
 } from "./weekUtil";
 import { deriveStudentSnapshot, aggregateSubjectAverages } from "./metrics";
-import { buildRanking, updateRankHistory } from "./ranking";
+import { buildRanking, buildSubjectRankings, updateRankHistory } from "./ranking";
 import type {
   DerivedStudentSnapshot,
   LeaderboardDoc,
@@ -153,6 +153,7 @@ export async function processClass(
   const now = Date.now();
   const generatedAt = now;
   const subjectClassAvgs = aggregateSubjectAverages(snapshots);
+  const subjectRankings = buildSubjectRankings(snapshots);
 
   const leaderboardDoc: LeaderboardDoc = {
     classId,
@@ -164,6 +165,8 @@ export async function processClass(
     classAverage,
     rankings,
     generatedAt,
+    subjectRankings,
+    classSubjectAverages: subjectClassAvgs,
   };
 
   const batch = db.batch();

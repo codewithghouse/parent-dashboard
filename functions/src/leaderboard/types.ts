@@ -35,6 +35,16 @@ export interface RankingEntry {
   avatarText: string;
 }
 
+export interface SubjectRankingEntry {
+  studentId: string;
+  name: string;
+  initials: string;
+  rank: number;
+  score: number;             // 0-100 percentage in this subject
+  avatarBg: string;
+  avatarText: string;
+}
+
 export interface LeaderboardDoc {
   classId: string;
   schoolId: string;
@@ -45,6 +55,11 @@ export interface LeaderboardDoc {
   classAverage: number;
   rankings: RankingEntry[];
   generatedAt: number;
+  // Per-subject rankings — added 2026-05-21 for parent UI subject tabs.
+  // Optional for backwards-compat with leaderboard docs written before this
+  // field existed (frontend treats missing as "Overall only").
+  subjectRankings?: Record<string, SubjectRankingEntry[]>;
+  classSubjectAverages?: Record<string, number>;
 }
 
 export interface SubjectScore {
@@ -129,6 +144,13 @@ export interface InsightsDoc {
   forecast: ForecastData;
   generatedAt: number;
   aiModel: "gpt-4.1-mini" | "gpt-4o-mini" | "fallback";
+  // Stamp the source leaderboard's generation timestamp + topper composite.
+  // Used by the idempotency check so when a leaderboard is RE-RUN with
+  // updated metrics (cron fix lands, manual trigger, etc.), insights are
+  // regenerated rather than served stale. Without this, fresh leaderboards
+  // were silently masked by old AI text from the first cron run.
+  leaderboardGeneratedAt?: number;
+  leaderboardTopperScore?: number;
 }
 
 export interface StudentMetricsDoc {

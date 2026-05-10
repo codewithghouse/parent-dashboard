@@ -32,6 +32,16 @@ export interface RankingEntry {
   avatarText: string;
 }
 
+export interface SubjectRankingEntry {
+  studentId: string;
+  name: string;
+  initials: string;
+  rank: number;
+  score: number;             // 0-100 percentage in this subject
+  avatarBg: string;
+  avatarText: string;
+}
+
 export interface LeaderboardDoc {
   classId: string;
   schoolId: string;
@@ -42,6 +52,10 @@ export interface LeaderboardDoc {
   classAverage: number;
   rankings: RankingEntry[];
   generatedAt: number;
+  // Per-subject rankings — added 2026-05-21 for subject tabs UI.
+  // Optional for backwards-compat with older docs that don't have this field.
+  subjectRankings?: Record<string, SubjectRankingEntry[]>;
+  classSubjectAverages?: Record<string, number>;
 }
 
 export interface SubjectScore {

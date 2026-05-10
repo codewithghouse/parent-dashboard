@@ -5,6 +5,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.compareForRanking = compareForRanking;
 exports.buildRanking = buildRanking;
+exports.buildSubjectRankings = buildSubjectRankings;
 exports.updateRankHistory = updateRankHistory;
 const weekUtil_1 = require("./weekUtil");
 /**
@@ -111,6 +112,47 @@ function buildRanking(snapshots, previousRankByStudentId) {
             avatarText: avatar.text,
         };
     });
+}
+/**
+ * Build a per-subject ranking map. For each subject any student in the class
+ * has a score in, sort students by that subject's score descending and
+ * assign per-subject ranks. Students without a score in a given subject are
+ * NOT included in that subject's ranking (subject leaderboards only contain
+ * students who have data — keeps the leaderboard meaningful, not padded
+ * with zeros).
+ *
+ * Output keyed by the normalised subject string (matches what readSubject()
+ * in metrics.ts produces — "mathematics", "science", "english", "hindi",
+ * "social", or the raw lowercased subject for anything else).
+ */
+function buildSubjectRankings(snapshots) {
+    // Collect every distinct subject across all students.
+    const allSubjects = new Set();
+    for (const s of snapshots) {
+        for (const sub of Object.keys(s.subjectScores))
+            allSubjects.add(sub);
+    }
+    const out = {};
+    for (const subject of allSubjects) {
+        const entries = snapshots
+            .filter((s) => subject in s.subjectScores)
+            .map((s) => {
+            const avatar = avatarFor(s.studentId);
+            return {
+                studentId: s.studentId,
+                name: s.name,
+                initials: initialsFor(s.name),
+                score: s.subjectScores[subject],
+                avatarBg: avatar.bg,
+                avatarText: avatar.text,
+            };
+        })
+            .sort((a, b) => b.score - a.score)
+            .map((e, i) => ({ ...e, rank: i + 1 }));
+        if (entries.length > 0)
+            out[subject] = entries;
+    }
+    return out;
 }
 /**
  * Append the current week's entry to the rolling history, capped at maxWeeks.

@@ -1,18 +1,18 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
-import { CheckCircle, AlertCircle, Calendar, Star, Clock, Loader2, ShieldCheck, BrainCircuit, Sparkles, TrendingUp, BookOpen, Lightbulb, Download, Trophy, ArrowRight, BarChart3, ClipboardList, Award } from "lucide-react";
-import { ParentAIController } from "../ai/controller/ai-controller";
+import { CheckCircle, AlertCircle, Calendar, Star, Clock, Loader2, ShieldCheck, BrainCircuit, Sparkles, TrendingUp, BookOpen, Download, Trophy, ArrowRight, BarChart3, ClipboardList, Award, RefreshCw } from "lucide-react";
 import { selectParentingTips } from "../ai/system/parenting-tips";
 import { generateWeeklyReport } from "../ai/engines/weekly-report-engine";
 import WeeklyReportPDF from "../components/WeeklyReportPDF";
-import { PageHeader } from "@/components/ui/PageHeader";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, getDocs, Timestamp } from "firebase/firestore";
 import { subscribeEnrollments } from "@/lib/enrollmentQuery";
-import { fetchPerStudent } from "@/lib/perStudentQuery";
+import { fetchPerStudent, subscribePerStudent } from "@/lib/perStudentQuery";
+import { buildAlerts } from "@/lib/alertBuilder";
 import { useSchoolSettings, resolveAcademicYear } from "@/hooks/useSchoolSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { toast } from "sonner";
 
 function timeAgo(date: Date): string {
   const diff = (Date.now() - date.getTime()) / 1000;
@@ -20,6 +20,134 @@ function timeAgo(date: Date): string {
   if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
   if (diff < 172800) return "Yesterday";
   return date.toLocaleDateString();
+}
+
+// IST-anchored day-of-week (0=Sun..6=Sat). Avoids the "Friday window shifts by
+// timezone" bug where a parent in EST sees the wrong report-generate state.
+function istDayOfWeek(d: Date = new Date()): number {
+  const istString = d.toLocaleString("en-US", { timeZone: "Asia/Kolkata", weekday: "short" });
+  const map: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  return map[istString] ?? d.getDay();
+}
+
+// Smart class label — avoids "Grade Grade 10B" when className already starts
+// with "Grade" or "Class".
+function classDisplay(className: string | undefined | null): string {
+  const c = (className || "").trim();
+  if (!c || c === "—") return "—";
+  if (/^(grade|class)\s/i.test(c)) return c;
+  return `Grade ${c}`;
+}
+
+// Module-level design tokens (P1-4 partial refactor). Single source of truth
+// for the Blue Apple palette used by both mobile and desktop branches —
+// previously duplicated 22 const declarations × 2 = 44 lines.
+const T_DASH = {
+  IND: "#0055FF",
+  IND2: "#1166FF",
+  IND3: "#4499FF",
+  BG: "#EEF4FF",
+  T1: "#001040",
+  T2: "#002080",
+  T3: "#5070B0",
+  T4: "#99AACC",
+  SEP: "rgba(0,85,255,0.07)",
+  IND_BDR: "rgba(0,85,255,0.10)",
+  IND_SOFT: "rgba(0,85,255,0.05)",
+  GREEN: "#00C853",
+  GREEN_S: "rgba(0,200,83,0.12)",
+  GREEN_B: "rgba(0,200,83,0.25)",
+  ORANGE: "#FF8800",
+  ORANGE_S: "rgba(255,136,0,0.12)",
+  ORANGE_B: "rgba(255,136,0,0.25)",
+  ROSE: "#FF3355",
+  ROSE_S: "rgba(255,51,85,0.10)",
+  IND_DARK_GRAD: "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)",
+  SH: "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.09), 0 10px 28px rgba(0,85,255,0.11)",
+  SH_LG: "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 20px 48px rgba(0,85,255,0.14)",
+  SH_BTN: "0 4px 14px rgba(0,85,255,0.32), 0 1px 4px rgba(0,85,255,0.18)",
+} as const;
+
+// P3-2: Tiny isolated sub-component for the desktop greeting date display.
+// Holds its own currentTime ticker so the parent's 1900-line tree doesn't
+// re-render every minute. Only the date/day text re-renders.
+const LiveDateDisplay = ({ T2, T4 }: { T2: string; T4: string }) => {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <div className="flex flex-col items-end">
+      <span className="text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: T4 }}>
+        {now.toLocaleDateString("en-US", { weekday: "long" })}
+      </span>
+      <span className="text-[14px] font-semibold mt-[2px]" style={{ color: T2 }}>
+        {now.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
+      </span>
+    </div>
+  );
+};
+
+// Rule-based child summary narrative — replaces the AI dashboard-insights
+// call (memory: parent_dashboard_ai_strategy + ai_cleanup_progress). The AI
+// version cost ~$0.001-0.005 per dashboard load and just restated the
+// numbers already on the cards above. Pure rule-based, deterministic, free.
+function buildChildSummaryNarrative(opts: {
+  childName: string;
+  attendance: number | null;
+  avgScore: number;
+  pending: number | null;
+  tests: number | null;
+  recentGrade: string;
+  recentSubject: string;
+  trendPct: number;
+  hasAnyData: boolean;
+}): string {
+  if (!opts.hasAnyData) {
+    return "is just getting started — no data on record yet. Performance signals will appear as scores and attendance roll in.";
+  }
+  const parts: string[] = [];
+
+  // Headline — academic standing
+  if (opts.avgScore > 0) {
+    if (opts.avgScore >= 80) parts.push(`is performing strongly with a ${opts.avgScore}% average`);
+    else if (opts.avgScore >= 60) parts.push(`is holding steady at a ${opts.avgScore}% average`);
+    else parts.push(`is averaging ${opts.avgScore}% — room for improvement`);
+  }
+
+  // Trend
+  if (opts.trendPct > 5) parts.push(`recent tests are up ${opts.trendPct}% versus the prior set`);
+  else if (opts.trendPct < -5) parts.push(`recent tests are down ${Math.abs(opts.trendPct)}% versus the prior set — worth a check-in`);
+
+  // Attendance
+  if (opts.attendance !== null) {
+    if (opts.attendance >= 90) parts.push(`attendance is excellent at ${opts.attendance}%`);
+    else if (opts.attendance >= 85) parts.push(`attendance is on track at ${opts.attendance}%`);
+    else parts.push(`attendance has slipped to ${opts.attendance}% — below the 85% target`);
+  }
+
+  // Pending work
+  if (opts.pending !== null && opts.pending > 0) {
+    parts.push(opts.pending === 1
+      ? `has 1 assignment pending`
+      : `has ${opts.pending} assignments pending`);
+  }
+
+  // Upcoming tests
+  if (opts.tests !== null && opts.tests > 0) {
+    parts.push(opts.tests === 1
+      ? `has 1 test in the next 7 days`
+      : `has ${opts.tests} tests in the next 7 days`);
+  }
+
+  // Recent test highlight
+  if (opts.recentGrade !== "N/A" && opts.recentSubject !== "—") {
+    parts.push(`most recent grade is ${opts.recentGrade} in ${opts.recentSubject}`);
+  }
+
+  if (parts.length === 0) return "is enrolled but no graded activity yet — nothing to summarise.";
+  return parts.join("; ") + ".";
 }
 
 // Parenting tips are now sourced from a curated 50-tip library (signal-tagged).
@@ -88,7 +216,9 @@ const DashboardPage = () => {
   const settings = useSchoolSettings();
   // Real academic year — replaces two hardcoded "2025-26" strings.
   const academicYear = resolveAcademicYear(settings);
-  const [aiInsights, setAiInsights] = useState<any>(null);
+  // aiInsights is now rule-based (no AI call) — see useMemo below the
+  // listeners. Kept the same shape `{ child_summary_narrative: string }`
+  // so the JSX that consumes it doesn't have to change.
   // Initial defaults must NOT look like real data. attendance:100 was showing
   // "100% attendance" for brand-new students who had zero records — making
   // the dashboard appear to have data that didn't exist in Firestore.
@@ -118,20 +248,43 @@ const DashboardPage = () => {
     hasTestData: false,
     hasScoreData: false,
   });
-  const [recentAlerts, setRecentAlerts] = useState<any[]>([]);
+  // Raw alert sources — fed to buildAlerts() (shared with AlertsPage).
+  // recentAlerts is DERIVED via useMemo from these + raw assignments/scores
+  // already collected for the stat cards. Single source of truth (lib/alertBuilder.ts)
+  // means Dashboard and AlertsPage can never drift apart again.
+  const [risksRaw, setRisksRaw] = useState<any[]>([]);
+  const [attendanceRaw, setAttendanceRaw] = useState<any[]>([]);
+  const [scoresRaw, setScoresRaw] = useState<any[]>([]);
+  const [notesRaw, setNotesRaw] = useState<any[]>([]);
+  const [assignmentsRaw, setAssignmentsRaw] = useState<any[]>([]);
+  const [submissionsRaw, setSubmissionsRaw] = useState<any[]>([]);
   const [teacherInfo, setTeacherInfo] = useState({ name: "—" });
   const [studentMeta, setStudentMeta] = useState({ className: "—", rollNo: "—" });
+  // currentTime here is only used for the morning/afternoon/evening greeting
+  // (calculated once per day boundary). The minute-by-minute date display lives
+  // in <LiveDateDisplay /> so this parent doesn't re-render every 60s.
   const [currentTime, setCurrentTime] = useState(new Date());
   const [dataLoading, setDataLoading] = useState(true);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [smartTips, setSmartTips] = useState<{ tip: string; reason: string }[]>([]);
   const [weeklyReport, setWeeklyReport] = useState<any>(null);
   const [weeklyLoading, setWeeklyLoading] = useState(false);
   const [pdfDownloading, setPdfDownloading] = useState(false);
   const [pdfData, setPdfData] = useState<any>(null);
   const pdfRef = useRef<HTMLDivElement>(null);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
-    const t = setInterval(() => setCurrentTime(new Date()), 60000);
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  // Refresh `currentTime` only every 30 minutes — enough to flip the greeting
+  // ("Good Morning"→"Good Afternoon" etc.) without forcing a full rerender on
+  // a 1900-line tree once a minute.
+  useEffect(() => {
+    const t = setInterval(() => setCurrentTime(new Date()), 30 * 60000);
     return () => clearInterval(t);
   }, []);
 
@@ -139,7 +292,11 @@ const DashboardPage = () => {
     if (!studentData?.id) return;
     const schoolId = studentData.schoolId;
 
-    // Helper: build a scoped query (schoolId filter when available prevents cross-school reads)
+    // Helper: build a scoped query (schoolId filter when available prevents cross-school reads).
+    // Used ONLY for class-scoped queries (assignments/tests by classId).
+    // Per-student reads (attendance/risks/results/gradebook_scores/submissions)
+    // MUST use subscribePerStudent / fetchPerStudent for the dual-key (id+email)
+    // pattern — single-key sq() silently drops legacy docs (memory: dual_query_pattern_studentid_email).
     const sq = (collName: string, field = "studentId", value = studentData.id) =>
       schoolId
         ? query(collection(db, collName), where("schoolId", "==", schoolId), where(field, "==", value))
@@ -152,18 +309,24 @@ const DashboardPage = () => {
       setDataLoading(false);
     };
 
-    // 1. Attendance — single listener (was 2)
-    const u1 = onSnapshot(sq("attendance"), snap => {
-      const records = snap.docs.map(d => d.data());
-      if (records.length === 0) {
-        // No attendance recorded yet. Don't fake a "100%" — show empty state.
-        setLiveStats(prev => ({ ...prev, attendance: null, hasAttendanceData: false }));
-        return;
-      }
-      const present = records.filter((r: any) => r.status === "present" || r.status === "late").length;
-      const pct = Math.round((present / records.length) * 100);
-      setLiveStats(prev => ({ ...prev, attendance: pct, hasAttendanceData: true }));
-    }, onListenerError("attendance"));
+    // 1. Attendance — DUAL-KEY (id + email merge) per dual_query_pattern memory.
+    // Single-query missed any attendance doc written with only studentEmail.
+    const u1 = subscribePerStudent({
+      collection: "attendance",
+      student: studentData,
+      onChange: (docs) => {
+        const records = docs.map(d => ({ id: d.id, ...d.data() as any }));
+        setAttendanceRaw(records); // for buildAlerts
+        if (records.length === 0) {
+          setLiveStats(prev => ({ ...prev, attendance: null, hasAttendanceData: false }));
+          return;
+        }
+        const present = records.filter((r: any) => r.status === "present" || r.status === "late").length;
+        const pct = Math.round((present / records.length) * 100);
+        setLiveStats(prev => ({ ...prev, attendance: pct, hasAttendanceData: true }));
+      },
+      onError: onListenerError("attendance"),
+    });
 
     // 2. Enrollments → assignments + tests (single listener, was 2 + unbounded classIds)
     let enSnap: any = null;
@@ -216,20 +379,42 @@ const DashboardPage = () => {
           ? query(collection(db, coll), where("schoolId", "==", schoolId), where("classId", "in", ids))
           : query(collection(db, coll), where("classId", "in", ids));
 
-      const [aSnaps, tSnaps, subSnap] = await Promise.all([
+      // submissions: dual-key (id + email merge) — single-query was missing
+      // submissions where only studentEmail was set on the write.
+      const [aSnaps, tSnaps, subDocs] = await Promise.all([
         Promise.all(chunks.map(c => getDocs(buildQ("assignments", c)))),
         Promise.all(chunks.map(c => getDocs(buildQ("tests", c)))),
-        getDocs(sq("submissions")),
+        fetchPerStudent({ collection: "submissions", student: studentData }),
       ]);
       const allAssignments = aSnaps.flatMap(s => s.docs);
       const allTests = tSnaps.flatMap(s => s.docs);
-      const subIds = new Set(subSnap.docs.flatMap(d => [d.data().homeworkId, d.data().assignmentId].filter(Boolean)));
-      const pending = allAssignments.filter(d => !subIds.has(d.id)).length;
+      const subIds = new Set(subDocs.flatMap(d => [d.data().homeworkId, d.data().assignmentId].filter(Boolean)));
+      // Stash raw assignments + submissions so buildAlerts can synthesize
+      // overdue / due-soon alerts. Single source of truth with AlertsPage.
+      setAssignmentsRaw(allAssignments.map(d => ({ id: d.id, ...d.data() as any })));
+      setSubmissionsRaw(subDocs.map(d => ({ id: d.id, ...d.data() as any })));
       const today = new Date().toISOString().split("T")[0];
       const nw = new Date(); nw.setDate(nw.getDate() + 7);
+      const nextWeekStr = nw.toISOString().split("T")[0];
+      // P1-2: pending = NOT submitted AND (no due date OR due in future or
+      // recently due within 14 days). Old assignments stay archived, not
+      // counted as pending forever.
+      const fourteenDaysAgo = new Date(); fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+      const pendingCutoff = fourteenDaysAgo.toISOString().split("T")[0];
+      const pending = allAssignments.filter(d => {
+        if (subIds.has(d.id)) return false;
+        const due = (d.data().dueDate as string) || "";
+        if (!due) return true; // no due date — count as pending
+        return due >= pendingCutoff;
+      }).length;
+      // Tests writer (CreateTest.tsx) writes `testDate`. Some legacy docs may
+      // have `date` instead — be tolerant. Filter to "scheduled within next 7
+      // days" (already-past tests are not "upcoming").
       const tests = allTests.filter(d => {
-        const dt = d.data().date;
-        return dt >= today && dt <= nw.toISOString().split("T")[0];
+        const data = d.data();
+        const dt = (data.testDate as string) || (data.date as string) || "";
+        if (!dt) return false;
+        return dt >= today && dt <= nextWeekStr;
       }).length;
       setLiveStats(prev => ({
         ...prev,
@@ -248,14 +433,24 @@ const DashboardPage = () => {
       processEnroll();
     });
 
-    // 3. Results + gradebook — single listener each (was 4)
+    // 3. Results + gradebook — single listener each (was 4).
+    // P1-3: wait until BOTH snapshots have arrived once before computing,
+    // so the avg doesn't briefly flash a partial value on the first render.
     let rSnap: any = null, gSnap: any = null;
     const processResults = () => {
+      if (rSnap === null || gSnap === null) return;
       const testRes = (rSnap?.docs || []).map((d: any) => ({ id: d.id, ...d.data() as any }));
       const gbRes = (gSnap?.docs || []).map((d: any) => {
         const data = d.data();
-        return { id: d.id, ...data, score: (data.mark / (data.maxMarks || 100)) * 100, subject: data.subject || data.className || "General", timestamp: data.updatedAt ? Timestamp.fromMillis(data.updatedAt) : Timestamp.now() };
+        // P0-2: type-safe Timestamp.fromMillis — string/NaN/etc. would throw
+        // and crash this listener, blanking out the entire avg score.
+        const ts = (typeof data.updatedAt === "number" && Number.isFinite(data.updatedAt))
+          ? Timestamp.fromMillis(data.updatedAt)
+          : Timestamp.now();
+        return { id: d.id, ...data, score: (data.mark / (data.maxMarks || 100)) * 100, subject: data.subject || data.className || "General", timestamp: ts };
       });
+      // Stash merged scores so buildAlerts can synthesize Excellent/Below-Passing alerts
+      setScoresRaw([...testRes, ...gbRes]);
       const all = Array.from(new Map([...testRes, ...gbRes].map(d => [d.id, d])).values())
         .sort((a, b) => (b.timestamp?.toDate()?.getTime() || 0) - (a.timestamp?.toDate()?.getTime() || 0));
       if (!all.length) {
@@ -273,13 +468,27 @@ const DashboardPage = () => {
       const avg = all.reduce((s, r) => s + (parseFloat(r.score) || 0), 0) / all.length;
       const latest = all[0];
       const grade = (s: number) => s >= 90 ? "A+" : s >= 80 ? "A" : s >= 70 ? "A-" : s >= 60 ? "B" : "C";
-      const scores = all.map(r => parseFloat(r.score) || 0);
-      const recent3 = scores.slice(0, 3);
-      const prev3 = scores.slice(3, 6);
+
+      // P3-3: trend bucketed by ACTUAL week boundaries (last 7 days vs prior
+      // 7 days), not the last-3-vs-prior-3 sample which could span 6 tests
+      // taken across 2 days and call that a "trend".
+      const nowMs = Date.now();
+      const weekMs = 7 * 24 * 60 * 60 * 1000;
+      const lastWeekStart = nowMs - weekMs;
+      const priorWeekStart = nowMs - 2 * weekMs;
+      const lastWeek: number[] = [];
+      const priorWeek: number[] = [];
+      for (const r of all) {
+        const ts = r.timestamp?.toDate?.()?.getTime?.() ?? 0;
+        const score = parseFloat(r.score);
+        if (!Number.isFinite(score)) continue;
+        if (ts >= lastWeekStart) lastWeek.push(score);
+        else if (ts >= priorWeekStart) priorWeek.push(score);
+      }
       let trendPct = 0;
-      if (recent3.length > 0 && prev3.length > 0) {
-        const recentAvg = recent3.reduce((a, b) => a + b, 0) / recent3.length;
-        const prevAvg = prev3.reduce((a, b) => a + b, 0) / prev3.length;
+      if (lastWeek.length > 0 && priorWeek.length > 0) {
+        const recentAvg = lastWeek.reduce((a, b) => a + b, 0) / lastWeek.length;
+        const prevAvg = priorWeek.reduce((a, b) => a + b, 0) / priorWeek.length;
         trendPct = Math.round(recentAvg - prevAvg);
       }
       setLiveStats(prev => ({
@@ -291,29 +500,77 @@ const DashboardPage = () => {
         hasScoreData: true,
       }));
     };
-    const u3 = onSnapshot(sq("results"), s => { rSnap = s; processResults(); }, onListenerError("results"));
-    const u4 = onSnapshot(sq("gradebook_scores"), s => { gSnap = s; processResults(); }, onListenerError("gradebook_scores"));
+    // results + gradebook_scores: DUAL-KEY per dual_query_pattern memory.
+    // Wraps the dual-snapshot helper to keep the same {docs:[]} shape that
+    // processResults expects.
+    const u3 = subscribePerStudent({
+      collection: "results",
+      student: studentData,
+      onChange: (docs) => { rSnap = { docs }; processResults(); },
+      onError: onListenerError("results"),
+    });
+    const u4 = subscribePerStudent({
+      collection: "gradebook_scores",
+      student: studentData,
+      onChange: (docs) => { gSnap = { docs }; processResults(); },
+      onError: onListenerError("gradebook_scores"),
+    });
 
-    // 4. Risks — single listener (was 2)
-    const u5 = onSnapshot(sq("risks"), snap => {
-      const unique = snap.docs
-        .map(d => ({ id: d.id, ...d.data() as any }))
-        .sort((a, b) => ((b.timestamp?.toDate()?.getTime() ?? 0) - (a.timestamp?.toDate()?.getTime() ?? 0)));
-      setRecentAlerts(unique.slice(0, 3).map(d => ({ id: d.id, title: d.issue, time: d.timestamp?.toDate() || new Date(), urgent: d.severity === "Critical" })));
-    }, onListenerError("risks"));
+    // 4. Risks — DUAL-KEY (id + email merge) per dual_query_pattern memory.
+    // Just stashes raw — synthesis happens in the buildAlerts useMemo below.
+    const u5 = subscribePerStudent({
+      collection: "risks",
+      student: studentData,
+      onChange: (docs) => {
+        setRisksRaw(docs.map(d => ({ id: d.id, ...d.data() as any })));
+      },
+      onError: onListenerError("risks"),
+    });
 
-    return () => [u1, u2, u3, u4, u5].forEach(u => u());
-  }, [studentData?.id, studentData?.schoolId]);
+    // 5. Parent notes — drives the "Note from teacher" alerts. Was missing
+    // from Dashboard entirely until 2026-05-21; AlertsPage had it from day 1.
+    const u6 = subscribePerStudent({
+      collection: "parent_notes",
+      student: studentData,
+      onChange: (docs) => {
+        setNotesRaw(docs.map(d => ({ id: d.id, ...d.data() as any })));
+      },
+      onError: onListenerError("parent_notes"),
+    });
+
+    // Stamp the last successful data load so the "Updated <time>" badge is honest.
+    setLastUpdatedAt(new Date());
+
+    return () => [u1, u2, u3, u4, u5, u6].forEach(u => u());
+    // studentData?.email IS REQUIRED in deps — per memory dual_query_pattern_studentid_email.
+    // Without it, listeners that race ahead of email resolution never re-subscribe
+    // with the email-side query, silently dropping any per-student doc whose
+    // studentId field doesn't match the parent's auth doc id.
+  }, [studentData?.id, studentData?.schoolId, studentData?.email, studentData?.studentEmail, refreshKey]);
+
+  // P0-3: assignments + tests are one-shot getDocs (live-onSnapshot would
+  // require nested listener management). To keep the UI honest about freshness,
+  // refetch when the parent returns to the tab. Combined with the visible
+  // "Updated <time>" badge replacing the dishonest "LIVE" pulse pill.
+  useEffect(() => {
+    const onFocus = () => {
+      if (mountedRef.current) setRefreshKey(k => k + 1);
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
 
   useEffect(() => {
     if (dataLoading) return;
     setSmartTips(generateSmartParentingTips(liveStats, studentData?.name?.split(" ")[0] || "", studentData?.grade));
   }, [dataLoading, liveStats.attendance, liveStats.avgScore, liveStats.pending, liveStats.tests, studentData?.grade, studentData?.name]);
 
-  // Week config: Fri/Sat/Sun = generate window; Mon = prev week report + block
+  // Week config: Fri/Sat/Sun = generate window; Mon = prev week report + block.
+  // P2-1: anchored to IST so a parent in another timezone doesn't see the
+  // wrong report-generate state.
   const getWeekConfig = () => {
-    const day = new Date().getDay(); // 0=Sun,1=Mon,...5=Fri,6=Sat
     const now = new Date();
+    const day = istDayOfWeek(now); // 0=Sun..6=Sat in IST
     // This week's Sunday (end of this reporting week)
     const thisSunday = new Date(now);
     thisSunday.setDate(now.getDate() + (day === 0 ? 0 : 7 - day));
@@ -418,10 +675,21 @@ const DashboardPage = () => {
       if (report) {
         setWeeklyReport(report);
         setPdfData({ ...reportData, weekEnd: weekEndStr });
-        try { localStorage.setItem(weekCacheKey, JSON.stringify(report)); } catch {}
+        // P3-1: surface storage-quota errors so the parent knows the report
+        // wasn't cached (will need re-generate on next visit). Other errors
+        // (private mode, etc.) we still swallow silently — non-critical.
+        try {
+          localStorage.setItem(weekCacheKey, JSON.stringify(report));
+        } catch (storageErr: unknown) {
+          const err = storageErr as { name?: string };
+          if (err?.name === "QuotaExceededError") {
+            toast.warning("Report shown but couldn't be saved — browser storage is full.");
+          }
+        }
       }
     } catch (e) {
       console.error("Weekly report generation failed:", e);
+      toast.error("Couldn't generate weekly report. Please try again.");
     } finally {
       setWeeklyLoading(false);
     }
@@ -441,8 +709,14 @@ const DashboardPage = () => {
         "position:fixed;top:0;left:0;z-index:99999;background:#fff;overflow:auto;";
     }
 
+    // P3-5: capture wrapper ref locally — if user navigates away mid-render,
+    // wrapper.style assignment in the catch/finally still works on the
+    // (still-DOM-attached) original element rather than the unmounted one.
+    const restoreWrapper = () => {
+      if (wrapper && wrapper.isConnected) wrapper.style.cssText = origStyle;
+    };
+
     try {
-      // Give browser one frame to paint charts
       await new Promise(r => setTimeout(r, 300));
 
       const html2canvas = (await import("html2canvas")).default;
@@ -458,14 +732,12 @@ const DashboardPage = () => {
         windowHeight: el.scrollHeight,
       });
 
-      // Restore hidden state immediately after capture
-      if (wrapper) wrapper.style.cssText = origStyle;
+      restoreWrapper();
 
       const imgData = canvas.toDataURL("image/png");
-      // Landscape A4
       const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-      const pageW = pdf.internal.pageSize.getWidth();  // 297mm
-      const pageH = pdf.internal.pageSize.getHeight(); // 210mm
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
       const imgH = (canvas.height * pageW) / canvas.width;
 
       let y = 0;
@@ -477,38 +749,70 @@ const DashboardPage = () => {
       pdf.save(`${studentData?.name || "Student"}_WeeklyReport_${new Date().toISOString().split("T")[0]}.pdf`);
     } catch (e) {
       console.error("PDF generation failed:", e);
-      if (wrapper) wrapper.style.cssText = origStyle;
+      restoreWrapper();
+      toast.error("Couldn't generate PDF. Please try again.");
     } finally {
-      setPdfDownloading(false);
+      if (mountedRef.current) setPdfDownloading(false);
     }
   };
 
-  useEffect(() => {
-    if (!studentData?.id || dataLoading) return;
-    // Skip AI insight call if there's no real data — feeding "null"/zero stats
-    // to the AI produces hallucinated narratives about a student that hasn't
-    // done anything yet.
-    const noDataYet =
-      !liveStats.hasAttendanceData &&
-      !liveStats.hasAssignmentData &&
-      !liveStats.hasTestData &&
-      !liveStats.hasScoreData;
-    if (noDataYet) {
-      setAiInsights(null);
-      return;
-    }
-    ParentAIController.getDashboardInsights({
-      child_name: studentData.name,
-      attendance: liveStats.attendance === null ? "No data" : `${liveStats.attendance}%`,
-      avg_score: liveStats.avgScore > 0 ? `${liveStats.avgScore}%` : "No data",
-      pending_assignments: liveStats.pending ?? 0,
-      upcoming_tests: liveStats.tests ?? 0,
-      recent_grade: liveStats.recentGrade,
-      recent_subject: liveStats.recentSubject,
-      grade: studentData.grade || "—",
-      recent_alerts: recentAlerts.map(a => a.title).slice(0, 3),
-    }).then(r => { if (r.status === "success") setAiInsights(r.data); }).catch(() => {});
-  }, [studentData?.id, dataLoading]);
+  // Derived recent alerts — synthesized via the SHARED buildAlerts lib that
+  // AlertsPage also uses. Single source of truth: extending alert logic here
+  // automatically improves the AlertsPage too. Slice to top 3 (already sorted
+  // by priority: High → Medium → Good News → General). Maps to the small UI
+  // shape with subject chip + urgency color.
+  const recentAlerts = useMemo(() => {
+    const all = buildAlerts({
+      studentName: studentData?.name || "Student",
+      risks: risksRaw,
+      attendance: attendanceRaw,
+      scores: scoresRaw,
+      assignments: assignmentsRaw,
+      submissions: submissionsRaw,
+      notes: notesRaw,
+    });
+    const top3 = all.slice(0, 3);
+    return top3.map(a => ({
+      id: a.id,
+      title: a.title,
+      time: a.createdAt?.toDate ? a.createdAt.toDate() : (a.createdAt instanceof Date ? a.createdAt : new Date()),
+      urgent: a.priority === "High Priority",
+      subject: a.subject || "",
+      category: a.subject || a.category || "General",
+    }));
+  }, [studentData?.name, risksRaw, attendanceRaw, scoresRaw, assignmentsRaw, submissionsRaw, notesRaw]);
+
+  // P0-1: rule-based child summary — replaces ParentAIController.getDashboardInsights
+  // which was a real AI call (~$0.001-0.005 per dashboard load) just narrating
+  // the same numbers already on the cards above. Per memory parent_dashboard_ai_strategy.
+  const aiInsights = useMemo(() => {
+    if (dataLoading) return null;
+    const hasAnyData =
+      liveStats.hasAttendanceData ||
+      liveStats.hasAssignmentData ||
+      liveStats.hasTestData ||
+      liveStats.hasScoreData;
+    if (!hasAnyData) return null;
+    return {
+      child_summary_narrative: buildChildSummaryNarrative({
+        childName: studentData?.name?.split(" ")[0] || "Student",
+        attendance: liveStats.attendance,
+        avgScore: liveStats.avgScore,
+        pending: liveStats.pending,
+        tests: liveStats.tests,
+        recentGrade: liveStats.recentGrade,
+        recentSubject: liveStats.recentSubject,
+        trendPct: liveStats.trendPct,
+        hasAnyData,
+      }),
+    };
+  }, [
+    dataLoading,
+    liveStats.hasAttendanceData, liveStats.hasAssignmentData, liveStats.hasTestData, liveStats.hasScoreData,
+    liveStats.attendance, liveStats.avgScore, liveStats.pending, liveStats.tests,
+    liveStats.recentGrade, liveStats.recentSubject, liveStats.trendPct,
+    studentData?.name,
+  ]);
 
   if (studentData?.status === "Invited") return (
     <div className="h-[80vh] flex flex-col items-center justify-center p-10 text-center gap-4">
@@ -536,32 +840,15 @@ const DashboardPage = () => {
      MOBILE — Edullent Indigo Apple UI
      ═══════════════════════════════════════════════════════════════ */
   if (isMobile) {
-    // ── Bright Blue Apple UI tokens (matches Performance page) ──
-    const IND = "#0055FF";
-    const IND2 = "#1166FF";
-    const IND3 = "#4499FF";
-    const BG = "#EEF4FF";
-    const BG2 = "#E0ECFF";
-    const T1 = "#001040";
-    const T2 = "#002080";
-    const T3 = "#5070B0";
-    const T4 = "#99AACC";
-    const SEP = "rgba(0,85,255,0.07)";
-    const IND_BDR = "rgba(0,85,255,0.10)";
-    const IND_SOFT = "rgba(0,85,255,0.05)";
-    const GREEN = "#00C853";
-    const GREEN_S = "rgba(0,200,83,0.12)";
-    const GREEN_B = "rgba(0,200,83,0.25)";
-    const ORANGE = "#FF8800";
-    const ORANGE_S = "rgba(255,136,0,0.12)";
-    const ORANGE_B = "rgba(255,136,0,0.25)";
-    const ROSE = "#FF3355";
-    const ROSE_S = "rgba(255,51,85,0.10)";
-    const IND_DARK_GRAD = "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)";
-    const SH = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.09), 0 10px 28px rgba(0,85,255,0.11)";
-    const SH_LG = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 20px 48px rgba(0,85,255,0.14)";
-    const SH_BTN = "0 4px 14px rgba(0,85,255,0.32), 0 1px 4px rgba(0,85,255,0.18)";
-    void BG2;
+    // P1-4: tokens sourced from module-level T_DASH — single source of truth.
+    // Destructure all 22 tokens (noUnusedLocals:false in tsconfig) to avoid
+    // "X is not defined" runtime errors from any usage we might have missed.
+    const {
+      IND, IND2, IND3, BG, T1, T2, T3, T4, SEP, IND_BDR, IND_SOFT,
+      GREEN, GREEN_S, GREEN_B, ORANGE, ORANGE_S, ORANGE_B, ROSE, ROSE_S,
+      IND_DARK_GRAD, SH, SH_LG, SH_BTN,
+    } = T_DASH;
+    void IND2; void T2; void ROSE_S; // suppress unused warnings if any branch doesn't use these
     // Academic Health ring
     const scorePct = Math.min(liveStats.avgScore, 100);
     const ringR = 40, ringCirc = 2 * Math.PI * ringR;
@@ -704,12 +991,19 @@ const DashboardPage = () => {
           <div className="flex items-center justify-between px-5 pt-[14px] pb-[12px]" style={{ borderBottom: `0.5px solid ${IND_BDR}` }}>
             <div className="flex items-center gap-2">
               <Sparkles className="w-[12px] h-[12px]" style={{ color: IND }} strokeWidth={2.4} />
-              <span className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: T4 }}>Edullent AI · Live Summary</span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: T4 }}>Edullent · Live Summary</span>
             </div>
-            <div className="flex items-center gap-[5px] px-[10px] py-[3px] rounded-full" style={{ background: GREEN_S, border: `0.5px solid ${GREEN_B}` }}>
-              <div className="w-[5px] h-[5px] rounded-full animate-pulse" style={{ background: GREEN, boxShadow: `0 0 0 2px ${GREEN_S}` }} />
-              <span className="text-[10px] font-bold tracking-[0.06em]" style={{ color: GREEN }}>LIVE</span>
-            </div>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setRefreshKey(k => k + 1); setLastUpdatedAt(new Date()); }}
+              className="flex items-center gap-[5px] px-[10px] py-[3px] rounded-full active:scale-[0.96] transition-transform"
+              style={{ background: IND_SOFT, border: `0.5px solid ${IND_BDR}` }}
+              aria-label="Refresh dashboard data">
+              <RefreshCw className="w-[10px] h-[10px]" style={{ color: T3 }} />
+              <span className="text-[10px] font-bold tracking-[0.06em]" style={{ color: T3 }}>
+                {lastUpdatedAt ? `Updated ${timeAgo(lastUpdatedAt)}` : "Updating…"}
+              </span>
+            </button>
           </div>
 
           {dataLoading ? (
@@ -795,10 +1089,9 @@ const DashboardPage = () => {
                     {aiInsights.child_summary_narrative.replace(studentData?.name || "", "").trim()}
                   </p>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="w-3 h-3 animate-spin" style={{ color: IND }} />
-                    <p className="text-[11px] italic" style={{ color: T4 }}>AI summary generating...</p>
-                  </div>
+                  <p className="text-[11px] italic" style={{ color: T4 }}>
+                    No activity yet — summary will appear when scores or attendance are recorded.
+                  </p>
                 )}
               </div>
             </>
@@ -832,7 +1125,11 @@ const DashboardPage = () => {
             </div>
             <div className="text-[22px] font-bold text-white" style={{ letterSpacing: "-0.6px" }}>{studentData?.name || "Student"}</div>
             <div className="text-[14px] mt-[3px]" style={{ color: "rgba(255,255,255,0.52)" }}>
-              {studentMeta.className !== "—" ? `Grade ${studentMeta.className}` : studentData?.grade ? `Grade ${studentData.grade}` : "Grade —"}
+              {studentMeta.className !== "—"
+                ? classDisplay(studentMeta.className)
+                : studentData?.grade
+                  ? classDisplay(String(studentData.grade))
+                  : "Grade —"}
               {teacherInfo.name !== "—" ? ` — ${teacherInfo.name}` : ""}
             </div>
             <div className="grid grid-cols-2 mt-5 rounded-[15px] overflow-hidden" style={{ gap: "1px", background: "rgba(255,255,255,0.10)" }}>
@@ -862,12 +1159,20 @@ const DashboardPage = () => {
             <div className="space-y-3">
               {recentAlerts.map(alert => (
                 <div key={alert.id} className="flex items-start gap-3 p-3 rounded-xl"
-                  style={{ background: alert.urgent ? "rgba(245,160,0,0.08)" : "rgba(18,192,78,0.08)" }}>
+                  style={{ background: alert.urgent ? "rgba(255,136,0,0.08)" : "rgba(0,200,83,0.08)" }}>
                   <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-                    style={{ background: alert.urgent ? "rgba(245,160,0,0.15)" : "rgba(18,192,78,0.15)", color: alert.urgent ? ORANGE : GREEN }}>
+                    style={{ background: alert.urgent ? "rgba(255,136,0,0.15)" : "rgba(0,200,83,0.15)", color: alert.urgent ? ORANGE : GREEN }}>
                     {alert.urgent ? <Clock className="w-3.5 h-3.5" /> : <CheckCircle className="w-3.5 h-3.5" />}
                   </div>
-                  <div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      {alert.category && (
+                        <span className="text-[9px] font-bold uppercase tracking-[0.08em] px-1.5 py-0.5 rounded"
+                          style={{ background: alert.urgent ? "rgba(255,136,0,0.16)" : "rgba(0,85,255,0.10)", color: alert.urgent ? ORANGE : IND, letterSpacing: "0.4px" }}>
+                          {alert.category}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm font-medium leading-snug" style={{ color: T1 }}>{alert.title}</p>
                     <p className="text-xs mt-0.5" style={{ color: T3 }}>{timeAgo(alert.time)}</p>
                   </div>
@@ -1128,32 +1433,15 @@ const DashboardPage = () => {
      DESKTOP — Edullent Indigo Apple UI (matches mobile language)
      ═══════════════════════════════════════════════════════════════ */
   {
-    // Bright Blue Apple UI tokens (matches Performance page)
-    const IND = "#0055FF";
-    const IND2 = "#1166FF";
-    const IND3 = "#4499FF";
-    const BG = "#EEF4FF";
-    const BG2 = "#E0ECFF";
-    const T1 = "#001040";
-    const T2 = "#002080";
-    const T3 = "#5070B0";
-    const T4 = "#99AACC";
-    const SEP = "rgba(0,85,255,0.07)";
-    const IND_BDR = "rgba(0,85,255,0.10)";
-    const IND_SOFT = "rgba(0,85,255,0.05)";
-    const GREEN = "#00C853";
-    const GREEN_S = "rgba(0,200,83,0.12)";
-    const GREEN_B = "rgba(0,200,83,0.25)";
-    const ORANGE = "#FF8800";
-    const ORANGE_S = "rgba(255,136,0,0.12)";
-    const ORANGE_B = "rgba(255,136,0,0.25)";
-    const ROSE = "#FF3355";
-    const ROSE_S = "rgba(255,51,85,0.10)";
-    const IND_DARK_GRAD = "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)";
-    const SH = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.09), 0 10px 28px rgba(0,85,255,0.11)";
-    const SH_LG = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 20px 48px rgba(0,85,255,0.14)";
-    const SH_BTN = "0 4px 14px rgba(0,85,255,0.32), 0 1px 4px rgba(0,85,255,0.18)";
-    void BG2;
+    // P1-4: tokens sourced from module-level T_DASH — single source of truth.
+    // Destructure all 22 tokens (noUnusedLocals:false in tsconfig) to avoid
+    // "X is not defined" runtime errors from any usage we might have missed.
+    const {
+      IND, IND2, IND3, BG, T1, T2, T3, T4, SEP, IND_BDR, IND_SOFT,
+      GREEN, GREEN_S, GREEN_B, ORANGE, ORANGE_S, ORANGE_B, ROSE, ROSE_S,
+      IND_DARK_GRAD, SH, SH_LG, SH_BTN,
+    } = T_DASH;
+    void ROSE_S; // suppress unused warning
 
     const scorePct = Math.min(liveStats.avgScore, 100);
     const ringR = 56, ringCirc = 2 * Math.PI * ringR;
@@ -1181,14 +1469,7 @@ const DashboardPage = () => {
               <p className="text-[15px] mt-2" style={{ color: T3, letterSpacing: "-0.1px" }}>Here's how {childFirstName} is doing today</p>
             </div>
             <div className="flex items-center gap-3">
-              <div className="flex flex-col items-end">
-                <span className="text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: T4 }}>
-                  {currentTime.toLocaleDateString("en-US", { weekday: "long" })}
-                </span>
-                <span className="text-[14px] font-semibold mt-[2px]" style={{ color: T2 }}>
-                  {currentTime.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
-                </span>
-              </div>
+              <LiveDateDisplay T2={T2} T4={T4} />
               <div className="w-12 h-12 rounded-[14px] flex items-center justify-center text-[14px] font-bold text-white"
                 style={{ background: `linear-gradient(140deg, ${IND} 0%, ${IND2} 100%)`, boxShadow: "0 4px 14px rgba(0,85,255,0.28)" }}>
                 {userInitials}
@@ -1285,7 +1566,11 @@ const DashboardPage = () => {
                 </div>
                 <div className="text-[24px] font-bold text-white" style={{ letterSpacing: "-0.6px" }}>{studentData?.name || "Student"}</div>
                 <div className="text-[14px] mt-[3px]" style={{ color: "rgba(255,255,255,0.52)" }}>
-                  {studentMeta.className !== "—" ? `Grade ${studentMeta.className}` : studentData?.grade ? `Grade ${studentData.grade}` : "Grade —"}
+                  {studentMeta.className !== "—"
+                    ? classDisplay(studentMeta.className)
+                    : studentData?.grade
+                      ? classDisplay(String(studentData.grade))
+                      : "Grade —"}
                   {studentMeta.rollNo !== "—" ? ` · Roll ${studentMeta.rollNo}` : ""}
                 </div>
                 <div className="grid grid-cols-2 mt-5 rounded-[15px] overflow-hidden" style={{ gap: "1px", background: "rgba(255,255,255,0.10)" }}>
@@ -1364,12 +1649,19 @@ const DashboardPage = () => {
             <div className="flex items-center justify-between px-6 pt-[14px] pb-[12px]" style={{ borderBottom: `0.5px solid ${IND_BDR}` }}>
               <div className="flex items-center gap-2">
                 <Sparkles className="w-[13px] h-[13px]" style={{ color: IND }} strokeWidth={2.4} />
-                <span className="text-[11px] font-bold uppercase tracking-[0.12em]" style={{ color: T4 }}>Edullent AI · Live Summary</span>
+                <span className="text-[11px] font-bold uppercase tracking-[0.12em]" style={{ color: T4 }}>Edullent · Live Summary</span>
               </div>
-              <div className="flex items-center gap-[5px] px-3 py-[4px] rounded-full" style={{ background: GREEN_S, border: `0.5px solid ${GREEN_B}` }}>
-                <div className="w-[6px] h-[6px] rounded-full animate-pulse" style={{ background: GREEN, boxShadow: `0 0 0 2px ${GREEN_S}` }} />
-                <span className="text-[10px] font-bold tracking-[0.06em]" style={{ color: GREEN }}>LIVE</span>
-              </div>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setRefreshKey(k => k + 1); setLastUpdatedAt(new Date()); }}
+                className="flex items-center gap-[5px] px-3 py-[4px] rounded-full active:scale-[0.96] transition-transform hover:opacity-80"
+                style={{ background: IND_SOFT, border: `0.5px solid ${IND_BDR}` }}
+                aria-label="Refresh dashboard data">
+                <RefreshCw className="w-[11px] h-[11px]" style={{ color: T3 }} />
+                <span className="text-[10px] font-bold tracking-[0.06em]" style={{ color: T3 }}>
+                  {lastUpdatedAt ? `Updated ${timeAgo(lastUpdatedAt)}` : "Updating…"}
+                </span>
+              </button>
             </div>
 
             {dataLoading ? (
@@ -1454,10 +1746,9 @@ const DashboardPage = () => {
                       {aiInsights.child_summary_narrative.replace(studentData?.name || "", "").trim()}
                     </p>
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="w-3 h-3 animate-spin" style={{ color: IND }} />
-                      <p className="text-[12px] italic" style={{ color: T4 }}>AI summary generating...</p>
-                    </div>
+                    <p className="text-[12px] italic" style={{ color: T4 }}>
+                      No activity yet — summary will appear when scores or attendance are recorded.
+                    </p>
                   )}
                 </div>
               </>
@@ -1481,12 +1772,20 @@ const DashboardPage = () => {
                 <div className="space-y-3">
                   {recentAlerts.map(alert => (
                     <div key={alert.id} className="flex items-start gap-3 p-3 rounded-xl"
-                      style={{ background: alert.urgent ? "rgba(245,160,0,0.08)" : "rgba(18,192,78,0.08)" }}>
+                      style={{ background: alert.urgent ? "rgba(255,136,0,0.08)" : "rgba(0,200,83,0.08)" }}>
                       <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-                        style={{ background: alert.urgent ? "rgba(245,160,0,0.15)" : "rgba(18,192,78,0.15)", color: alert.urgent ? ORANGE : GREEN }}>
+                        style={{ background: alert.urgent ? "rgba(255,136,0,0.15)" : "rgba(0,200,83,0.15)", color: alert.urgent ? ORANGE : GREEN }}>
                         {alert.urgent ? <Clock className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
                       </div>
-                      <div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          {alert.category && (
+                            <span className="text-[9px] font-bold uppercase tracking-[0.08em] px-1.5 py-0.5 rounded"
+                              style={{ background: alert.urgent ? "rgba(255,136,0,0.16)" : "rgba(0,85,255,0.10)", color: alert.urgent ? ORANGE : IND, letterSpacing: "0.4px" }}>
+                              {alert.category}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[14px] font-medium leading-snug" style={{ color: T1 }}>{alert.title}</p>
                         <p className="text-[12px] mt-0.5" style={{ color: T3 }}>{timeAgo(alert.time)}</p>
                       </div>

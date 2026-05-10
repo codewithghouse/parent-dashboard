@@ -206,13 +206,25 @@ export const parentAIProxy = functions
 
     const openai = new OpenAI({ apiKey: openaiApiKey.value() });
 
+    const DEFAULT_SYSTEM_PROMPT =
+      "You are Edullent AI, a friendly educational assistant for school students and their parents. Always respond in simple, encouraging language.";
+
     const {
       prompt,
-      systemPrompt = "You are Edullent AI, a friendly educational assistant for school students and their parents. Always respond in simple, encouraging language.",
       jsonMode = true,
       imageBase64,
       model,
     } = data || {};
+
+    // Defensive systemPrompt resolution: destructure default only fires for
+    // `undefined`, but Firebase Callable SDK can serialize client-side
+    // `undefined` as `null` — which falls through the default and trips
+    // the type check with a misleading "too long" error. Coerce null /
+    // wrong-type / empty to the default explicitly.
+    let systemPrompt = (data || {}).systemPrompt;
+    if (typeof systemPrompt !== "string" || systemPrompt.length === 0) {
+      systemPrompt = DEFAULT_SYSTEM_PROMPT;
+    }
 
     if (typeof prompt !== "string" || prompt.length === 0) {
       throw new functions.https.HttpsError("invalid-argument", "prompt is required.");
@@ -220,8 +232,10 @@ export const parentAIProxy = functions
     if (prompt.length > MAX_PROMPT_CHARS) {
       throw new functions.https.HttpsError("invalid-argument", "prompt too long.");
     }
-    if (typeof systemPrompt !== "string" || systemPrompt.length > MAX_PROMPT_CHARS) {
-      throw new functions.https.HttpsError("invalid-argument", "systemPrompt too long.");
+    if (systemPrompt.length > MAX_PROMPT_CHARS) {
+      // Truncate gracefully rather than throwing — caller may have sent a
+      // legitimately long system prompt; better to clip than fail the report.
+      systemPrompt = systemPrompt.slice(0, MAX_PROMPT_CHARS);
     }
     if (imageBase64 !== undefined) {
       if (typeof imageBase64 !== "string") {

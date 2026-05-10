@@ -29,7 +29,17 @@ const proxyFn = httpsCallable<
 export async function callAI(prompt: string, options: CallAIOptions = {}): Promise<any> {
   const { jsonMode = true, imageBase64, model, systemPrompt } = options;
 
-  const result = await proxyFn({ prompt, systemPrompt, jsonMode, imageBase64, model });
+  // Build payload with only DEFINED keys. Firebase Callable SDK serializes
+  // explicit `undefined`/`null` values as `null` server-side — which then
+  // bypasses the server's destructure default and fails type validation
+  // with a misleading "systemPrompt too long" error. Skip the key entirely
+  // so the server's default kicks in.
+  const payload: Record<string, unknown> = { prompt, jsonMode };
+  if (typeof systemPrompt === "string" && systemPrompt.length > 0) payload.systemPrompt = systemPrompt;
+  if (typeof imageBase64 === "string" && imageBase64.length > 0) payload.imageBase64 = imageBase64;
+  if (typeof model === "string" && model.length > 0) payload.model = model;
+
+  const result = await proxyFn(payload as Parameters<typeof proxyFn>[0]);
   const content = result.data?.content;
 
   if (!content) throw new Error("Empty AI response from server.");

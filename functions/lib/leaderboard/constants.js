@@ -15,10 +15,11 @@ exports.WEIGHTS = {
 };
 // Schedule expressions in cron format (UTC interpreted via TIMEZONE).
 exports.SCHEDULE = {
-    // ⚠️ TEMPORARY for testing — runs every 15 minutes so a fresh leaderboard
-    //    appears within 15 min of deploy. REVERT TO "0 2 * * 1" before production.
-    //    Original Mon-02:00-IST schedule:  "0 2 * * 1"
-    leaderboardCron: "*/15 * * * *",
+    // Production: Monday 2:00 AM IST — fresh leaderboard for the week ahead.
+    // Was temporarily on "*/5 * * * *" 2026-05-21 for live verification of the
+    // dual-key + gradebook-merge + IST date + idempotency-fingerprint fixes.
+    // Reverted to weekly cadence after user confirmed all fixes landed.
+    leaderboardCron: "0 2 * * 1",
     // Daily 06:00 IST — runs every morning to update action progress.
     actionCheckCron: "0 6 * * *",
 };

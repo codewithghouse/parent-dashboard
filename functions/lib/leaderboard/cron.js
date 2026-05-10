@@ -142,6 +142,7 @@ async function processClass(schoolId, classId, weekId) {
     const now = Date.now();
     const generatedAt = now;
     const subjectClassAvgs = (0, metrics_1.aggregateSubjectAverages)(snapshots);
+    const subjectRankings = (0, ranking_1.buildSubjectRankings)(snapshots);
     const leaderboardDoc = {
         classId,
         schoolId,
@@ -152,6 +153,8 @@ async function processClass(schoolId, classId, weekId) {
         classAverage,
         rankings,
         generatedAt,
+        subjectRankings,
+        classSubjectAverages: subjectClassAvgs,
     };
     const batch = db.batch();
     batch.set(db.doc(`leaderboards/${schoolId}_${classId}/weeks/${weekId}`), leaderboardDoc);

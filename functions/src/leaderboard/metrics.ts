@@ -43,6 +43,51 @@ function tsToMillis(v: any): number {
 }
 
 /**
+ * Dual-key per-student fetch — runs TWO queries (by `studentId` AND by
+ * `studentEmail`) in parallel and merges by doc id.
+ *
+ * Why this exists in the cron (not just on the client):
+ * Per memory `dual_query_pattern_studentid_email`, teacher / principal write
+ * paths don't always carry the canonical `studentId` — many docs are written
+ * with only `studentEmail`. A single-key query on the cron silently misses
+ * those docs, producing per-student snapshots with marks: 0, enrolledSubjects: 0,
+ * etc. This was caught 2026-05-21 in the leaderboard cron logs: most students
+ * had `enrolledSubjects: 0` even though they were enrolled in classes.
+ *
+ * Email side falls back to empty docs[] if the composite index isn't deployed
+ * — keeps the studentId side working unconditionally.
+ */
+async function fetchPerStudentDual(
+  collection: string,
+  schoolId: string,
+  studentId: string,
+  studentEmail: string,
+): Promise<admin.firestore.QueryDocumentSnapshot[]> {
+  const db = admin.firestore();
+  const queries: Array<Promise<admin.firestore.QuerySnapshot | { docs: admin.firestore.QueryDocumentSnapshot[] }>> = [
+    db.collection(collection)
+      .where("schoolId", "==", schoolId)
+      .where("studentId", "==", studentId)
+      .get(),
+  ];
+  if (studentEmail) {
+    queries.push(
+      db.collection(collection)
+        .where("schoolId", "==", schoolId)
+        .where("studentEmail", "==", studentEmail)
+        .get()
+        .catch(() => ({ docs: [] as admin.firestore.QueryDocumentSnapshot[] })),
+    );
+  }
+  const snaps = await Promise.all(queries);
+  const map = new Map<string, admin.firestore.QueryDocumentSnapshot>();
+  for (const s of snaps) {
+    for (const d of s.docs) map.set(d.id, d);
+  }
+  return Array.from(map.values());
+}
+
+/**
  * Try every field name the codebase has used for an assignment's due date.
  * Order matters: pick the first non-zero value. If a school migrated their
  * data they might have multiple variants on the same doc.
@@ -107,34 +152,79 @@ export async function deriveStudentSnapshot(
   const name: string = data.name || "Unknown";
   const enrolledAt =
     tsToMillis(data.enrolledAt) || tsToMillis(data.createdAt) || Date.now();
+  // DUAL-KEY: read student's email so all per-student fetches can merge
+  // by-id + by-email matches (memory: dual_query_pattern_studentid_email).
+  const studentEmail: string = (data.email || data.studentEmail || "").toString().trim().toLowerCase();
 
   const db = admin.firestore();
 
   // ── 1. Marks (smoothed: last 30 days, not just this week) ────────────
+  // Source-of-truth for "what subjects this student has" is the `enrollments`
+  // collection — each enrollment doc represents one student-class-subject combo.
+  // Parent ClassesPage renders 1 card per enrollment using exactly this source.
+  // We seed `subjectScores` with EVERY enrolled subject (score = 0 until data
+  // arrives) so the leaderboard subject grid covers ALL of the child's subjects,
+  // not just ones with scores yet.
+  //
+  // Read BOTH test_scores AND gradebook_scores — they are co-canonical per
+  // memory `owner_dashboard_alternate_data_sources`. Reading only one drops
+  // ~40% of records and (worse) leaves entire subjects out of the leaderboard
+  // breakdown when teachers use the gradebook column workflow.
   const lookbackStart = weekEnd - MARKS_LOOKBACK_DAYS * MS_PER_DAY;
-  const testScoresSnap = await db
-    .collection("test_scores")
-    .where("schoolId", "==", schoolId)
-    .where("studentId", "==", studentId)
-    .get();
-  const recentScores = testScoresSnap.docs.filter((d) => {
+  // ALL per-student reads use dual-key (id + email merge). Was previously
+  // single-key which silently dropped any doc whose teacher writer used only
+  // studentEmail. Logs 2026-05-21 showed most students with marks: 0 +
+  // enrolledSubjects: 0 — root cause of "leaderboard missing breakdown".
+  const [testScoresDocs, gradebookScoresDocs, enrollmentDocs] = await Promise.all([
+    fetchPerStudentDual("test_scores", schoolId, studentId, studentEmail),
+    fetchPerStudentDual("gradebook_scores", schoolId, studentId, studentEmail),
+    fetchPerStudentDual("enrollments", schoolId, studentId, studentEmail),
+  ]);
+
+  // Per-collection time field is different (memory: bug_pattern_filterbytime_field_drift):
+  //   test_scores      → timestamp (Firestore Timestamp)
+  //   gradebook_scores → updatedAt (number ms)
+  const recentTestScores = testScoresDocs.filter((d) => {
     const ts = tsToMillis(d.data().timestamp);
     return ts >= lookbackStart && ts <= weekEnd;
   });
-  const marksAvg = recentScores.length
-    ? Math.round(
-        recentScores.reduce((sum, d) => {
-          const v = d.data();
-          // Prefer percentage; fall back to score/maxScore if percentage is missing.
-          const pct =
-            typeof v.percentage === "number"
-              ? v.percentage
-              : typeof v.score === "number" && typeof v.maxScore === "number" && v.maxScore > 0
-              ? (v.score / v.maxScore) * 100
-              : 0;
-          return sum + pct;
-        }, 0) / recentScores.length,
-      )
+  const recentGradebookScores = gradebookScoresDocs.filter((d) => {
+    const v = d.data();
+    const ts = tsToMillis(v.updatedAt) || tsToMillis(v.createdAt);
+    return ts >= lookbackStart && ts <= weekEnd;
+  });
+
+  // Normalise each doc to a percentage. test_scores writes `percentage`,
+  // gradebook_scores writes `mark` + `maxMarks` (memory: bug_pattern_score_field_singular_mark).
+  type ScoreRow = { pct: number; subject: string };
+  const rows: ScoreRow[] = [];
+  for (const d of recentTestScores) {
+    const v = d.data();
+    const pct =
+      typeof v.percentage === "number"
+        ? v.percentage
+        : typeof v.score === "number" && typeof v.maxScore === "number" && v.maxScore > 0
+        ? (v.score / v.maxScore) * 100
+        : null;
+    if (pct === null) continue;
+    rows.push({ pct, subject: readSubject(v) });
+  }
+  for (const d of recentGradebookScores) {
+    const v = d.data();
+    const pct =
+      typeof v.percentage === "number"
+        ? v.percentage
+        : typeof v.mark === "number" && typeof v.maxMarks === "number" && v.maxMarks > 0
+        ? (v.mark / v.maxMarks) * 100
+        : typeof v.marks === "number" && typeof v.maxMarks === "number" && v.maxMarks > 0
+        ? (v.marks / v.maxMarks) * 100
+        : null;
+    if (pct === null) continue;
+    rows.push({ pct, subject: readSubject(v) });
+  }
+
+  const marksAvg = rows.length
+    ? Math.round(rows.reduce((sum, r) => sum + r.pct, 0) / rows.length)
     : 0;
 
   // H1 FIX: average per subject across all tests in the lookback window.
@@ -142,36 +232,46 @@ export async function deriveStudentSnapshot(
   // which produced non-deterministic rankings when a student took the same
   // subject's test multiple times — Firestore returned docs in random order
   // so the displayed score depended on storage-layer arbitrary ordering.
+  // Now also covers gradebook_scores so EVERY subject the teacher records
+  // shows up in the breakdown, not just the ones with formal tests.
   const subjectAccumulator: Record<string, { sum: number; n: number }> = {};
-  for (const d of recentScores) {
-    const v = d.data();
-    const subj = readSubject(v);
-    const pct =
-      typeof v.percentage === "number"
-        ? v.percentage
-        : typeof v.score === "number" && typeof v.maxScore === "number" && v.maxScore > 0
-        ? (v.score / v.maxScore) * 100
-        : 0;
-    if (!subjectAccumulator[subj]) subjectAccumulator[subj] = { sum: 0, n: 0 };
-    subjectAccumulator[subj].sum += pct;
-    subjectAccumulator[subj].n += 1;
+  for (const r of rows) {
+    if (!subjectAccumulator[r.subject]) subjectAccumulator[r.subject] = { sum: 0, n: 0 };
+    subjectAccumulator[r.subject].sum += r.pct;
+    subjectAccumulator[r.subject].n += 1;
   }
   const subjectScores: Record<string, number> = {};
   for (const [subj, { sum, n }] of Object.entries(subjectAccumulator)) {
     subjectScores[subj] = Math.round(sum / n);
   }
 
+  // Seed every enrolled subject with 0 if not already present from scores.
+  // This ensures the leaderboard subject grid covers ALL subjects the child
+  // is enrolled in (matching ClassesPage), even when no score has been
+  // recorded yet — so a parent looking at the breakdown sees the complete
+  // picture instead of a half-filled list.
+  for (const e of enrollmentDocs) {
+    const v = e.data();
+    const enrolledSubjectRaw = v.subject || v.subjectName || v.Subject || v.name || v.title || v.courseName || v.course || "";
+    if (!enrolledSubjectRaw) continue;
+    const subj = readSubject({ subject: enrolledSubjectRaw });
+    if (!(subj in subjectScores)) subjectScores[subj] = 0;
+  }
+
   // ── 2. Attendance (this week only) ───────────────────────────────────
+  // Dual-key: fetch ALL attendance for this student (by id OR email) then
+  // post-filter by date string in-memory. Combining `where("date","in",...)`
+  // with the email side requires the same composite index — to avoid that
+  // deploy step, post-filter instead.
   const dateStrings = isoDatesInRange(weekStart, weekEnd);
-  // Firestore `in` clause caps at 30 values; a week is 7 — safe.
-  const attendanceSnap = await db
-    .collection("attendance")
-    .where("schoolId", "==", schoolId)
-    .where("studentId", "==", studentId)
-    .where("date", "in", dateStrings)
-    .get();
-  const totalDays = attendanceSnap.size;
-  const presentDays = attendanceSnap.docs.filter(
+  const dateSet = new Set(dateStrings);
+  const allAttendanceDocs = await fetchPerStudentDual("attendance", schoolId, studentId, studentEmail);
+  const attendanceDocsThisWeek = allAttendanceDocs.filter((d) => {
+    const dateStr = (d.data().date as string) || "";
+    return dateSet.has(dateStr);
+  });
+  const totalDays = attendanceDocsThisWeek.length;
+  const presentDays = attendanceDocsThisWeek.filter(
     (d) => d.data().status === "present",
   ).length;
   // No recorded school days → don't penalise (return 100). A genuinely
@@ -187,14 +287,10 @@ export async function deriveStudentSnapshot(
 
   let assignmentsPct = 100; // default if nothing due
   if (dueThisWeek.length > 0) {
-    // Single submissions query per student → build a map of {assignmentId → submitTs}
-    const subsSnap = await db
-      .collection("submissions")
-      .where("schoolId", "==", schoolId)
-      .where("studentId", "==", studentId)
-      .get();
+    // Dual-key: get all submissions for this student (id + email merged).
+    const subsDocs = await fetchPerStudentDual("submissions", schoolId, studentId, studentEmail);
     const subsByAssignment = new Map<string, number>();
-    for (const s of subsSnap.docs) {
+    for (const s of subsDocs) {
       const sd = s.data();
       const ts = tsToMillis(sd.submittedAt) || tsToMillis(sd.timestamp);
       if (!ts || ts < weekStart - MS_PER_DAY * 14) continue; // ignore very old subs
@@ -214,13 +310,11 @@ export async function deriveStudentSnapshot(
   }
 
   // ── 4. Behavior score (this week's teacher remarks) ──────────────────
-  const notesSnap = await db
-    .collection("parent_notes")
-    .where("schoolId", "==", schoolId)
-    .where("studentId", "==", studentId)
-    .get();
+  // Dual-key: parent_notes can be written with studentEmail only (legacy
+  // teacher writes), so merge id + email matches.
+  const noteDocs = await fetchPerStudentDual("parent_notes", schoolId, studentId, studentEmail);
   let behaviorScore = DEFAULT_BEHAVIOR_SCORE;
-  for (const n of notesSnap.docs) {
+  for (const n of noteDocs) {
     const nd = n.data();
     if (nd.from !== "teacher") continue;
     const ts = tsToMillis(nd.createdAt);
@@ -260,10 +354,16 @@ export async function deriveStudentSnapshot(
     weekStart,
     weekEnd,
     counts: {
-      testScoresLookback: recentScores.length,
+      testScoresLookback: recentTestScores.length,
+      gradebookScoresLookback: recentGradebookScores.length,
+      testScoresAll: testScoresDocs.length,
+      gradebookScoresAll: gradebookScoresDocs.length,
+      enrolledSubjects: enrollmentDocs.length,
+      attendanceAll: allAttendanceDocs.length,
       attendanceWeek: totalDays,
       assignmentsDueThisWeek: dueThisWeek.length,
-      teacherNotesAll: notesSnap.size,
+      teacherNotesAll: noteDocs.length,
+      hasEmail: !!studentEmail,
     },
     breakdown,
     compositeScore,

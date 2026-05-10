@@ -55,27 +55,49 @@ export function formatWeekShort(weekId: string): string {
 }
 
 /**
- * Produce a YYYY-MM-DD string in UTC for a given timestamp. Used to filter
- * the `attendance` collection which stores `date` as a YYYY-MM-DD string.
+ * Produce a YYYY-MM-DD string in IST (Asia/Kolkata) for a given timestamp.
+ * Must match the format teachers' MarkAttendance.tsx writes:
+ *   `new Date().toLocaleDateString("en-CA")` — local timezone, en-CA = YYYY-MM-DD.
+ *
+ * For Indian schools the local TZ is IST. The CRON runs in asia-south1 region
+ * but Node.js inside Cloud Functions defaults to UTC — so naive `getUTCDate()`
+ * shifts by 5h30m and a Monday morning IST mark gets read as the previous
+ * Sunday UTC. Result: this week's attendance silently drops out of the filter.
+ *
+ * This is the leaderboard equivalent of the bug AlertsPage / DashboardPage
+ * had with date string handling — caught 2026-05-21.
  */
 export function toIsoDate(ts: number): string {
-  const d = new Date(ts);
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(d.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  // en-CA returns YYYY-MM-DD; timeZone option pins to IST.
+  return new Date(ts).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 }
 
 /**
- * Returns every YYYY-MM-DD string in [start, end] inclusive, in UTC.
- * Used to build an `in` query on the attendance.date field.
+ * Returns every YYYY-MM-DD string in [start, end] inclusive, in IST.
+ * Used to build an `in` query on the attendance.date field — and since
+ * MarkAttendance writes IST date strings, this MUST also be IST or filter
+ * misses early-IST-morning marks.
+ *
+ * Uses an inflated step (1 day) and IST-aware comparison so we don't lose a
+ * day at the DST boundary (India doesn't observe DST, but defensive anyway).
  */
 export function isoDatesInRange(start: number, end: number): string[] {
   const out: string[] = [];
-  const startDay = new Date(start);
-  startDay.setUTCHours(0, 0, 0, 0);
-  for (let t = startDay.getTime(); t <= end; t += MS_PER_DAY) {
-    out.push(toIsoDate(t));
+  // Step at exact-day granularity. Use IST midnight as the cursor advance
+  // base to keep keys stable regardless of host TZ.
+  const seen = new Set<string>();
+  let cursor = start;
+  while (cursor <= end) {
+    const key = toIsoDate(cursor);
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(key);
+    }
+    cursor += MS_PER_DAY;
   }
+  // One more lookup at `end` exactly, in case the loop's last step was just
+  // before midnight IST and missed the final day.
+  const tail = toIsoDate(end);
+  if (!seen.has(tail)) out.push(tail);
   return out;
 }

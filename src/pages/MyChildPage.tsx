@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Printer, MessageSquare, AlertCircle, Loader2, ChevronLeft, ChevronRight, CheckCircle2, FileText, BookOpen, Calendar, TrendingUp, BarChart3, Activity } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, Radar } from "recharts";
-import { doc, getDoc, collection, query, where, getDocs, onSnapshot, updateDoc } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc, where, getDocs } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../lib/AuthContext";
 import { toast } from "sonner";
 import { useIsMobile } from "../hooks/use-mobile";
+import { subscribePerStudent } from "../lib/perStudentQuery";
+import { subscribeEnrollments } from "../lib/enrollmentQuery";
+import { scopedQuery } from "../lib/scopedQuery";
 
 // ── Tokens ───────────────────────────────────────────────────────────────────
 const T = {
@@ -21,20 +24,39 @@ const toDate = (v: any): Date | null => { if (!v) return null; if (v?.toDate) re
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 const timeAgo = (v: any) => { const d = toDate(v); if (!d) return ""; const s = (Date.now() - d.getTime()) / 1000; if (s < 60) return "just now"; if (s < 3600) return `${Math.floor(s / 60)}m ago`; if (s < 86400) return `${Math.floor(s / 3600)}h ago`; return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase(); };
 
+// IST date key — matches MarkAttendance writer (toLocaleDateString en-CA in Asia/Kolkata).
+// Using UTC ISO here drops marks made in early IST morning into the previous day.
+const istKey = (dt: Date | null | undefined): string =>
+  dt ? dt.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }) : "";
+
+// Canonical score normalizer. Test/result/gradebook writers use any of:
+//   percentage / mark / marks / score, with optional maxMark / maxMarks / outOf.
+// Returns 0 for missing/zero so caller can filter with > 0.
+const pctOf = (t: any): number => {
+  const raw = t?.percentage ?? t?.mark ?? t?.marks ?? t?.score;
+  const n = Number(raw);
+  if (!isFinite(n) || n <= 0) return 0;
+  if (typeof t?.percentage === "number" && t.percentage > 0) return Math.min(100, t.percentage);
+  const max = Number(t?.maxMark ?? t?.maxMarks ?? t?.totalMark ?? t?.outOf ?? 0);
+  if (max > 0) return Math.min(100, Math.round((n / max) * 100));
+  // raw is already a percentage if 0-100, otherwise treat as marks-out-of-100
+  return Math.min(100, n);
+};
+
+const scoreDateOf = (t: any): Date | null =>
+  toDate(t?.testDate) || toDate(t?.timestamp) || toDate(t?.createdAt) || toDate(t?.date);
+
 // ── Canonical blue-halo shadows (matches principal-dashboard tilt3D) ──────────
 const SH_REST = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 20px 48px rgba(0,85,255,0.14)";
 const SH_HOVER = "0 0 0 0.5px rgba(0,85,255,0.14), 0 8px 24px rgba(0,85,255,0.16), 0 20px 46px rgba(0,85,255,0.18)";
 
-// ── Card wrapper — hover lift + blue halo, no cursor-tracking rotation ────────
-// Mirrors principal-dashboard's tilt3D behavior: translate3d(-5px) + scale(1.02)
-// with a stronger blue halo. No rotateX/rotateY (those caused text blur).
-const Card = ({ children, title, action, style }: { children: React.ReactNode; title?: string; action?: React.ReactNode; style?: React.CSSProperties }) => {
+const Card = ({ children, title, action, style, onClick }: { children: React.ReactNode; title?: string; action?: React.ReactNode; style?: React.CSSProperties; onClick?: () => void }) => {
   const [hovered, setHovered] = useState(false);
-
   return (
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onClick={onClick}
       style={{
         background: T.white,
         border: `0.5px solid ${hovered ? "rgba(0,85,255,0.22)" : "rgba(0,85,255,0.10)"}`,
@@ -49,6 +71,7 @@ const Card = ({ children, title, action, style }: { children: React.ReactNode; t
         WebkitBackfaceVisibility: "hidden",
         willChange: "transform",
         position: "relative",
+        cursor: onClick ? "pointer" : undefined,
         ...style,
       }}
     >
@@ -63,7 +86,17 @@ const Card = ({ children, title, action, style }: { children: React.ReactNode; t
   );
 };
 
-const DetailLink = () => <span style={{ fontSize: 11, color: T.blue, fontWeight: 500, cursor: "pointer" }}>Details →</span>;
+const DetailLink = ({ to }: { to: string }) => {
+  const navigate = useNavigate();
+  return (
+    <span
+      onClick={(e) => { e.stopPropagation(); navigate(to); }}
+      style={{ fontSize: 11, color: T.blue, fontWeight: 500, cursor: "pointer" }}
+    >
+      Details →
+    </span>
+  );
+};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PARENT MY CHILD — canonical design (matches owner/principal/teacher)
@@ -82,69 +115,135 @@ const MyChildPage = () => {
   const [incidents, setIncidents] = useState<any[]>([]);
   const [parentNotes, setParentNotes] = useState<any[]>([]);
   const [interventions, setInterventions] = useState<any[]>([]);
+  const [enrollments, setEnrollments] = useState<any[]>([]);
   const [calMonth, setCalMonth] = useState(new Date());
+  const [now, setNow] = useState(() => new Date());
 
   const sid = studentData?.id || studentData?.studentId || "";
-  const email = (studentData?.email || "").toLowerCase();
 
-  // ── Fetch ──────────────────────────────────────────────────────────────────
+  // Live clock (was frozen on render, lying for minutes at a time).
   useEffect(() => {
-    if (!sid || !studentData?.schoolId) { setLoading(false); return; }
-    const schoolId = studentData.schoolId;
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
-    // Live-subscribe to the student's master record
-    const unsubStudent = onSnapshot(doc(db, "students", sid), (d) => {
+  // ── Live student master profile ────────────────────────────────────────────
+  useEffect(() => {
+    if (!sid) { setLoading(false); return; }
+    const unsub = onSnapshot(doc(db, "students", sid), (d) => {
       if (d.exists()) setMasterProfile(d.data());
     }, (err) => {
-      // Permission-denied or network failure — don't leave masterProfile stale
-      // forever; fall back to the cached studentData from AuthContext.
       console.error("[MyChild] student doc listener error:", err);
     });
+    return () => unsub();
+  }, [sid]);
 
-    const run = async () => {
-      setLoading(true);
-      try {
-        const byId = (col: string) => getDocs(query(
-          collection(db, col),
-          where("schoolId", "==", schoolId),
-          where("studentId", "==", sid),
-        ));
-        const byEmail = (col: string) => email ? getDocs(query(
-          collection(db, col),
-          where("schoolId", "==", schoolId),
-          where("studentEmail", "==", email),
-        )) : Promise.resolve(null as any);
-        const merge = (a: any, b: any) => { const l: any[] = []; if (a) a.docs.forEach((d: any) => l.push({ id: d.id, ...d.data() })); if (b) b.docs.forEach((d: any) => { if (!l.find(x => x.id === d.id)) l.push({ id: d.id, ...d.data() }); }); return l; };
+  // ── Per-student dual-key listeners (id + email merge) ──────────────────────
+  // Memory rule `dual_query_pattern_studentid_email`: every per-student read
+  // MUST query both studentId AND studentEmail to avoid silent data loss.
+  useEffect(() => {
+    if (!studentData?.id || !studentData.schoolId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
 
-        const [aI, aE, sI, sE, rI, rE, subI, subE, inc, pn, iv] = await Promise.all([
-          byId("attendance"), byEmail("attendance"),
-          byId("test_scores"), byEmail("test_scores"),
-          byId("results"), byEmail("results"),
-          byId("submissions"), byEmail("submissions"),
-          byId("incidents"), byId("parent_notes"), byId("interventions"),
-        ]);
-        setAttendance(merge(aI, aE));
-        setTestScores([...merge(sI, sE), ...merge(rI, rE)]);
-        setSubmissions(merge(subI, subE));
-        setIncidents(inc.docs.map((d: any) => ({ id: d.id, ...d.data() })));
-        setParentNotes(pn.docs.map((d: any) => ({ id: d.id, ...d.data() })));
-        setInterventions(iv.docs.map((d: any) => ({ id: d.id, ...d.data() })));
-
-        const classId = studentData.classId || merge(await byId("enrollments"), await byEmail("enrollments"))[0]?.classId;
-        if (classId) {
-          const asSnap = await getDocs(query(
-            collection(db, "assignments"),
-            where("schoolId", "==", schoolId),
-            where("classId", "==", classId),
-          ));
-          setAssignments(asSnap.docs.map((d: any) => ({ id: d.id, ...d.data() })));
-        }
-      } catch (e) { console.error("MyChild fetch error:", e); }
-      finally { setLoading(false); }
+    // Track listener readiness so we can flip loading off once primary streams arrive.
+    const ready = { att: false, scores: false, gb: false, res: false, sub: false, inc: false, pn: false, iv: false, en: false };
+    const checkReady = () => {
+      if (ready.att && ready.scores && ready.gb && ready.res && ready.sub && ready.inc && ready.pn && ready.iv && ready.en) {
+        setLoading(false);
+      }
     };
-    run();
-    return () => unsubStudent();
-  }, [sid, email, studentData?.schoolId, studentData?.classId]);
+
+    const unsubs: Array<() => void> = [];
+    const sub = (col: string, setter: (docs: any[]) => void, key: keyof typeof ready) => {
+      unsubs.push(subscribePerStudent({
+        collection: col,
+        student: studentData,
+        onChange: (docs) => {
+          setter(docs.map(d => ({ id: d.id, ...d.data() })));
+          ready[key] = true;
+          checkReady();
+        },
+        onError: (err) => {
+          console.error(`[MyChild] ${col} listener error:`, err);
+          ready[key] = true;
+          checkReady();
+        },
+      }));
+    };
+
+    sub("attendance", setAttendance, "att");
+    sub("incidents", setIncidents, "inc");
+    sub("parent_notes", setParentNotes, "pn");
+    sub("interventions", setInterventions, "iv");
+    sub("submissions", setSubmissions, "sub");
+
+    // Scores: 3-source merge (test_scores + gradebook_scores + results).
+    let tsCache: any[] = [], gbCache: any[] = [], rsCache: any[] = [];
+    const emitScores = () => {
+      const map = new Map<string, any>();
+      [...tsCache, ...gbCache, ...rsCache].forEach(d => map.set(d.id, d));
+      setTestScores(Array.from(map.values()));
+    };
+    unsubs.push(subscribePerStudent({
+      collection: "test_scores",
+      student: studentData,
+      onChange: (docs) => { tsCache = docs.map(d => ({ id: d.id, ...d.data() })); emitScores(); ready.scores = true; checkReady(); },
+      onError: (err) => { console.error("[MyChild] test_scores:", err); ready.scores = true; checkReady(); },
+    }));
+    unsubs.push(subscribePerStudent({
+      collection: "gradebook_scores",
+      student: studentData,
+      onChange: (docs) => { gbCache = docs.map(d => ({ id: d.id, ...d.data() })); emitScores(); ready.gb = true; checkReady(); },
+      onError: (err) => { console.error("[MyChild] gradebook_scores:", err); ready.gb = true; checkReady(); },
+    }));
+    unsubs.push(subscribePerStudent({
+      collection: "results",
+      student: studentData,
+      onChange: (docs) => { rsCache = docs.map(d => ({ id: d.id, ...d.data() })); emitScores(); ready.res = true; checkReady(); },
+      onError: (err) => { console.error("[MyChild] results:", err); ready.res = true; checkReady(); },
+    }));
+
+    // Enrollments via canonical dual-key helper (used to derive classId fallback).
+    unsubs.push(subscribeEnrollments(
+      studentData,
+      (docs) => {
+        setEnrollments(docs.map(d => ({ id: d.id, ...d.data() })));
+        ready.en = true;
+        checkReady();
+      },
+      (err) => { console.error("[MyChild] enrollments:", err); ready.en = true; checkReady(); },
+    ));
+
+    return () => { unsubs.forEach(u => u()); };
+  }, [studentData?.id, studentData?.schoolId, studentData?.email, studentData?.studentEmail]);
+
+  // ── Resolve current classId (from auth, or most-recent active enrollment) ──
+  const classId = useMemo(() => {
+    if (studentData?.classId) return studentData.classId;
+    const active = enrollments.find(e => e.status === "active") || enrollments[0];
+    return active?.classId || "";
+  }, [studentData?.classId, enrollments]);
+
+  // ── Class-scoped assignments (separate effect — only refires on classId) ────
+  useEffect(() => {
+    if (!classId || !studentData?.schoolId) { setAssignments([]); return; }
+    let aborted = false;
+    (async () => {
+      try {
+        const snap = await getDocs(scopedQuery("assignments", studentData.schoolId, where("classId", "==", classId)));
+        if (aborted) return;
+        setAssignments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (e) {
+        if (aborted) return;
+        console.error("[MyChild] assignments fetch error:", e);
+        setAssignments([]);
+      }
+    })();
+    return () => { aborted = true; };
+  }, [classId, studentData?.schoolId]);
 
   // Merged student (live master overrides cached studentData)
   const student = useMemo(() => ({ ...studentData, ...(masterProfile || {}) }), [studentData, masterProfile]);
@@ -157,53 +256,82 @@ const MyChildPage = () => {
     const abs = tot - pres - late;
     const attRate = tot > 0 ? ((pres + late) / tot) * 100 : 0;
 
-    const vals = testScores.map(t => Number(t.percentage ?? t.score ?? 0)).filter(n => !isNaN(n) && n > 0);
+    const vals = testScores.map(pctOf).filter(n => n > 0);
     const avg = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
 
-    const subScores: Record<string, number> = {};
-    const subCounts: Record<string, number> = {};
+    // Per-subject averages (immutable build, no in-place mutation).
+    const sums: Record<string, number> = {};
+    const cnts: Record<string, number> = {};
     testScores.forEach(t => {
-      const sub = (t.subject || t.subjectName || "General").toUpperCase();
-      const p = Number(t.percentage ?? t.score ?? 0);
-      if (isNaN(p) || p <= 0) return;
-      subScores[sub] = (subScores[sub] || 0) + p;
-      subCounts[sub] = (subCounts[sub] || 0) + 1;
+      const sub = String(t.subject || t.subjectName || "General").toUpperCase();
+      const p = pctOf(t);
+      if (p <= 0) return;
+      sums[sub] = (sums[sub] || 0) + p;
+      cnts[sub] = (cnts[sub] || 0) + 1;
     });
-    Object.keys(subScores).forEach(k => { subScores[k] = Math.round(subScores[k] / subCounts[k]); });
+    const subScores: Record<string, number> = Object.fromEntries(
+      Object.entries(sums).map(([k, sum]) => [k, Math.round(sum / cnts[k])])
+    );
 
-    const sorted = [...testScores].sort((a, b) => (toDate(b.timestamp || b.createdAt)?.getTime() || 0) - (toDate(a.timestamp || a.createdAt)?.getTime() || 0));
-    const r3 = sorted.slice(0, 3).map(t => Number(t.percentage ?? t.score ?? 0)).filter(n => !isNaN(n));
-    const p3 = sorted.slice(3, 6).map(t => Number(t.percentage ?? t.score ?? 0)).filter(n => !isNaN(n));
+    const sorted = [...testScores].sort((a, b) => (scoreDateOf(b)?.getTime() || 0) - (scoreDateOf(a)?.getTime() || 0));
+    const r3 = sorted.slice(0, 3).map(pctOf).filter(n => n > 0);
+    const p3 = sorted.slice(3, 6).map(pctOf).filter(n => n > 0);
     const rAvg = r3.length ? r3.reduce((a, b) => a + b, 0) / r3.length : 0;
     const pAvg = p3.length ? p3.reduce((a, b) => a + b, 0) / p3.length : 0;
     const trend: "up" | "down" | "flat" = rAvg - pAvg >= 5 ? "up" : pAvg - rAvg >= 5 ? "down" : "flat";
 
-    const now = new Date();
+    const today0 = new Date();
     const monthly = Array.from({ length: 6 }, (_, i) => {
-      const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+      const d = new Date(today0.getFullYear(), today0.getMonth() - (5 - i), 1);
       const mAtt = attendance.filter(r => { const dt = toDate(r.date); return dt && dt.getMonth() === d.getMonth() && dt.getFullYear() === d.getFullYear(); });
-      const mSc = testScores.filter(t => { const dt = toDate(t.timestamp || t.createdAt); return dt && dt.getMonth() === d.getMonth() && dt.getFullYear() === d.getFullYear(); });
+      const mSc = testScores.filter(t => { const dt = scoreDateOf(t); return dt && dt.getMonth() === d.getMonth() && dt.getFullYear() === d.getFullYear(); });
       const mP = mAtt.filter(r => r.status === "present" || r.status === "late").length;
       const attP = mAtt.length > 0 ? (mP / mAtt.length) * 100 : 0;
-      const sV = mSc.map(t => Number(t.percentage ?? t.score ?? 0)).filter(n => !isNaN(n) && n > 0);
+      const sV = mSc.map(pctOf).filter(n => n > 0);
       const scP = sV.length > 0 ? sV.reduce((a, b) => a + b, 0) / sV.length : 0;
       return { month: MONTHS[d.getMonth()], score: Math.round(scP), attendance: Math.round(attP) };
     });
 
-    const subCount = submissions.length;
+    // Submission completion: a submission counts if it matches assignment by id
+    // OR by legacy `homeworkId` field (teacher-dashboard writes both).
+    const submittedAsgIds = new Set(submissions.map((s: any) => s.assignmentId || s.homeworkId).filter(Boolean));
+    const subCount = assignments.filter(a => submittedAsgIds.has(a.id)).length;
     const asgCount = assignments.length;
     const completion = asgCount > 0 ? (subCount / asgCount) * 100 : 0;
-    const days = new Set(attendance.map(a => toDate(a.date)?.toDateString())).size;
+    const days = new Set(attendance.map(a => istKey(toDate(a.date))).filter(Boolean)).size;
 
-    return { tot, pres, late, abs, attRate, avg, subScores, trend, monthly, subCount, asgCount, completion, days };
-  }, [attendance, testScores, submissions, assignments]);
+    // Recent incidents (last 30 days) for risk weighting — old incidents shouldn't haunt forever.
+    const cutoff = Date.now() - 30 * 24 * 3600 * 1000;
+    const recentIncidents = incidents.filter((i: any) => {
+      const d = toDate(i.createdAt || i.date);
+      return d && d.getTime() >= cutoff;
+    }).length;
 
-  const overallRisk = Math.round((Math.max(0, 100 - m.attRate) + Math.max(0, 100 - m.avg) + Math.max(0, 100 - m.completion) + Math.min(100, incidents.length * 25)) / 4);
-  const riskLevel = overallRisk < 20 ? "STABLE" : overallRisk < 45 ? "MONITOR" : overallRisk < 70 ? "ELEVATED" : "CRITICAL";
-  const riskColor = overallRisk < 20 ? T.grn : overallRisk < 45 ? T.amb : T.red;
+    return { tot, pres, late, abs, attRate, avg, subScores, trend, monthly, subCount, asgCount, completion, days, recentIncidents };
+  }, [attendance, testScores, submissions, assignments, incidents]);
 
-  const subEntries = Object.entries(m.subScores);
-  const radarData = subEntries.map(([sub, sc]) => ({ subject: sub.slice(0, 10), score: sc, fullMark: 100 }));
+  // No-data guard: a brand-new student should show "NO DATA", not "CRITICAL".
+  const hasAnyData = testScores.length > 0 || attendance.length > 0 || incidents.length > 0;
+
+  const overallRisk = hasAnyData
+    ? Math.round((Math.max(0, 100 - m.attRate) + Math.max(0, 100 - m.avg) + Math.max(0, 100 - m.completion) + Math.min(100, m.recentIncidents * 25)) / 4)
+    : 0;
+  const riskLevel = !hasAnyData ? "NO DATA"
+    : overallRisk < 20 ? "STABLE"
+    : overallRisk < 45 ? "MONITOR"
+    : overallRisk < 70 ? "ELEVATED"
+    : "CRITICAL";
+  const riskColor = !hasAnyData ? T.ink3
+    : overallRisk < 20 ? T.grn
+    : overallRisk < 45 ? T.amb
+    : T.red;
+
+  // Sort subjects by average descending — deterministic display order.
+  const subEntries = useMemo(
+    () => Object.entries(m.subScores).sort((a, b) => b[1] - a[1]),
+    [m.subScores]
+  );
+  const radarData = subEntries.slice(0, 8).map(([sub, sc]) => ({ subject: sub.slice(0, 10), score: sc, fullMark: 100 }));
 
   const calYear = calMonth.getFullYear();
   const calMon = calMonth.getMonth();
@@ -213,8 +341,12 @@ const MyChildPage = () => {
     const dayNum = i - firstDay + 1;
     if (dayNum < 1 || dayNum > daysInMonth) return null;
     const d = new Date(calYear, calMon, dayNum);
-    const dateStr = d.toISOString().split("T")[0];
-    const rec = attendance.find(a => { const ad = toDate(a.date); return ad && ad.toISOString().split("T")[0] === dateStr; });
+    const dateStr = istKey(d);
+    const rec = attendance.find(a => {
+      if (typeof a.date === "string") return a.date === dateStr;
+      const ad = toDate(a.date);
+      return ad && istKey(ad) === dateStr;
+    });
     return { dayNum, date: d, status: rec?.status || null };
   });
   const calPresent = attendance.filter(a => { const d = toDate(a.date); return d && d.getMonth() === calMon && d.getFullYear() === calYear && a.status === "present"; }).length;
@@ -225,23 +357,44 @@ const MyChildPage = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ dob: "", bloodGroup: "", parentPhone: "", emergencyContact: "" });
+  const firstFieldRef = useRef<HTMLInputElement>(null);
+
+  // Re-sync form whenever the live master profile arrives (was keyed on
+  // `student?.id` which never changes after load — form stayed empty).
   useEffect(() => {
-    if (student) setForm({
-      dob: student.dob || "",
-      bloodGroup: student.bloodGroup || "",
-      parentPhone: student.parentPhone || "",
-      emergencyContact: student.emergencyContact || "",
+    const src = masterProfile || studentData || {};
+    const dobRaw = src.dob || src.dateOfBirth || "";
+    const dob = typeof dobRaw === "string"
+      ? dobRaw
+      : (toDate(dobRaw)?.toISOString().split("T")[0] || "");
+    setForm({
+      dob,
+      bloodGroup: src.bloodGroup || "",
+      parentPhone: src.parentPhone || "",
+      emergencyContact: src.emergencyContact || "",
     });
-  }, [student?.id]);
+  }, [masterProfile, studentData]);
+
+  // Esc-to-close + autofocus on the modal.
+  useEffect(() => {
+    if (!editOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setEditOpen(false); };
+    window.addEventListener("keydown", onKey);
+    setTimeout(() => firstFieldRef.current?.focus(), 50);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [editOpen]);
 
   const handleSave = async () => {
     if (!sid) return;
     setSaving(true);
     try {
       await updateDoc(doc(db, "students", sid), form);
-      toast.success("Profile updated!");
+      toast.success("Profile updated.");
       setEditOpen(false);
-    } catch { toast.error("Failed to update."); }
+    } catch (e) {
+      console.error("[MyChild] profile save failed:", e);
+      toast.error("Failed to update.");
+    }
     finally { setSaving(false); }
   };
 
@@ -262,12 +415,17 @@ const MyChildPage = () => {
   const today = new Date();
 
   const scoreHistory = [...testScores]
-    .sort((a, b) => (toDate(b.timestamp || b.createdAt)?.getTime() || 0) - (toDate(a.timestamp || a.createdAt)?.getTime() || 0))
+    .sort((a, b) => (scoreDateOf(b)?.getTime() || 0) - (scoreDateOf(a)?.getTime() || 0))
     .slice(0, 6);
   const barChartData = [...scoreHistory].reverse().map(t => ({
-    name: (t.subject || t.subjectName || "TEST").slice(0, 8),
-    score: Number(t.percentage ?? t.score ?? 0),
+    name: String(t.subject || t.subjectName || "TEST").slice(0, 8),
+    score: pctOf(t),
   }));
+
+  // Predicted next score — deterministic forecast based on recent trend.
+  const forecast = m.avg > 0
+    ? Math.min(100, Math.round(m.avg + (m.trend === "up" ? 3 : m.trend === "down" ? -3 : 0)))
+    : 0;
 
   return (
     <div style={{ minHeight: "100vh", background: T.bg, padding: isMobile ? "12px 12px 60px" : "20px 24px 60px", fontFamily: "'Inter','Plus Jakarta Sans',-apple-system,sans-serif" }}>
@@ -300,12 +458,12 @@ const MyChildPage = () => {
                     strokeDasharray={2 * Math.PI * 26} strokeDashoffset={2 * Math.PI * 26 * (1 - m.avg / 100)} transform="rotate(-90 32 32)"
                     style={{ transition: "stroke-dashoffset 1s ease" }} />
                 </svg>
-                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: T.blue }}>{(m.avg / 25).toFixed(1)}</div>
+                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: T.blue }}>{(m.avg / 10).toFixed(1)}</div>
               </div>
               <div>
                 <div style={{ fontSize: 28, fontWeight: 800, color: T.ink }}>{Math.round(m.avg)}%</div>
                 <div style={{ fontSize: 11, color: T.ink3, display: "flex", alignItems: "center", gap: 4 }}>
-                  Avg Score · {testScores.length} tests
+                  Avg Score · {testScores.length} {testScores.length === 1 ? "record" : "records"}
                   {m.trend === "up" && <TrendingUp size={12} color={T.grn} />}
                   {m.trend === "down" && <TrendingUp size={12} color={T.red} style={{ transform: "scaleY(-1)" }} />}
                 </div>
@@ -343,7 +501,7 @@ const MyChildPage = () => {
             </div>
           </Card>
 
-          <Card title="Subject Mastery" action={<DetailLink />}>
+          <Card title="Subject Mastery" action={<DetailLink to="/performance" />}>
             {radarData.length >= 3 && (
               <div style={{ height: 180, marginBottom: 12 }}>
                 <ResponsiveContainer width="100%" height="100%">
@@ -355,7 +513,7 @@ const MyChildPage = () => {
                 </ResponsiveContainer>
               </div>
             )}
-            {subEntries.map(([sub, sc]) => (
+            {subEntries.slice(0, 8).map(([sub, sc]) => (
               <div key={sub} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                 <span style={{ fontSize: 11, color: T.ink3, width: 90, flexShrink: 0 }}>{sub}</span>
                 <div style={{ flex: 1, height: 6, background: T.s1, borderRadius: 3, overflow: "hidden" }}>
@@ -364,6 +522,9 @@ const MyChildPage = () => {
                 <span style={{ fontSize: 12, fontWeight: 600, color: T.ink, width: 28, textAlign: "right" }}>{sc}</span>
               </div>
             ))}
+            {subEntries.length > 8 && (
+              <div style={{ fontSize: 10, color: T.ink3, textAlign: "center", marginTop: 4 }}>+ {subEntries.length - 8} more subjects</div>
+            )}
           </Card>
         </div>
 
@@ -376,7 +537,7 @@ const MyChildPage = () => {
           <p style={{ fontSize: 11, color: T.ink3, textAlign: "center", marginBottom: 12 }}>Roll: {student.rollNo || student.roll || "—"} · ID: {sid.slice(0, 6).toUpperCase()}</p>
           <div style={{ display: "flex", gap: 6 }}>
             <span style={{ padding: "4px 12px", borderRadius: 20, background: T.glBg, color: T.grn, fontSize: 10, fontWeight: 600 }}>ACTIVE</span>
-            <span style={{ padding: "4px 12px", borderRadius: 20, background: riskColor === T.grn ? T.glBg : riskColor === T.amb ? T.alBg : T.rlBg, color: riskColor, fontSize: 10, fontWeight: 600 }}>{riskLevel}</span>
+            <span style={{ padding: "4px 12px", borderRadius: 20, background: riskColor === T.grn ? T.glBg : riskColor === T.amb ? T.alBg : riskColor === T.red ? T.rlBg : T.s1, color: riskColor, fontSize: 10, fontWeight: 600 }}>{riskLevel}</span>
           </div>
           <button onClick={() => setEditOpen(true)} style={{ marginTop: 14, padding: "6px 14px", borderRadius: 20, border: `1px solid ${T.bdr}`, background: T.white, color: T.ink2, fontSize: 11, fontWeight: 500, cursor: "pointer" }}>
             Edit Profile
@@ -384,7 +545,7 @@ const MyChildPage = () => {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <Card title="Behaviour Record" action={<DetailLink />}>
+          <Card title="Behaviour Record" action={<DetailLink to="/behaviour" />}>
             {incidents.length === 0 ? (
               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: T.glBg, borderRadius: 10 }}>
                 <CheckCircle2 size={14} color={T.grn} /><span style={{ fontSize: 12, color: T.grn, fontWeight: 500 }}>No incidents recorded</span>
@@ -393,26 +554,27 @@ const MyChildPage = () => {
               <div key={inc.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 0", borderBottom: `1px solid ${T.s2}` }}>
                 <div style={{ width: 8, height: 8, borderRadius: "50%", background: T.red, marginTop: 5, flexShrink: 0 }} />
                 <div>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: T.red }}>{(inc.type || "INCIDENT").toUpperCase()}</span>
-                  <p style={{ fontSize: 11, color: T.ink3, marginTop: 2 }}>{(inc.description || inc.content || "").slice(0, 80)}</p>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: T.red }}>{String(inc.type || "Incident").toUpperCase()}</span>
+                  <p style={{ fontSize: 11, color: T.ink3, marginTop: 2 }}>{String(inc.description || inc.content || "").slice(0, 80)}</p>
                 </div>
               </div>
             ))}
           </Card>
 
-          <Card title="AI Intelligence" action={<DetailLink />}>
+          <Card title="Performance Forecast" action={<DetailLink to="/performance" />}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
               <span style={{ fontSize: 11, color: T.ink3 }}>Predicted next score:</span>
-              <span style={{ fontSize: 20, fontWeight: 700, color: T.blue }}>{Math.min(100, Math.round(m.avg + Math.max(0, (100 - m.avg) * 0.05)))}%</span>
+              <span style={{ fontSize: 20, fontWeight: 700, color: T.blue }}>{forecast > 0 ? `${forecast}%` : "—"}</span>
             </div>
             <div style={{ fontSize: 11, color: T.ink3, lineHeight: 1.6 }}>
-              {m.trend === "up" ? "Performance is improving. Your child is on a positive trajectory." :
+              {!hasAnyData ? "Not enough data yet. Forecast becomes available after the first few records." :
+               m.trend === "up" ? "Performance is improving. Your child is on a positive trajectory." :
                m.trend === "down" ? "Performance has dipped recently. Consider checking in with teachers." :
                "Performance is stable. Keep up consistent study habits."}
             </div>
           </Card>
 
-          <Card title="Teacher Messages" action={<DetailLink />}>
+          <Card title="Teacher Messages" action={<DetailLink to="/teacher-notes" />}>
             {parentNotes.length === 0 ? (
               <p style={{ fontSize: 12, color: T.ink3, textAlign: "center", padding: "8px 0" }}>No messages yet</p>
             ) : parentNotes.slice(0, 2).map(n => (
@@ -420,7 +582,7 @@ const MyChildPage = () => {
                 <div style={{ fontSize: 10, color: n.from === "teacher" ? T.blue : T.grn, fontWeight: 600, marginBottom: 2 }}>
                   {n.from === "teacher" ? (n.teacherName || "TEACHER") : "YOU"} · {timeAgo(n.createdAt)}
                 </div>
-                <p style={{ fontSize: 12, color: T.ink2, lineHeight: 1.5, margin: 0 }}>{(n.content || n.message || "").slice(0, 100)}</p>
+                <p style={{ fontSize: 12, color: T.ink2, lineHeight: 1.5, margin: 0 }}>{String(n.content || n.message || "").slice(0, 100)}</p>
               </div>
             ))}
           </Card>
@@ -431,7 +593,7 @@ const MyChildPage = () => {
             ) : (
               <div style={{ padding: "10px 14px", background: T.blBg, borderLeft: `3px solid ${T.blue}`, borderRadius: 8 }}>
                 <p style={{ fontSize: 12, color: T.ink2, lineHeight: 1.6, margin: 0, fontStyle: "italic" }}>
-                  "{(parentNotes.find(n => n.from === "teacher")?.content || parentNotes.find(n => n.from === "teacher")?.message || "").slice(0, 150)}"
+                  "{String(parentNotes.find(n => n.from === "teacher")?.content || parentNotes.find(n => n.from === "teacher")?.message || "").slice(0, 150)}"
                 </p>
               </div>
             )}
@@ -440,7 +602,7 @@ const MyChildPage = () => {
       </div>
 
       {/* ═══ PERFORMANCE TIMELINE ═══ */}
-      <Card title="Performance Timeline" action={<DetailLink />} style={{ marginBottom: isMobile ? 14 : 20 }}>
+      <Card title="Performance Timeline" action={<DetailLink to="/performance" />} style={{ marginBottom: isMobile ? 14 : 20 }}>
         <div style={{ height: isMobile ? 160 : 200 }}>
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={m.monthly}>
@@ -461,26 +623,26 @@ const MyChildPage = () => {
 
       {/* ═══ ASSIGNMENTS + RISK ═══ */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 14 : 20, marginBottom: isMobile ? 14 : 20 }}>
-        <Card title={`Assignments · ${m.subCount}/${m.asgCount}`} action={<span style={{ fontSize: 11, color: T.blue, fontWeight: 500, cursor: "pointer" }}>View All →</span>}>
+        <Card title={`Assignments · ${m.subCount}/${m.asgCount}`} action={<DetailLink to="/assignments" />}>
           {[...assignments].sort((a, b) => (toDate(b.dueDate)?.getTime() || 0) - (toDate(a.dueDate)?.getTime() || 0)).slice(0, 5).map(a => {
-            const sub = submissions.find((s: any) => s.assignmentId === a.id);
+            const sub = submissions.find((s: any) => (s.assignmentId || s.homeworkId) === a.id);
             return (
               <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: `1px solid ${T.s2}` }}>
                 <CheckCircle2 size={14} color={sub ? T.grn : T.ink3} />
-                <span style={{ fontSize: 13, color: T.ink, flex: 1 }}>{(a.title || "Assignment").slice(0, 35)}</span>
+                <span style={{ fontSize: 13, color: T.ink, flex: 1 }}>{String(a.title || "Assignment").slice(0, 35)}</span>
               </div>
             );
           })}
           {assignments.length === 0 && <p style={{ fontSize: 12, color: T.ink3, textAlign: "center" }}>No assignments</p>}
         </Card>
 
-        <Card title="Risk Assessment" action={<DetailLink />}>
+        <Card title="Risk Assessment" action={<DetailLink to="/alerts" />}>
           <div style={{ fontSize: 22, fontWeight: 800, color: riskColor, marginBottom: 14 }}>{riskLevel}</div>
           {[
             { label: "ATTENDANCE", val: m.attRate, color: m.attRate >= 85 ? T.blue : T.amb, extra: undefined as string | undefined },
             { label: "ACADEMIC", val: m.avg, color: m.avg >= 75 ? T.blue : m.avg >= 50 ? T.amb : T.red, extra: undefined },
             { label: "SUBMISSION", val: m.completion, color: m.completion >= 80 ? T.blue : T.amb, extra: undefined },
-            { label: "BEHAVIOURAL", val: incidents.length > 0 ? -1 : 100, color: incidents.length === 0 ? T.blue : T.red, extra: incidents.length > 0 ? `${incidents.length} Events` : undefined },
+            { label: "BEHAVIOURAL", val: m.recentIncidents > 0 ? -1 : 100, color: m.recentIncidents === 0 ? T.blue : T.red, extra: m.recentIncidents > 0 ? `${m.recentIncidents} recent` : undefined },
           ].map(r => (
             <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
               <span style={{ fontSize: 11, color: T.ink3, width: 100, flexShrink: 0 }}>{r.label}</span>
@@ -495,7 +657,7 @@ const MyChildPage = () => {
 
       {/* ═══ CALENDAR + SUPPORT ═══ */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 14 : 20, marginBottom: isMobile ? 14 : 20 }}>
-        <Card title="Attendance Calendar" action={<span style={{ fontSize: 11, color: T.ink3 }}>Daily attendance record</span>}>
+        <Card title="Attendance Calendar" action={<DetailLink to="/attendance" />}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginBottom: 14 }}>
             <button onClick={() => setCalMonth(new Date(calYear, calMon - 1))} style={{ background: "none", border: "none", cursor: "pointer", color: T.ink3 }}><ChevronLeft size={16} /></button>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.ink }}>{MONTHS[calMon]} {calYear}</span>
@@ -535,38 +697,49 @@ const MyChildPage = () => {
             })}
           </div>
           <div style={{ display: "flex", gap: isMobile ? 10 : 14, marginTop: 12, justifyContent: "center", flexWrap: "wrap", rowGap: 8 }}>
-            {[{ c: T.grn, l: "Present" }, { c: T.amb, l: "Late" }, { c: T.red, l: "Absent" }, { c: T.s2, l: "Weekend" }, { c: "transparent", l: "No Data" }].map(x => (
+            {[
+              { c: T.grn, l: "Present" },
+              { c: T.amb, l: "Late" },
+              { c: T.red, l: "Absent" },
+              { c: T.s2, l: "Weekend" },
+              { c: T.s1, l: "No Data" },
+            ].map(x => (
               <div key={x.l} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <div style={{ width: 8, height: 8, borderRadius: 2, background: x.c, border: x.c === "transparent" ? `1px solid ${T.s2}` : "none" }} />
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: x.c, border: `1px solid ${T.s2}` }} />
                 <span style={{ fontSize: 10, color: T.ink3 }}>{x.l}</span>
               </div>
             ))}
           </div>
         </Card>
 
-        <Card title="Support Actions" action={<DetailLink />}>
+        <Card title="Support Actions" action={<DetailLink to="/alerts" />}>
           {interventions.length === 0 ? (
             <p style={{ fontSize: 12, color: T.ink3, textAlign: "center", padding: "20px 0" }}>No active interventions</p>
-          ) : interventions.map(iv => (
-            <div key={iv.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 0", borderBottom: `1px solid ${T.s2}` }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: iv.status === "completed" ? T.grn : T.amb, marginTop: 5, flexShrink: 0 }} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 11, color: T.ink3, marginBottom: 2 }}>{timeAgo(iv.createdAt)}</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: T.ink }}>{iv.actionTitle || iv.title || "Intervention"}</div>
-                <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-                  <span style={{ padding: "2px 8px", borderRadius: 4, background: T.blBg, color: T.blue, fontSize: 10, fontWeight: 600 }}>{(iv.actionType || iv.type || "GENERAL").toUpperCase()}</span>
-                  <span style={{ padding: "2px 8px", borderRadius: 4, background: iv.status === "completed" ? T.glBg : T.alBg, color: iv.status === "completed" ? T.grn : T.amb, fontSize: 10, fontWeight: 600 }}>{iv.status === "completed" ? "Complete" : "Active"}</span>
+          ) : interventions.map(iv => {
+            const isDone = String(iv.status || "").toLowerCase() === "completed";
+            return (
+              <div key={iv.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 0", borderBottom: `1px solid ${T.s2}` }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: isDone ? T.grn : T.amb, marginTop: 5, flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: T.ink3, marginBottom: 2 }}>{timeAgo(iv.createdAt || iv.date)}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: T.ink }}>{iv.actionTitle || iv.title || "Intervention"}</div>
+                  <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                    {(iv.actionType || iv.type) && (
+                      <span style={{ padding: "2px 8px", borderRadius: 4, background: T.blBg, color: T.blue, fontSize: 10, fontWeight: 600 }}>{String(iv.actionType || iv.type).toUpperCase()}</span>
+                    )}
+                    <span style={{ padding: "2px 8px", borderRadius: 4, background: isDone ? T.glBg : T.alBg, color: isDone ? T.grn : T.amb, fontSize: 10, fontWeight: 600 }}>{isDone ? "Complete" : (iv.status || "Active")}</span>
+                  </div>
                 </div>
+                <span style={{ fontSize: 10, color: T.ink3, flexShrink: 0 }}>{iv.assignedTo || ""}</span>
               </div>
-              <span style={{ fontSize: 10, color: T.ink3, flexShrink: 0 }}>{iv.assignedTo || ""}</span>
-            </div>
-          ))}
+            );
+          })}
         </Card>
       </div>
 
       {/* ═══ INCIDENTS + OVERVIEW ═══ */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 14 : 20, marginBottom: isMobile ? 14 : 20 }}>
-        <Card title="Incidents" action={<DetailLink />}>
+        <Card title="Incidents" action={<DetailLink to="/behaviour" />}>
           {incidents.length === 0 ? (
             <div style={{ textAlign: "center", padding: "20px 0" }}>
               <CheckCircle2 size={24} color={T.grn} style={{ margin: "0 auto 8px" }} />
@@ -575,10 +748,10 @@ const MyChildPage = () => {
           ) : incidents.map(inc => (
             <div key={inc.id} style={{ padding: "10px 0", borderBottom: `1px solid ${T.s2}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: T.red }}>• {(inc.type || "INCIDENT").toUpperCase()}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: T.red }}>• {String(inc.type || "Incident").toUpperCase()}</span>
                 <span style={{ fontSize: 10, color: T.ink3 }}>{timeAgo(inc.createdAt || inc.date)}</span>
               </div>
-              <p style={{ fontSize: 11, color: T.ink2, marginTop: 4, lineHeight: 1.5 }}>{(inc.description || inc.content || "").slice(0, 120)}</p>
+              <p style={{ fontSize: 11, color: T.ink2, marginTop: 4, lineHeight: 1.5 }}>{String(inc.description || inc.content || "").slice(0, 120)}</p>
             </div>
           ))}
           {incidents.length > 0 && (
@@ -588,7 +761,7 @@ const MyChildPage = () => {
           )}
         </Card>
 
-        <Card title="Overview" action={<span style={{ fontSize: 11, color: T.blue, cursor: "pointer" }}>Dashboard →</span>}>
+        <Card title="Overview" action={<DetailLink to="/" />}>
           {[
             { icon: FileText, label: "TOTAL TESTS", val: testScores.length },
             { icon: BookOpen, label: "SUBJECTS TRACKED", val: subEntries.length },
@@ -610,7 +783,7 @@ const MyChildPage = () => {
 
       {/* ═══ COMMS + SCORE HISTORY ═══ */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 14 : 20, marginBottom: isMobile ? 14 : 20 }}>
-        <Card title={`Communications · ${parentNotes.length} entries`} action={<span style={{ fontSize: 11, color: T.blue, cursor: "pointer" }}>View All →</span>}>
+        <Card title={`Communications · ${parentNotes.length} entries`} action={<DetailLink to="/teacher-notes" />}>
           {parentNotes.slice(0, 3).map(n => (
             <div key={n.id} style={{ padding: "12px 0", borderBottom: `1px solid ${T.s2}` }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
@@ -618,13 +791,13 @@ const MyChildPage = () => {
                 <span style={{ padding: "2px 8px", borderRadius: 4, background: n.from === "teacher" ? T.blBg : T.glBg, color: n.from === "teacher" ? T.blue : T.grn, fontSize: 10, fontWeight: 600 }}>{n.from === "teacher" ? "FACULTY" : "PARENT"}</span>
                 <span style={{ fontSize: 10, color: T.ink3, marginLeft: "auto" }}>{timeAgo(n.createdAt)}</span>
               </div>
-              <p style={{ fontSize: 12, color: T.ink2, lineHeight: 1.5, margin: 0 }}>{(n.content || n.message || "").slice(0, 120)}</p>
+              <p style={{ fontSize: 12, color: T.ink2, lineHeight: 1.5, margin: 0 }}>{String(n.content || n.message || "").slice(0, 120)}</p>
             </div>
           ))}
           {parentNotes.length === 0 && <p style={{ fontSize: 12, color: T.ink3, textAlign: "center", padding: "16px 0" }}>No communications</p>}
         </Card>
 
-        <Card title={`Score History · ${testScores.length} records`} action={<span style={{ fontSize: 11, color: T.blue, cursor: "pointer" }}>View All →</span>}>
+        <Card title={`Score History · ${testScores.length} records`} action={<DetailLink to="/tests" />}>
           {barChartData.length > 0 && (
             <div style={{ height: 150, marginBottom: 12 }}>
               <ResponsiveContainer width="100%" height="100%">
@@ -645,12 +818,13 @@ const MyChildPage = () => {
             </thead>
             <tbody>
               {scoreHistory.map(t => {
-                const d = toDate(t.timestamp || t.createdAt);
+                const d = scoreDateOf(t);
+                const p = pctOf(t);
                 return (
                   <tr key={t.id} style={{ borderBottom: `1px solid ${T.s2}` }}>
-                    <td style={{ padding: "8px", color: T.ink }}>{(t.subject || t.subjectName || "TEST").slice(0, 20)}</td>
+                    <td style={{ padding: "8px", color: T.ink }}>{String(t.subject || t.subjectName || "TEST").slice(0, 20)}</td>
                     <td style={{ padding: "8px", color: T.ink3 }}>{d ? d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" }).toUpperCase() : "—"}</td>
-                    <td style={{ padding: "8px", fontWeight: 600, color: T.blue }}>{Number(t.percentage ?? t.score ?? 0)}%</td>
+                    <td style={{ padding: "8px", fontWeight: 600, color: T.blue }}>{p > 0 ? `${p}%` : "—"}</td>
                   </tr>
                 );
               })}
@@ -667,12 +841,12 @@ const MyChildPage = () => {
         {!isMobile && <span>★ Data: Live</span>}
         <span>★ Secured</span>
         <span>★ ID: {sid.slice(0, 8).toUpperCase()}</span>
-        <span style={{ color: T.blue, fontWeight: 600 }}>{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+        <span style={{ color: T.blue, fontWeight: 600 }}>{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
       </div>
 
       {/* ═══ EDIT PROFILE MODAL ═══ */}
       {editOpen && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.4)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }} onClick={() => setEditOpen(false)}>
+        <div role="dialog" aria-modal="true" aria-label="Edit profile" style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.4)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }} onClick={() => setEditOpen(false)}>
           <div onClick={e => e.stopPropagation()} style={{ background: T.white, borderRadius: 16, width: 420, maxWidth: "90vw", padding: 24, boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}>
             <h3 style={{ fontSize: 16, fontWeight: 700, color: T.ink, marginBottom: 16 }}>Edit Profile</h3>
             {([
@@ -680,10 +854,11 @@ const MyChildPage = () => {
               { key: "bloodGroup", label: "Blood Group", type: "text" },
               { key: "parentPhone", label: "Parent Phone", type: "tel" },
               { key: "emergencyContact", label: "Emergency Contact", type: "tel" },
-            ] as const).map(f => (
+            ] as const).map((f, idx) => (
               <div key={f.key} style={{ marginBottom: 12 }}>
                 <label style={{ fontSize: 10, fontWeight: 600, color: T.ink3, textTransform: "uppercase", letterSpacing: "0.05em" }}>{f.label}</label>
                 <input
+                  ref={idx === 0 ? firstFieldRef : undefined}
                   type={f.type}
                   value={(form as any)[f.key]}
                   onChange={e => setForm({ ...form, [f.key]: e.target.value })}
