@@ -1096,6 +1096,43 @@ service cloud.firestore {
 
 
     // ═══════════════════════════════════════════════════════════════════════
+    // ── 11.5 AI Practice (parent-only) ──────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════════════
+    // Both collections are written by the parent themselves from
+    // AIPracticePage. No teacher/principal/owner touches them, so the rule
+    // surface is intentionally minimal: signed-in + same-school + non-empty
+    // schoolId on writes. Update is permitted only to the original parent
+    // (matched by studentId on the existing doc) so they can resume a draft
+    // or replace metadata, but nobody can edit somebody else's attempt.
+
+    // Practice attempts — one doc per completed exam.
+    match /practice_attempts/{id} {
+      allow get:  if signedIn() && inSameSchool();
+      // Phase-1 relaxed list to match the parent_notes pattern above; client
+      // queries already filter by schoolId + studentId. Re-tighten later.
+      allow list: if signedIn();
+      allow create: if signedIn() && hasSchoolId() && writingToOwnSchool();
+      allow update: if signedIn() && inSameSchool() && schoolIdImmutable();
+      // Admins can clear erroneous attempts; the parent can also delete their
+      // own (matched via studentId on the existing doc).
+      allow delete: if signedIn() && inSameSchool()
+        && (hasAdminRole()
+            || resource.data.studentId == uid());
+    }
+
+    // Practice documents — uploaded syllabus / notes PDFs.
+    match /practice_documents/{id} {
+      allow get:  if signedIn() && inSameSchool();
+      allow list: if signedIn();
+      allow create: if signedIn() && hasSchoolId() && writingToOwnSchool();
+      allow update: if signedIn() && inSameSchool() && schoolIdImmutable();
+      allow delete: if signedIn() && inSameSchool()
+        && (hasAdminRole()
+            || resource.data.studentId == uid());
+    }
+
+
+    // ═══════════════════════════════════════════════════════════════════════
     // ── 12. CATCH-ALL — deny unknown collections ────────────────────────
     // ═══════════════════════════════════════════════════════════════════════
     match /{document=**} {

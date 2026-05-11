@@ -10,8 +10,19 @@ import {
 import { scopedQuery } from "../lib/scopedQuery";
 import { toast } from "sonner";
 import * as pdfjsLib from "pdfjs-dist";
+// Self-host the PDF.js worker via Vite's `?url` import. Previously we pulled
+// it from `unpkg.com` at runtime — when the CDN was slow/blocked/version-
+// mismatched, PDF.js fell back to a "fake worker" that creates a `blob:` URL,
+// which our CSP blocks (no `worker-src` directive). Bundling the worker
+// locally eliminates the CDN dependency AND the blob fallback path.
+//
+// Vite produces a fingerprinted, same-origin asset URL — works under
+// the strictest CSP without any extra directive.
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore — Vite handles the `?url` query at build time.
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const C = {
@@ -485,10 +496,25 @@ const AIPracticePage = () => {
         </div>
 
         {/* ── Practice Calendar ── */}
+        {/* Practiced days now render in GREEN (GitHub-style contribution feel),
+            and a daily-streak chip sits in the card header so the parent
+            always sees the streak even when the heatmap is otherwise sparse. */}
         <div className="mx-[18px] mt-3 rounded-[22px] px-[18px] py-[18px]"
           style={{ background: CARD, boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-          <div className="text-[15px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Practice Calendar</div>
-          <div className="text-[11px] font-normal mt-[3px] mb-[14px]" style={{ color: T3 }}>{practiceDates.size} days practiced this year</div>
+          <div className="flex items-start justify-between gap-3 mb-[14px]">
+            <div>
+              <div className="text-[15px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Practice Calendar</div>
+              <div className="text-[11px] font-normal mt-[3px]" style={{ color: T3 }}>{practiceDates.size} days practiced</div>
+            </div>
+            <div className="shrink-0 px-[10px] py-[5px] rounded-full text-[11px] font-bold flex items-center gap-[5px]"
+              style={{
+                background: streak > 0 ? "rgba(0,200,83,0.10)" : "rgba(140,146,164,0.10)",
+                color: streak > 0 ? "#007830" : T3,
+                border: streak > 0 ? "0.5px solid rgba(0,200,83,0.22)" : "0.5px solid rgba(140,146,164,0.22)",
+              }}>
+              🔥 {streak} day streak
+            </div>
+          </div>
 
           {/* Heatmap 18×7 grid */}
           <div className="grid gap-[3px] mb-[10px]" style={{ gridTemplateColumns: "repeat(18, 1fr)" }}>
@@ -496,26 +522,29 @@ const AIPracticePage = () => {
               const dateStr = toLocalDateStr(day.date);
               const isToday = dateStr === todayStr;
               const isFuture = day.date > new Date();
-              let bg = BG2;
-              if (day.level > 0) bg = B1;
+              const practiced = day.level > 0;
               const cellStyle: React.CSSProperties = {
                 aspectRatio: "1",
                 borderRadius: 3,
-                background: isFuture ? "transparent" : bg,
+                background: isFuture ? "transparent" : practiced ? "#00C853" : BG2,
                 opacity: isFuture ? 0.15 : 1,
               };
               if (isToday) {
-                cellStyle.background = B1;
-                cellStyle.boxShadow = "0 0 0 2px rgba(0,85,255,0.30), 0 0 0 4px rgba(0,85,255,0.10)";
+                // Highlight today regardless of practice status; green ring if
+                // practiced, blue ring otherwise so it always stands out.
+                cellStyle.background = practiced ? "#00C853" : BG2;
+                cellStyle.boxShadow = practiced
+                  ? "0 0 0 2px rgba(0,200,83,0.35), 0 0 0 4px rgba(0,200,83,0.10)"
+                  : "0 0 0 2px rgba(0,85,255,0.30), 0 0 0 4px rgba(0,85,255,0.10)";
               }
               return <div key={idx} style={cellStyle} title={day.date.toLocaleDateString()} />;
             })}
           </div>
 
-          {/* Legend */}
+          {/* Legend — green gradient matches the practiced-day color. */}
           <div className="flex items-center gap-[6px] text-[10px] font-semibold" style={{ color: T4 }}>
             <span>Less</span>
-            {[BG2, "rgba(0,85,255,0.15)", "rgba(0,85,255,0.30)", "rgba(0,85,255,0.55)", B1].map((c, i) => (
+            {[BG2, "rgba(0,200,83,0.20)", "rgba(0,200,83,0.40)", "rgba(0,200,83,0.65)", "#00C853"].map((c, i) => (
               <div key={i} className="w-3 h-3 rounded-[3px]" style={{ background: c }} />
             ))}
             <span>More</span>
@@ -942,20 +971,22 @@ const AIPracticePage = () => {
 
       {/* ── Main Row: Calendar (col-2) + Recent Attempts (col-1) ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
-        {/* Calendar */}
+        {/* Calendar — green practiced cells + always-visible streak chip. */}
         <div className="lg:col-span-2 bg-white rounded-[22px] p-6"
           style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
           <div className="flex items-center justify-between mb-5">
             <div>
               <div className="text-[17px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Practice Calendar</div>
-              <div className="text-[11px] font-normal mt-[3px]" style={{ color: T3 }}>{practiceDates.size} days practiced this year</div>
+              <div className="text-[11px] font-normal mt-[3px]" style={{ color: T3 }}>{practiceDates.size} days practiced</div>
             </div>
-            {streak > 0 && (
-              <div className="px-[10px] py-[5px] rounded-full text-[11px] font-bold flex items-center gap-[5px]"
-                style={{ background: "rgba(255,136,0,0.10)", color: "#884400", border: "0.5px solid rgba(255,136,0,0.22)" }}>
-                🔥 {streak} day streak
-              </div>
-            )}
+            <div className="shrink-0 px-[12px] py-[6px] rounded-full text-[12px] font-bold flex items-center gap-[6px]"
+              style={{
+                background: streak > 0 ? "rgba(0,200,83,0.10)" : "rgba(140,146,164,0.10)",
+                color: streak > 0 ? "#007830" : T3,
+                border: streak > 0 ? "0.5px solid rgba(0,200,83,0.22)" : "0.5px solid rgba(140,146,164,0.22)",
+              }}>
+              🔥 {streak} day streak
+            </div>
           </div>
           <div className="overflow-x-auto">
             <div className="flex gap-[3px] min-w-[700px]">
@@ -965,13 +996,18 @@ const AIPracticePage = () => {
                     const today = new Date();
                     const isToday = day.date.toDateString() === today.toDateString();
                     const isFuture = day.date > today;
+                    const practiced = day.level > 0;
                     return (
                       <div key={di}
                         title={day.date.toLocaleDateString()}
                         style={{
                           width: 14, height: 14, borderRadius: 3,
-                          background: isFuture ? "transparent" : day.level > 0 ? B1 : BG2_D,
-                          boxShadow: isToday ? "0 0 0 2px rgba(0,85,255,0.30), 0 0 0 4px rgba(0,85,255,0.10)" : "none",
+                          background: isFuture ? "transparent" : practiced ? GREEN_D : BG2_D,
+                          boxShadow: isToday
+                            ? practiced
+                              ? "0 0 0 2px rgba(0,200,83,0.35), 0 0 0 4px rgba(0,200,83,0.10)"
+                              : "0 0 0 2px rgba(0,85,255,0.30), 0 0 0 4px rgba(0,85,255,0.10)"
+                            : "none",
                           opacity: isFuture ? 0.15 : 1,
                         }} />
                     );
@@ -981,7 +1017,7 @@ const AIPracticePage = () => {
             </div>
             <div className="flex items-center gap-2 mt-4 text-[11px] font-semibold" style={{ color: T4 }}>
               <span>Less</span>
-              {[BG2_D, "rgba(0,85,255,0.15)", "rgba(0,85,255,0.30)", "rgba(0,85,255,0.55)", B1].map((c, i) => (
+              {[BG2_D, "rgba(0,200,83,0.20)", "rgba(0,200,83,0.40)", "rgba(0,200,83,0.65)", GREEN_D].map((c, i) => (
                 <div key={i} className="w-[12px] h-[12px] rounded-[3px]" style={{ background: c }} />
               ))}
               <span>More</span>

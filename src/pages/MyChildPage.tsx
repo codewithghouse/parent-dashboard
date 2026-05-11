@@ -262,19 +262,36 @@ const MyChildPage = () => {
     return () => { unsubs.forEach(u => u()); };
   }, [studentData?.id, studentData?.schoolId, studentData?.email, studentData?.studentEmail]);
 
-  // ── Resolve current classId (from auth, or most-recent active enrollment) ──
-  const classId = useMemo(() => {
-    if (studentData?.classId) return studentData.classId;
-    const active = enrollments.find(e => e.status === "active") || enrollments[0];
-    return active?.classId || "";
+  // ── Resolve ALL enrolled classIds (multi-class students are common) ────────
+  // CRITICAL: a single-class query (`where classId == X`) silently misses any
+  // assignment posted to a class the student is enrolled in but isn't the one
+  // picked here. The user's exact symptom 2026-05-11: parent submitted an
+  // assignment from AssignmentsPage (which uses multi-class), MyChildPage
+  // didn't show it as submitted because the assignment itself never loaded.
+  // We mirror AssignmentsPage's `where("classId", "in", classIds)` pattern so
+  // both pages see the same set, and the submitted-flag flip is consistent.
+  const classIds = useMemo(() => {
+    const set = new Set<string>();
+    if (studentData?.classId) set.add(String(studentData.classId));
+    enrollments.forEach((e: any) => {
+      if (e?.classId) set.add(String(e.classId));
+    });
+    return Array.from(set);
   }, [studentData?.classId, enrollments]);
 
-  // ── Class-scoped assignments — LIVE listener so newly-published HW shows up
-  // for the parent without a refresh. Was previously a one-shot getDocs.
+  // ── LIVE multi-class assignments listener ──────────────────────────────────
+  // Firestore `in` operator currently supports up to 30 values; defensively
+  // cap the array so an edge-case student enrolled in >30 classes still gets
+  // a working subscription (their excess classes simply won't surface — rare,
+  // and a teacher-side enrollment-cleanup is the real fix in that scenario).
   useEffect(() => {
-    if (!classId || !studentData?.schoolId) { setAssignments([]); return; }
+    if (!studentData?.schoolId || classIds.length === 0) {
+      setAssignments([]);
+      return;
+    }
+    const limited = classIds.slice(0, 30);
     const unsub = onSnapshot(
-      scopedQuery("assignments", studentData.schoolId, where("classId", "==", classId)),
+      scopedQuery("assignments", studentData.schoolId, where("classId", "in", limited)),
       (snap) => setAssignments(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
       (err) => {
         console.error("[MyChild] assignments listener error:", err);
@@ -282,7 +299,10 @@ const MyChildPage = () => {
       },
     );
     return () => unsub();
-  }, [classId, studentData?.schoolId]);
+    // Depend on a stable string-join so the listener doesn't tear down on
+    // every render — only when the actual list of classIds changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classIds.join("|"), studentData?.schoolId]);
 
   // Merged student (live master overrides cached studentData)
   const student = useMemo(() => ({ ...studentData, ...(masterProfile || {}) }), [studentData, masterProfile]);
@@ -774,15 +794,32 @@ const MyChildPage = () => {
             {calDays.map((d, i) => {
               if (!d) return <div key={i} />;
               const isToday = d.date.toDateString() === today.toDateString();
-              const bg = d.status === "present" ? T.grn : d.status === "late" ? T.amb : d.status === "absent" ? T.red : "transparent";
               const isWknd = d.date.getDay() === 0 || d.date.getDay() === 6;
+              // "Not marked" = past weekday, teacher didn't take attendance.
+              // Distinct from "absent" (red — student was actually absent).
+              // Honest visual signal so parent doesn't blame the student when
+              // no roll-call happened.
+              const isPastWeekday = !isWknd && d.date.getTime() < today.getTime();
+              const isUnmarked = !d.status && isPastWeekday && !isToday;
+              const bg =
+                d.status === "present" ? T.grn :
+                d.status === "late" ? T.amb :
+                d.status === "absent" ? T.red :
+                isUnmarked ? T.s3 :
+                "transparent";
+              const fontColor = d.status
+                ? "#fff"
+                : isUnmarked ? T.ink2
+                : isWknd ? T.ink3
+                : T.ink;
               return (
                 <div key={i} style={{
                   width: 32, height: 32, borderRadius: isToday ? "50%" : 8, margin: "0 auto",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 12, fontWeight: isToday ? 700 : 400,
-                  color: d.status ? "#fff" : isWknd ? T.ink3 : T.ink,
+                  color: fontColor,
                   background: isToday && !d.status ? T.blue : bg,
+                  border: isUnmarked ? `0.5px solid ${T.s2}` : "none",
                 }}>
                   {d.dayNum}
                 </div>
@@ -795,7 +832,7 @@ const MyChildPage = () => {
               { c: T.amb, l: "Late" },
               { c: T.red, l: "Absent" },
               { c: T.s2, l: "Weekend" },
-              { c: T.s3, l: "No Data" },
+              { c: T.s3, l: "Not marked" },
             ].map(x => (
               <div key={x.l} style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <div style={{ width: 8, height: 8, borderRadius: 2, background: x.c, border: `1px solid ${T.s2}` }} />

@@ -214,6 +214,7 @@ export const parentAIProxy = functions
       jsonMode = true,
       imageBase64,
       model,
+      maxTokens: clientMaxTokens,
     } = data || {};
 
     // Defensive systemPrompt resolution: destructure default only fires for
@@ -271,13 +272,26 @@ export const parentAIProxy = functions
         ? [resolvedModel]
         : Array.from(new Set<string>([resolvedModel, ...MODEL_FALLBACK_CHAIN]));
 
+      // Resolve max_tokens with sane bounds. The 1500 default was too small
+      // for AI Practice exam generation (20 MCQs with explanations easily
+      // exceed it) — OpenAI then truncates mid-string and our JSON parse
+      // throws. Default raised to 4096; client can request up to 6000 for
+      // heavy payloads. Cost is per actual output tokens generated, not
+      // per cap, so raising the ceiling is free for short-response callers.
+      const RESOLVED_MAX_TOKENS = (() => {
+        if (typeof clientMaxTokens === "number" && Number.isFinite(clientMaxTokens)) {
+          return Math.max(256, Math.min(6000, Math.floor(clientMaxTokens)));
+        }
+        return 4096;
+      })();
+
       let lastErr: any = null;
       for (const candidate of modelsToTry) {
         try {
           const completion = await openai.chat.completions.create({
             model: candidate,
             messages,
-            max_tokens: 1500,
+            max_tokens: RESOLVED_MAX_TOKENS,
             ...(jsonMode && !hasImage ? { response_format: { type: "json_object" } } : {}),
           });
           const content = completion.choices[0]?.message?.content ?? "";

@@ -1,23 +1,282 @@
-import { useEffect, useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState, useMemo } from "react";
+import type { ComponentType, ReactNode } from "react";
+import { useNavigate, type NavigateFunction } from "react-router-dom";
 import {
-  ArrowUp, ArrowDown, Minus, Loader2,
+  ArrowUp, ArrowDown, Minus, Loader2, AlertCircle,
   Calculator, FlaskConical, Languages, Globe, Monitor, Palette, BookOpen,
-  Sparkles, Target, Trophy
+  Sparkles, Target, Trophy,
+  FileText, Calendar, CheckCircle2, Clock, Heart, AlertTriangle, Activity, ChevronRight,
 } from "lucide-react";
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
+import {
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart,
+} from "recharts";
 import { SubjectPerformanceDetail } from "@/components/performance/SubjectPerformanceDetail";
 import { useAuth } from "@/lib/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, getDocs } from "firebase/firestore";
+import { onSnapshot, where } from "firebase/firestore";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useSchoolSettings } from "@/hooks/useSchoolSettings";
+import { subscribePerStudent } from "@/lib/perStudentQuery";
+import { subscribeEnrollments } from "@/lib/enrollmentQuery";
+import { scopedQuery } from "@/lib/scopedQuery";
 import {
   generatePerformanceNarrative,
   getGoalInsight,
   getBenchmarkTier,
 } from "@/ai/system/performance-insights";
 
-const getSubIcon = (name: string) => {
+/* ════════════════════════════════════════════════════════════════════════
+   TYPES — strict shapes for raw + derived data so the page can't silently
+   read a missing field as `any`.
+   ════════════════════════════════════════════════════════════════════════ */
+
+interface RawScore {
+  id: string;
+  studentId?: string;
+  studentEmail?: string;
+  classId?: string;
+  subject?: string;
+  subjectName?: string;
+  topic?: string;
+  topics?: string[];
+  testName?: string;
+  columnName?: string;
+  // Numeric variants stamped by different writers across the project:
+  score?: number | string;
+  maxScore?: number | string;
+  mark?: number | string;
+  maxMarks?: number | string;
+  marks?: number | string;
+  percentage?: number | string;
+  // Timestamp variants — each writer uses a different field name.
+  timestamp?: { toDate?: () => Date; seconds?: number } | string | number | null;
+  createdAt?: { toDate?: () => Date; seconds?: number } | string | number | null;
+  date?: string | number | null;
+  testDate?: string | number | null;
+}
+
+interface RawFeedback {
+  id: string;
+  studentId?: string;
+  studentEmail?: string;
+  subject?: string;
+  teacherName?: string;
+  content?: string;
+  message?: string;
+  timestamp?: { toDate?: () => Date; seconds?: number } | string | number | null;
+  createdAt?: { toDate?: () => Date; seconds?: number } | string | number | null;
+}
+
+interface SubjectAgg {
+  name: string;
+  grade: string;
+  progress: number;
+  status: string;
+  trendDir: "up" | "down" | "stable";
+  raw: RawScore[];
+}
+
+interface OverallStats {
+  grade: string;     // "A+" or "—"
+  avg: number;       // 0-100
+  trend: string;     // "+8%" or "—"
+  hasData: boolean;
+}
+
+interface TrendPoint {
+  month: string;
+  score: number | null;
+}
+
+/* ── Additional collections for end-to-end performance picture ─────── */
+
+interface RawAssignment {
+  id: string;
+  title?: string;
+  classId?: string;
+  dueDate?: { toDate?: () => Date; seconds?: number } | string | number | null;
+  createdAt?: { toDate?: () => Date; seconds?: number } | string | number | null;
+}
+
+interface RawSubmission {
+  id: string;
+  studentId?: string;
+  studentEmail?: string;
+  // Memory `bug_pattern_dual_id_writer_or_short_circuit`: writer stamps
+  // BOTH `homeworkId` (assignment doc id) AND `assignmentId` (teaching
+  // assignment id, falls back to "legacy"). Reader must match either.
+  homeworkId?: string;
+  assignmentId?: string;
+  status?: string;          // "Submitted" / "Not Submitted" / undefined
+  submittedAt?: { toDate?: () => Date; seconds?: number } | string | number | null;
+  timestamp?: { toDate?: () => Date; seconds?: number } | string | number | null;
+  score?: number | string;
+  grade?: number | string;
+}
+
+interface RawAttendance {
+  id: string;
+  studentId?: string;
+  studentEmail?: string;
+  // Memory `bug_pattern_ist_vs_utc_date_filter`: MarkAttendance writes
+  // `date` as IST date string `YYYY-MM-DD`. Compare with IST-aware key.
+  date?: string;
+  status?: string;          // "present" / "late" / "absent"
+}
+
+interface RawIncident {
+  id: string;
+  studentId?: string;
+  studentEmail?: string;
+  type?: string;
+  severity?: string;
+  description?: string;
+  content?: string;
+  createdAt?: { toDate?: () => Date; seconds?: number } | string | number | null;
+  date?: { toDate?: () => Date; seconds?: number } | string | number | null;
+}
+
+interface RawRating {
+  id: string;
+  studentId?: string;
+  studentEmail?: string;
+  rating?: number | string;
+  note?: string;
+  createdAt?: { toDate?: () => Date; seconds?: number } | string | number | null;
+}
+
+/** Derived snapshot — every metric the parent should see at a glance. */
+interface PerformanceSnapshot {
+  subjectsAvg: number | null;       // 0-100 or null
+  testsAvg: number | null;
+  testCount: number;
+  assignmentTotal: number;
+  assignmentSubmitted: number;
+  assignmentOnTime: number;
+  attendancePresent: number;
+  attendanceLate: number;
+  attendanceAbsent: number;
+  attendanceRate: number | null;    // 0-100
+  attendanceTotal: number;
+  incidents30d: number;
+  ratingAvg: number | null;         // 0-5 scale
+  ratingCount: number;
+}
+
+interface AssignmentRow {
+  id: string;
+  title: string;
+  dueDate: Date | null;
+  submitted: boolean;
+  onTime: boolean | null;
+}
+
+interface TestScoreRow {
+  id: string;
+  name: string;
+  subject: string;
+  date: Date | null;
+  pct: number;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   HELPERS — score normalization, date safety, grading, subject key.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Return a 0-100 percentage from any score doc — or `null` when the doc
+ * doesn't have enough information for an honest conversion.
+ *
+ * Memory `bug_pattern_score_zero_no_data`: distinguish "no data" from
+ * "actual 0%". Returning `null` lets the caller drop the doc from
+ * averages without conflating a missing score with a real zero.
+ *
+ * Memory `bug_pattern_score_field_singular_mark`: gradebook writes
+ * `mark` (singular) + `maxMarks`. We check that first since gradebook
+ * is the most common writer.
+ */
+const pctOf = (s: RawScore): number | null => {
+  if (s.percentage != null) {
+    const p = Number(s.percentage);
+    if (isFinite(p) && p >= 0) return Math.min(100, p);
+  }
+  if (s.mark != null && s.maxMarks != null) {
+    const m = Number(s.mark);
+    const max = Number(s.maxMarks);
+    if (isFinite(m) && isFinite(max) && max > 0 && m >= 0) {
+      return Math.min(100, (m / max) * 100);
+    }
+  }
+  if (s.score != null && s.maxScore != null) {
+    const v = Number(s.score);
+    const max = Number(s.maxScore);
+    if (isFinite(v) && isFinite(max) && max > 0 && v >= 0) {
+      return Math.min(100, (v / max) * 100);
+    }
+  }
+  if (s.marks != null) {
+    const v = Number(s.marks);
+    if (isFinite(v) && v >= 0 && v <= 100) return v;
+  }
+  // Score alone without explicit max — only safe to interpret as a
+  // percentage when the value is plausibly in [0,100]. If a teacher
+  // writes `score: 25` thinking out-of-50, we can't recover that
+  // intent here; better to return null than fabricate "25%".
+  if (s.score != null && s.maxScore == null) {
+    const v = Number(s.score);
+    if (isFinite(v) && v >= 0 && v <= 100) return v;
+  }
+  return null;
+};
+
+const toSafeDate = (v: unknown): Date | null => {
+  if (!v) return null;
+  if (typeof v === "object" && v !== null) {
+    const obj = v as { toDate?: () => Date; seconds?: number };
+    if (typeof obj.toDate === "function") return obj.toDate();
+    if (typeof obj.seconds === "number") return new Date(obj.seconds * 1000);
+  }
+  if (typeof v === "string" || typeof v === "number") {
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+};
+
+const scoreDateMs = (s: RawScore): number => {
+  const d =
+    toSafeDate(s.timestamp) ||
+    toSafeDate(s.createdAt) ||
+    toSafeDate(s.testDate) ||
+    toSafeDate(s.date);
+  return d ? d.getTime() : 0;
+};
+
+/** Real-subject key — drops testName / columnName (those are titles, not
+ *  subjects). Memory: subject grouping with bogus keys creates spurious
+ *  cards like "Unit Test 1" or "Col-abc123" as if they were subjects. */
+const subjectKey = (s: RawScore): string => {
+  const k = (s.subject || s.subjectName || "").trim();
+  return k || "General";
+};
+
+const gradeFor = (avg: number): string =>
+  avg >= 90 ? "A+" :
+  avg >= 85 ? "A" :
+  avg >= 80 ? "A-" :
+  avg >= 75 ? "B+" :
+  avg >= 70 ? "B" :
+  avg >= 65 ? "C+" : "C";
+
+const subjectStatusFor = (avg: number): string =>
+  avg >= 90 ? "Outstanding" :
+  avg >= 80 ? "Excellent" :
+  avg >= 70 ? "Improving" :
+  avg >= 60 ? "Stable" : "Needs Attention";
+
+const getSubIcon = (
+  name: string,
+): ComponentType<{ className?: string; strokeWidth?: number; style?: React.CSSProperties }> => {
   const n = name.toLowerCase();
   if (n.includes("math")) return Calculator;
   if (n.includes("science")) return FlaskConical;
@@ -28,1188 +287,2505 @@ const getSubIcon = (name: string) => {
   return BookOpen;
 };
 
-const CHART_COLORS = ["#1e3a8a", "#10b981", "#f59e0b", "#6366f1", "#ef4444", "#06b6d4"];
+/** IST date key — `MarkAttendance.tsx` writes `date` as IST `YYYY-MM-DD`.
+ *  Comparing with UTC silently drops early-IST-morning marks. */
+const istKey = (d: Date): string =>
+  d.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Match a submission to an assignment via EITHER `homeworkId` or
+ *  `assignmentId`. Memory `bug_pattern_dual_id_writer_or_short_circuit`. */
+const submissionMatchesAssignment = (sub: RawSubmission, asgId: string): boolean =>
+  sub.homeworkId === asgId || sub.assignmentId === asgId;
+
+const isSubmissionCompleted = (s: RawSubmission): boolean =>
+  String(s.status || "").toLowerCase() !== "not submitted";
+
+/** Was the submission submitted on-time (before or on the due date)? */
+const wasOnTime = (sub: RawSubmission, dueDate: Date | null): boolean | null => {
+  if (!dueDate) return null;
+  const submittedAt =
+    toSafeDate(sub.submittedAt) || toSafeDate(sub.timestamp);
+  if (!submittedAt) return null;
+  // End-of-day grace on the due date (matches AssignmentsPage convention).
+  const eod = new Date(dueDate);
+  eod.setHours(23, 59, 59, 999);
+  return submittedAt.getTime() <= eod.getTime();
+};
+
+/* ════════════════════════════════════════════════════════════════════════
+   DESIGN TOKENS — single source for both mobile + desktop, so the two
+   branches stay in sync instead of duplicating the palette.
+   ════════════════════════════════════════════════════════════════════════ */
+
+const T_PALETTE = {
+  B1: "#0055FF", B2: "#1166FF", B3: "#2277FF", B4: "#4499FF",
+  BG: "#EEF4FF", BG2: "#E0ECFF",
+  T1: "#001040", T2: "#002080", T3: "#5070B0", T4: "#99AACC",
+  SEP: "rgba(0,85,255,0.07)",
+  GREEN: "#00C853",
+  GREEN_S: "rgba(0,200,83,0.12)",
+  GREEN_B: "rgba(0,200,83,0.25)",
+  GREEN_DEEP: "#007830",
+  RED: "#FF3355",
+  ORANGE: "#FF8800",
+  SH:    "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.09), 0 10px 28px rgba(0,85,255,0.11)",
+  SH_LG: "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 20px 48px rgba(0,85,255,0.14)",
+};
+
+const UNIT_ACCENTS = [
+  { icoBg: `linear-gradient(135deg, ${T_PALETTE.B1}, ${T_PALETTE.B3})`, icoShadow: "0 3px 10px rgba(0,85,255,0.28)" },
+  { icoBg: "linear-gradient(135deg, #0044EE, #2277FF)", icoShadow: "0 3px 10px rgba(0,68,238,0.28)" },
+  { icoBg: "linear-gradient(135deg, #002DBB, #0055FF)", icoShadow: "0 3px 10px rgba(0,45,187,0.28)" },
+  { icoBg: "linear-gradient(135deg, #1155EE, #44AAFF)", icoShadow: "0 3px 10px rgba(17,85,238,0.28)" },
+];
+
+/* ════════════════════════════════════════════════════════════════════════
+   SHARED SUB-COMPONENTS — single source between mobile + desktop. The
+   page's outer layout still branches on isMobile, but every card body
+   lives in exactly one place.
+   ════════════════════════════════════════════════════════════════════════ */
+
+const ListenerErrorBanner = ({
+  message, onRetry, marginClass,
+}: { message: string; onRetry: () => void; marginClass: string }) => (
+  <div
+    className={`${marginClass} px-4 py-3 rounded-[14px] flex items-center gap-3`}
+    style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b" }}
+  >
+    <AlertCircle className="w-4 h-4 shrink-0" />
+    <div className="flex-1 text-[12px] md:text-[13px]">{message}</div>
+    <button onClick={onRetry} className="text-[11px] md:text-[12px] font-bold underline">
+      Retry
+    </button>
+  </div>
+);
+
+const LoadingBlock = ({ isMobile }: { isMobile: boolean }) =>
+  isMobile ? (
+    <div className="flex flex-col items-center gap-3 py-14" style={{ color: T_PALETTE.T4 }}>
+      <Loader2 className="w-8 h-8 animate-spin" style={{ color: T_PALETTE.B1 }} />
+      <p className="text-sm">Loading performance data…</p>
+    </div>
+  ) : (
+    <div
+      className="bg-white rounded-[22px] py-20 flex flex-col items-center gap-3"
+      style={{ boxShadow: T_PALETTE.SH, border: "0.5px solid rgba(0,85,255,0.10)" }}
+    >
+      <Loader2 className="w-10 h-10 animate-spin" style={{ color: T_PALETTE.B1 }} />
+      <p className="text-[13px] font-bold uppercase tracking-widest" style={{ color: T_PALETTE.T4 }}>
+        Loading performance data…
+      </p>
+    </div>
+  );
+
+const EmptyBlock = ({ isMobile }: { isMobile: boolean }) =>
+  isMobile ? (
+    <div
+      className="mx-5 mt-3 rounded-[22px] py-10 flex flex-col items-center text-center"
+      style={{ background: "white", border: "0.5px solid rgba(0,85,255,0.10)" }}
+    >
+      <div
+        className="w-14 h-14 rounded-[18px] flex items-center justify-center mb-3"
+        style={{ background: T_PALETTE.BG2, border: "0.5px solid rgba(0,85,255,0.14)" }}
+      >
+        <BookOpen className="w-7 h-7" style={{ color: T_PALETTE.T4 }} />
+      </div>
+      <div className="text-[15px] font-bold" style={{ color: T_PALETTE.T2 }}>
+        No assessments yet
+      </div>
+      <div className="text-[12px] mt-1" style={{ color: T_PALETTE.T4 }}>
+        Scores will appear here once graded.
+      </div>
+    </div>
+  ) : (
+    <div
+      className="bg-white rounded-[22px] py-20 flex flex-col items-center gap-3 text-center"
+      style={{ boxShadow: T_PALETTE.SH, border: "0.5px solid rgba(0,85,255,0.10)" }}
+    >
+      <div
+        className="w-16 h-16 rounded-[20px] flex items-center justify-center"
+        style={{ background: T_PALETTE.BG2, border: "0.5px solid rgba(0,85,255,0.14)" }}
+      >
+        <BookOpen className="w-8 h-8" style={{ color: T_PALETTE.T4 }} />
+      </div>
+      <div className="text-[16px] font-bold" style={{ color: T_PALETTE.T2 }}>
+        No assessments yet
+      </div>
+      <div className="text-[13px] mt-1" style={{ color: T_PALETTE.T4 }}>
+        Scores will appear here once graded.
+      </div>
+    </div>
+  );
+
+/* ── Overall hero ─────────────────────────────────────────────────────── */
+
+interface OverallHeroProps {
+  stats: OverallStats;
+  isMobile: boolean;
+  navigate: NavigateFunction;
+}
+
+const OverallPerformanceHero = ({ stats, isMobile, navigate }: OverallHeroProps) => {
+  const trendNum = parseInt(stats.trend.replace(/[^0-9-]/g, ""), 10) || 0;
+  const trendColor =
+    !stats.hasData ? T_PALETTE.T4 :
+    trendNum > 0 ? T_PALETTE.GREEN :
+    trendNum < 0 ? T_PALETTE.RED : "#008844";
+
+  const go = () => navigate("/reports");
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); }
+  };
+
+  if (isMobile) {
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label="Open reports page"
+        onClick={go}
+        onKeyDown={onKey}
+        className="mx-5 mt-4 bg-white rounded-[24px] p-5 relative overflow-hidden cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+        style={{ boxShadow: T_PALETTE.SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}
+      >
+        <div
+          className="absolute -top-[50px] -right-[30px] w-[160px] h-[160px] rounded-full pointer-events-none"
+          style={{ background: "radial-gradient(circle, rgba(0,85,255,0.06) 0%, transparent 70%)" }}
+        />
+        <div
+          className="text-[16px] font-bold relative z-10"
+          style={{ color: T_PALETTE.T1, letterSpacing: "-0.3px", marginBottom: 3 }}
+        >
+          Overall Performance
+        </div>
+        <div className="text-[11px] mb-4 relative z-10" style={{ color: T_PALETTE.T3 }}>
+          Across all recorded assessments
+        </div>
+        <div className="grid grid-cols-3 gap-[10px] relative z-10">
+          <StatTile label="Grade" value={stats.grade} color={T_PALETTE.B1} compact />
+          <StatTile
+            label="Average"
+            value={stats.hasData ? `${stats.avg}%` : "—"}
+            color={T_PALETTE.T1}
+            compact
+          />
+          <StatTile label="Trend" value={stats.trend} color={trendColor} compact />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label="Open reports page"
+      onClick={go}
+      onKeyDown={onKey}
+      className="bg-white rounded-[24px] p-7 relative overflow-hidden mb-5 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+      style={{ boxShadow: T_PALETTE.SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}
+    >
+      <div
+        className="absolute -top-[60px] -right-[40px] w-[240px] h-[240px] rounded-full pointer-events-none"
+        style={{ background: "radial-gradient(circle, rgba(0,85,255,0.06) 0%, transparent 70%)" }}
+      />
+      <div className="flex items-center justify-between gap-6 flex-wrap relative z-10">
+        <div>
+          <div
+            className="text-[20px] font-bold"
+            style={{ color: T_PALETTE.T1, letterSpacing: "-0.4px" }}
+          >
+            Overall Performance
+          </div>
+          <div className="text-[13px] mt-1" style={{ color: T_PALETTE.T3 }}>
+            Across all recorded assessments
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <StatTile label="Grade" value={stats.grade} color={T_PALETTE.B1} />
+          <StatTile
+            label="Average"
+            value={stats.hasData ? `${stats.avg}%` : "—"}
+            color={T_PALETTE.T1}
+          />
+          <StatTile
+            label="Trend"
+            value={stats.trend}
+            color={trendColor}
+            trendIcon={
+              !stats.hasData ? <Minus className="w-5 h-5" style={{ color: trendColor }} /> :
+              trendNum > 0 ? <ArrowUp className="w-5 h-5" style={{ color: trendColor }} /> :
+              trendNum < 0 ? <ArrowDown className="w-5 h-5" style={{ color: trendColor }} /> :
+              <Minus className="w-5 h-5" style={{ color: trendColor }} />
+            }
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const StatTile = ({
+  label, value, color, compact, trendIcon,
+}: {
+  label: string;
+  value: string;
+  color: string;
+  compact?: boolean;
+  trendIcon?: ReactNode;
+}) => {
+  const valFontSize = compact ? (label === "Trend" ? 18 : 22) : 36;
+  const trendValSize = compact ? 18 : 28;
+  return (
+    <div
+      className={
+        compact
+          ? "flex flex-col items-center gap-[5px] px-3 py-[14px] rounded-[16px]"
+          : "flex flex-col items-center gap-[6px] px-6 py-4 rounded-[18px] min-w-[140px]"
+      }
+      style={{ background: T_PALETTE.BG, border: "0.5px solid rgba(0,85,255,0.10)" }}
+    >
+      {trendIcon ? (
+        <div className="flex items-center gap-1">
+          {trendIcon}
+          <div
+            className="font-bold"
+            style={{ color, letterSpacing: compact ? "-0.5px" : "-0.8px", fontSize: trendValSize }}
+          >
+            {value}
+          </div>
+        </div>
+      ) : (
+        <div
+          className="font-bold"
+          style={{ color, letterSpacing: compact ? "-0.5px" : "-1px", fontSize: valFontSize }}
+        >
+          {value}
+        </div>
+      )}
+      <div
+        className={compact ? "text-[9px] font-bold uppercase tracking-[0.09em]" : "text-[10px] font-bold uppercase tracking-[0.10em]"}
+        style={{ color: T_PALETTE.T4 }}
+      >
+        {label}
+      </div>
+    </div>
+  );
+};
+
+/* ── Subject card ─────────────────────────────────────────────────────── */
+
+interface SubjectCardProps {
+  subject: SubjectAgg;
+  idx: number;
+  isMobile: boolean;
+  onClick: () => void;
+}
+
+const SubjectCard = ({ subject: s, idx, isMobile, onClick }: SubjectCardProps) => {
+  const acc = UNIT_ACCENTS[idx % UNIT_ACCENTS.length];
+  const Icon = getSubIcon(s.name);
+  const needsAttention = s.progress < 60;
+  const fill = needsAttention
+    ? `linear-gradient(90deg, ${T_PALETTE.RED}, #FF6688)`
+    : s.progress < 75
+      ? `linear-gradient(90deg, ${T_PALETTE.ORANGE}, #FFAA33)`
+      : `linear-gradient(90deg, ${T_PALETTE.B1}, ${T_PALETTE.B4})`;
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Open ${s.name} performance detail`}
+      onClick={onClick}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
+      className={
+        isMobile
+          ? "mx-5 mt-3 bg-white rounded-[22px] px-5 py-[18px] relative overflow-hidden active:scale-[0.98] transition-transform cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+          : "bg-white rounded-[22px] px-5 py-5 relative overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+      }
+      style={{ boxShadow: T_PALETTE.SH, border: "0.5px solid rgba(0,85,255,0.10)" }}
+    >
+      <div className={`flex items-center justify-between ${isMobile ? "mb-[14px]" : "mb-4"}`}>
+        <div className="flex items-center gap-[10px]">
+          <div
+            className={isMobile ? "w-9 h-9 rounded-[12px] flex items-center justify-center" : "w-10 h-10 rounded-[13px] flex items-center justify-center"}
+            style={{ background: acc.icoBg, boxShadow: acc.icoShadow }}
+          >
+            <Icon
+              className={isMobile ? "w-[18px] h-[18px] text-white" : "w-5 h-5 text-white"}
+              strokeWidth={2.2}
+            />
+          </div>
+          <span
+            className={isMobile ? "text-[15px] font-bold" : "text-[16px] font-bold"}
+            style={{ color: T_PALETTE.T1, letterSpacing: "-0.2px" }}
+          >
+            {s.name}
+          </span>
+        </div>
+        <div
+          className={
+            isMobile
+              ? "w-7 h-7 rounded-[9px] flex items-center justify-center text-[12px] font-bold text-white"
+              : "w-8 h-8 rounded-[10px] flex items-center justify-center text-[13px] font-bold text-white"
+          }
+          style={{
+            background: `linear-gradient(135deg, ${T_PALETTE.B1}, ${T_PALETTE.B2})`,
+            boxShadow: "0 2px 8px rgba(0,85,255,0.30)",
+          }}
+        >
+          {s.grade}
+        </div>
+      </div>
+      <div className="flex items-center justify-between mb-2">
+        <span
+          className="text-[11px] font-bold"
+          style={{ color: T_PALETTE.T2, letterSpacing: "-0.1px" }}
+        >
+          Progress
+        </span>
+        <span
+          className={isMobile ? "text-[13px] font-bold" : "text-[14px] font-bold"}
+          style={{ color: T_PALETTE.B1 }}
+        >
+          {s.progress}%
+        </span>
+      </div>
+      <div
+        className={isMobile ? "h-[7px] rounded-[4px] overflow-hidden mb-[10px]" : "h-2 rounded-[4px] overflow-hidden mb-3"}
+        style={{ background: T_PALETTE.BG2 }}
+      >
+        <div
+          className="h-full rounded-[4px] transition-all duration-700"
+          style={{ width: `${Math.max(s.progress, 3)}%`, background: fill }}
+        />
+      </div>
+      {needsAttention ? (
+        <div
+          className={
+            isMobile
+              ? "inline-flex items-center gap-[5px] px-[11px] py-1 rounded-full text-[10px] font-bold"
+              : "inline-flex items-center gap-[5px] px-3 py-1 rounded-full text-[10px] font-bold"
+          }
+          style={{
+            background: "rgba(255,51,85,0.10)",
+            color: T_PALETTE.RED,
+            border: "0.5px solid rgba(255,51,85,0.22)",
+          }}
+        >
+          <span className="w-[10px] h-[1.5px]" style={{ background: T_PALETTE.RED }} />
+          Needs Attention
+        </div>
+      ) : s.progress >= 75 ? (
+        <div
+          className={
+            isMobile
+              ? "inline-flex items-center gap-[5px] px-[11px] py-1 rounded-full text-[10px] font-bold"
+              : "inline-flex items-center gap-[5px] px-3 py-1 rounded-full text-[10px] font-bold"
+          }
+          style={{
+            background: T_PALETTE.GREEN_S,
+            color: "#007830",
+            border: `0.5px solid ${T_PALETTE.GREEN_B}`,
+          }}
+        >
+          ✓ On Track
+        </div>
+      ) : (
+        <div
+          className={
+            isMobile
+              ? "inline-flex items-center gap-[5px] px-[11px] py-1 rounded-full text-[10px] font-bold"
+              : "inline-flex items-center gap-[5px] px-3 py-1 rounded-full text-[10px] font-bold"
+          }
+          style={{
+            background: "rgba(255,136,0,0.12)",
+            color: T_PALETTE.ORANGE,
+            border: "0.5px solid rgba(255,136,0,0.25)",
+          }}
+        >
+          Stable
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ── Trend chart ──────────────────────────────────────────────────────── */
+
+const TrendChartCard = ({
+  data, isMobile, navigate,
+}: {
+  data: TrendPoint[];
+  isMobile: boolean;
+  navigate: NavigateFunction;
+}) => {
+  const points = data.filter(p => p.score != null);
+  if (points.length < 2) return null;
+
+  const go = () => navigate("/reports");
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); }
+  };
+
+  const lineGradId = isMobile ? "perfLineBlueM" : "perfLineBlueD";
+  const areaGradId = isMobile ? "perfAreaBlueM" : "perfAreaBlueD";
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label="Open reports page for detailed trend"
+      onClick={go}
+      onKeyDown={onKey}
+      className={
+        isMobile
+          ? "mx-5 mt-3 bg-white rounded-[24px] px-5 pt-5 pb-4 cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+          : "lg:col-span-3 bg-white rounded-[24px] px-6 pt-6 pb-5 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+      }
+      style={{ boxShadow: T_PALETTE.SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}
+    >
+      <div
+        className={isMobile ? "text-[16px] font-bold" : "text-[18px] font-bold"}
+        style={{ color: T_PALETTE.T1, letterSpacing: "-0.3px", marginBottom: 4 }}
+      >
+        Performance Trend
+      </div>
+      <div className={isMobile ? "text-[11px] mb-4" : "text-[12px] mt-1 mb-4"} style={{ color: T_PALETTE.T3 }}>
+        Score progression across recent months
+      </div>
+      <div className={isMobile ? "h-[150px] w-full" : "h-[240px] w-full"}>
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data} margin={{ top: 6, right: 6, left: isMobile ? -18 : -10, bottom: 0 }}>
+            <defs>
+              <linearGradient id={areaGradId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={T_PALETTE.B1} stopOpacity={isMobile ? 0.20 : 0.22} />
+                <stop offset="100%" stopColor={T_PALETTE.B1} stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id={lineGradId} x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor={T_PALETTE.B1} />
+                <stop offset="100%" stopColor="#66BBFF" />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="0" vertical={false} stroke="rgba(0,85,255,0.07)" />
+            <XAxis
+              dataKey="month"
+              axisLine={false}
+              tickLine={false}
+              tick={{ fontSize: isMobile ? 9 : 11, fill: T_PALETTE.T4, fontWeight: 600 }}
+            />
+            <YAxis
+              axisLine={false}
+              tickLine={false}
+              tick={{ fontSize: isMobile ? 9 : 11, fill: T_PALETTE.T4, fontWeight: 600 }}
+              domain={[0, 100]}
+              width={isMobile ? 30 : 36}
+            />
+            <Tooltip
+              contentStyle={{
+                borderRadius: 12,
+                border: "0.5px solid rgba(0,85,255,0.15)",
+                boxShadow: "0 4px 20px rgba(0,85,255,0.12)",
+                fontSize: isMobile ? 11 : 12,
+                padding: isMobile ? "6px 10px" : "8px 12px",
+              }}
+            />
+            <Area
+              type="monotone"
+              dataKey="score"
+              stroke={`url(#${lineGradId})`}
+              strokeWidth={isMobile ? 2.5 : 3}
+              fill={`url(#${areaGradId})`}
+              dot={{ r: isMobile ? 4 : 5, strokeWidth: 2, stroke: "#fff", fill: T_PALETTE.B1 }}
+              activeDot={{ r: isMobile ? 6 : 7, strokeWidth: 2 }}
+              connectNulls={false}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="flex items-center justify-center gap-[6px] mt-2">
+        <span
+          className={isMobile ? "w-6 h-[2.5px] rounded-[2px]" : "w-7 h-[3px] rounded-[2px]"}
+          style={{ background: T_PALETTE.B1 }}
+        />
+        <span
+          className={isMobile ? "text-[11px] font-medium" : "text-[12px] font-medium"}
+          style={{ color: T_PALETTE.T3 }}
+        >
+          Overall Average
+        </span>
+      </div>
+    </div>
+  );
+};
+
+/* ── Narrative card (system-generated, not AI — drop "AI" framing) ──── */
+
+const NarrativeCard = ({
+  narrative, isMobile, navigate,
+}: {
+  narrative: string;
+  isMobile: boolean;
+  navigate: NavigateFunction;
+}) => {
+  const go = () => navigate("/reports");
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); }
+  };
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label="Open reports page for full narrative"
+      onClick={go}
+      onKeyDown={onKey}
+      className={
+        isMobile
+          ? "mx-5 mt-3 rounded-[24px] px-5 py-[18px] relative overflow-hidden cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+          : "lg:col-span-2 rounded-[24px] px-6 py-6 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+      }
+      style={{
+        background: "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)",
+        boxShadow: "0 8px 30px rgba(0,51,204,0.34), 0 0 0 0.5px rgba(255,255,255,0.14)",
+        border: "0.5px solid rgba(255,255,255,0.14)",
+      }}
+    >
+      <div
+        className={isMobile ? "absolute -top-10 -right-7 w-[180px] h-[180px] rounded-full pointer-events-none" : "absolute -top-10 -right-7 w-[220px] h-[220px] rounded-full pointer-events-none"}
+        style={{ background: "radial-gradient(circle, rgba(255,255,255,0.14) 0%, transparent 65%)" }}
+      />
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,0.014) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.014) 1px, transparent 1px)",
+          backgroundSize: "24px 24px",
+        }}
+      />
+      <div className={`flex items-center gap-[8px] ${isMobile ? "mb-[14px]" : "mb-4"} relative z-10`}>
+        <div
+          className={isMobile ? "w-[30px] h-[30px] rounded-[9px] flex items-center justify-center" : "w-[32px] h-[32px] rounded-[10px] flex items-center justify-center"}
+          style={{ background: "rgba(255,255,255,0.18)", border: "0.5px solid rgba(255,255,255,0.26)" }}
+        >
+          <Sparkles
+            className={isMobile ? "w-4 h-4" : "w-[17px] h-[17px]"}
+            style={{ color: "rgba(255,255,255,0.9)" }}
+            strokeWidth={2.2}
+          />
+        </div>
+        <span
+          className={isMobile ? "text-[9px] font-bold uppercase tracking-[0.12em]" : "text-[10px] font-bold uppercase tracking-[0.12em]"}
+          style={{ color: "rgba(255,255,255,0.55)" }}
+        >
+          Performance Insight
+        </span>
+      </div>
+      <p
+        className={isMobile ? "text-[13px] leading-[1.72] font-normal mb-[14px] relative z-10" : "text-[14px] leading-[1.72] font-normal mb-4 relative z-10"}
+        style={{ color: "rgba(255,255,255,0.92)", letterSpacing: "-0.1px" }}
+      >
+        {narrative}
+      </p>
+      <div
+        className="flex items-center gap-[6px] pt-3 relative z-10"
+        style={{ borderTop: "0.5px solid rgba(255,255,255,0.12)" }}
+      >
+        <div
+          className="w-[6px] h-[6px] rounded-full"
+          style={{ background: T_PALETTE.B4, boxShadow: "0 0 0 2px rgba(68,153,255,0.25)" }}
+        />
+        <span
+          className={isMobile ? "text-[9px] font-bold uppercase tracking-[0.09em]" : "text-[10px] font-bold uppercase tracking-[0.09em]"}
+          style={{ color: "rgba(255,255,255,0.42)" }}
+        >
+          Generated from real-time assessment data
+        </span>
+      </div>
+    </div>
+  );
+};
+
+/* ── Goal planner card ────────────────────────────────────────────────── */
+
+interface GoalPlannerProps {
+  subjects: SubjectAgg[];
+  goalSubject: string;
+  setGoalSubject: (s: string) => void;
+  goalTarget: number;
+  setGoalTarget: (n: number) => void;
+  isMobile: boolean;
+}
+
+const GoalPlannerCard = ({
+  subjects, goalSubject, setGoalSubject, goalTarget, setGoalTarget, isMobile,
+}: GoalPlannerProps) => {
+  const active = subjects.find(s => s.name === (goalSubject || subjects[0]?.name));
+  const insight = active ? getGoalInsight(active.progress, goalTarget, active.name) : null;
+  const gap = active ? Math.max(0, goalTarget - active.progress) : 0;
+
+  if (!active) return null;
+
+  const ORANGE = T_PALETTE.ORANGE;
+  const RED = T_PALETTE.RED;
+  const B1 = T_PALETTE.B1;
+  const T1 = T_PALETTE.T1, T3 = T_PALETTE.T3, T4 = T_PALETTE.T4;
+  const BG = T_PALETTE.BG, BG2 = T_PALETTE.BG2;
+
+  return (
+    <div
+      className={isMobile ? "mx-5 mt-3 bg-white rounded-[24px] p-5" : "bg-white rounded-[24px] p-6"}
+      style={{ boxShadow: T_PALETTE.SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}
+    >
+      <div className={`flex items-center gap-3 ${isMobile ? "mb-[18px]" : "mb-5"}`}>
+        <div
+          className={isMobile ? "w-11 h-11 rounded-[14px] flex items-center justify-center shrink-0" : "w-12 h-12 rounded-[14px] flex items-center justify-center shrink-0"}
+          style={{
+            background: `linear-gradient(135deg, ${ORANGE}, #FFAA33)`,
+            boxShadow: "0 3px 12px rgba(255,136,0,0.30)",
+          }}
+        >
+          <Target className="w-[22px] h-[22px] text-white" strokeWidth={2.2} />
+        </div>
+        <div>
+          <div className={isMobile ? "text-[16px] font-bold" : "text-[17px] font-bold"}
+            style={{ color: T1, letterSpacing: "-0.3px" }}>
+            Goal Planner
+          </div>
+          <div className={isMobile ? "text-[11px] mt-0.5" : "text-[12px] mt-0.5"} style={{ color: T3 }}>
+            Set a target score and get a personalised plan
+          </div>
+        </div>
+      </div>
+
+      <div
+        className="text-[9px] font-bold uppercase tracking-[0.10em] mb-2"
+        style={{ color: T4 }}
+      >
+        Subject
+      </div>
+      <select
+        value={goalSubject || subjects[0]?.name || ""}
+        onChange={(e) => setGoalSubject(e.target.value)}
+        className={isMobile ? "w-full py-3 px-[14px] rounded-[14px] text-[14px] font-bold mb-4 cursor-pointer appearance-none" : "w-full py-3 px-[14px] rounded-[14px] text-[14px] font-bold mb-5 cursor-pointer appearance-none"}
+        style={{
+          border: "0.5px solid rgba(0,85,255,0.16)",
+          background: `${BG} url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%230055FF' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") right 14px center / auto no-repeat`,
+          color: T1,
+          fontFamily: "inherit",
+        }}
+      >
+        {subjects.map((s) => (
+          <option key={s.name} value={s.name}>
+            {s.name} — Current: {s.progress}%
+          </option>
+        ))}
+      </select>
+
+      <div className="flex items-center justify-between mb-[10px]">
+        <span
+          className="text-[11px] font-bold uppercase tracking-[0.08em]"
+          style={{ color: T4 }}
+        >
+          Target Score
+        </span>
+        <span
+          className={isMobile ? "text-[16px] font-bold" : "text-[18px] font-bold"}
+          style={{ color: ORANGE }}
+        >
+          {goalTarget}%
+        </span>
+      </div>
+
+      <input
+        type="range"
+        min={50}
+        max={100}
+        value={goalTarget}
+        onChange={(e) => setGoalTarget(Number(e.target.value))}
+        className="w-full cursor-pointer"
+        style={{
+          WebkitAppearance: "none",
+          appearance: "none",
+          height: 6,
+          borderRadius: 3,
+          background: `linear-gradient(90deg, ${ORANGE} ${((goalTarget - 50) / 50) * 100}%, ${BG2} ${((goalTarget - 50) / 50) * 100}%)`,
+          outline: "none",
+        }}
+      />
+      <style>{`
+        input[type=range]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          width: 22px; height: 22px; border-radius: 50%;
+          background: linear-gradient(135deg, #FF8800, #FFAA33);
+          box-shadow: 0 2px 10px rgba(255,136,0,0.40);
+          cursor: pointer; border: 2.5px solid #fff;
+        }
+        input[type=range]::-moz-range-thumb {
+          width: 22px; height: 22px; border-radius: 50%;
+          background: linear-gradient(135deg, #FF8800, #FFAA33);
+          box-shadow: 0 2px 10px rgba(255,136,0,0.40);
+          cursor: pointer; border: 2.5px solid #fff;
+        }
+      `}</style>
+      <div className="flex justify-between mt-[6px]">
+        <span className="text-[10px] font-semibold" style={{ color: T4 }}>50%</span>
+        <span className="text-[10px] font-semibold" style={{ color: T4 }}>75%</span>
+        <span className="text-[10px] font-semibold" style={{ color: T4 }}>100%</span>
+      </div>
+
+      {insight && (
+        <div
+          className={isMobile ? "mt-[14px] rounded-[16px] px-4 py-[14px]" : "mt-5 rounded-[16px] px-4 py-[14px]"}
+          style={{
+            background:
+              gap > 25 ? "rgba(255,51,85,0.06)" :
+              gap > 15 ? "rgba(255,136,0,0.07)" : "rgba(0,85,255,0.05)",
+            border: `0.5px solid ${
+              gap > 25 ? "rgba(255,51,85,0.18)" :
+              gap > 15 ? "rgba(255,136,0,0.22)" : "rgba(0,85,255,0.18)"
+            }`,
+          }}
+        >
+          <div
+            className={isMobile ? "text-[14px] font-bold mb-[5px]" : "text-[15px] font-bold mb-1"}
+            style={{
+              color: gap > 25 ? RED : gap > 15 ? ORANGE : B1,
+              letterSpacing: "-0.2px",
+            }}
+          >
+            {insight.line1}
+          </div>
+          <div
+            className={isMobile ? "text-[12px] leading-[1.6] font-normal" : "text-[13px] leading-[1.6] font-normal"}
+            style={{
+              color: gap > 25 ? "#AA2233" : gap > 15 ? "#AA5500" : T3,
+            }}
+          >
+            {insight.line2}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ── Benchmark insights card ──────────────────────────────────────────── */
+
+interface BenchmarkInsightsProps {
+  subjects: SubjectAgg[];
+  benchmark: number;
+  studentName: string;
+  isMobile: boolean;
+  onSubjectClick: (name: string) => void;
+}
+
+const BenchmarkInsightsCard = ({
+  subjects, benchmark, studentName, isMobile, onSubjectClick,
+}: BenchmarkInsightsProps) => {
+  const { T1, T3, T4, B1, B3, B4, BG, BG2, GREEN, GREEN_S, GREEN_B, RED, ORANGE, SH_LG, SEP } = T_PALETTE;
+  return (
+    <div
+      className={isMobile ? "mx-5 mt-3 mb-2 bg-white rounded-[24px] p-5" : "bg-white rounded-[24px] p-6"}
+      style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}
+    >
+      <div className={`flex items-center gap-3 ${isMobile ? "mb-[18px]" : "mb-5"}`}>
+        <div
+          className={isMobile ? "w-11 h-11 rounded-[14px] flex items-center justify-center shrink-0" : "w-12 h-12 rounded-[14px] flex items-center justify-center shrink-0"}
+          style={{ background: GREEN_S, border: `0.5px solid ${GREEN_B}` }}
+        >
+          <Trophy className="w-[22px] h-[22px]" style={{ color: GREEN }} strokeWidth={2.2} />
+        </div>
+        <div>
+          <div className={isMobile ? "text-[16px] font-bold" : "text-[17px] font-bold"}
+            style={{ color: T1, letterSpacing: "-0.3px" }}>
+            Benchmark Insights
+          </div>
+          <div className={isMobile ? "text-[11px] mt-0.5" : "text-[12px] mt-0.5"} style={{ color: T3 }}>
+            {studentName}'s score vs the {benchmark}% school standard
+          </div>
+        </div>
+      </div>
+
+      <div className={isMobile ? "" : "flex flex-col gap-3"}>
+        {subjects.map((s, i) => {
+          const tier = getBenchmarkTier(s.progress);
+          const acc = UNIT_ACCENTS[i % UNIT_ACCENTS.length];
+          const Icon = getSubIcon(s.name);
+          const isOnTrack = s.progress >= 70;
+          // Real recent scores only — no padding with fake "current avg" values
+          // (memory: bug_pattern_fabricated_fallback). Show only what exists.
+          const recent = (s.raw || [])
+            .slice()
+            .sort((a, b) => scoreDateMs(a) - scoreDateMs(b))
+            .slice(-4)
+            .map((r) => pctOf(r))
+            .filter((p): p is number => p != null);
+
+          return (
+            <div key={s.name} className={isMobile ? "mb-3" : ""}>
+              <div
+                role="button"
+                tabIndex={0}
+                aria-label={`Open ${s.name} performance detail`}
+                onClick={() => onSubjectClick(s.name)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSubjectClick(s.name); } }}
+                className={
+                  isMobile
+                    ? "flex items-center justify-between px-4 py-[14px] rounded-[16px] cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+                    : "flex items-center justify-between px-4 py-3 rounded-[16px] cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
+                }
+                style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.10)" }}
+              >
+                <div className="flex items-center gap-[10px]">
+                  <div
+                    className="w-10 h-10 rounded-[13px] flex items-center justify-center shrink-0"
+                    style={{ background: acc.icoBg, boxShadow: acc.icoShadow }}
+                  >
+                    <Icon className="w-[18px] h-[18px] text-white" strokeWidth={2.2} />
+                  </div>
+                  <div>
+                    <div
+                      className="text-[14px] font-bold"
+                      style={{ color: T1, letterSpacing: "-0.2px" }}
+                    >
+                      {s.name}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      {isOnTrack ? (
+                        <div
+                          className={isMobile ? "px-[11px] py-1 rounded-full text-[10px] font-bold" : "px-[11px] py-[3px] rounded-full text-[10px] font-bold"}
+                          style={{ background: GREEN_S, color: "#007830", border: `0.5px solid ${GREEN_B}` }}
+                        >
+                          {tier.label}
+                        </div>
+                      ) : (
+                        <div
+                          className={isMobile ? "px-[11px] py-1 rounded-full text-[10px] font-bold" : "px-[11px] py-[3px] rounded-full text-[10px] font-bold"}
+                          style={{ background: "rgba(255,51,85,0.10)", color: RED, border: "0.5px solid rgba(255,51,85,0.20)" }}
+                        >
+                          Needs Work
+                        </div>
+                      )}
+                      {!isMobile && (
+                        <span className="text-[11px] font-bold" style={{ color: T3 }}>
+                          Score: {s.progress}%
+                        </span>
+                      )}
+                    </div>
+                    {isMobile && (
+                      <div className="text-[12px] font-bold mt-[5px]" style={{ color: T3 }}>
+                        Score: {s.progress}%
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {recent.length >= 2 ? (
+                  <div className="flex flex-col items-end gap-[6px]">
+                    <div className={isMobile ? "flex items-end gap-[3px] h-8" : "flex items-end gap-[3px] h-10"}>
+                      {recent.map((val, k) => (
+                        <div
+                          key={k}
+                          style={{
+                            width: isMobile ? 8 : 9,
+                            borderRadius: "3px 3px 0 0",
+                            background: `linear-gradient(180deg, ${B1}, ${B3})`,
+                            height: `${Math.max(Math.min(val, 100), 10) * (isMobile ? 0.32 : 0.4)}px`,
+                          }}
+                        />
+                      ))}
+                    </div>
+                    {isMobile && (
+                      <div className="text-[9px] font-bold uppercase tracking-[0.08em]" style={{ color: T4 }}>
+                        Recent
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className={isMobile ? "mt-[10px] px-1" : "mt-2 px-1"}>
+                {isMobile && (
+                  <div className="flex justify-between mb-[7px]">
+                    <span className="text-[11px] font-bold" style={{ color: T3 }}>Your score</span>
+                    <span className="text-[11px] font-bold" style={{ color: T3 }}>Target</span>
+                  </div>
+                )}
+                <div
+                  className={isMobile ? "h-2 rounded-[4px] overflow-hidden relative mb-[5px]" : "h-2 rounded-[4px] overflow-hidden relative"}
+                  style={{ background: BG2 }}
+                >
+                  <div
+                    className="h-full rounded-[4px]"
+                    style={{
+                      width: `${Math.min(s.progress, 100)}%`,
+                      background: `linear-gradient(90deg, ${B1}, ${B4})`,
+                    }}
+                  />
+                  <div
+                    className="absolute -top-[2px] w-[2px] h-3 rounded-[1px]"
+                    style={{ left: `${benchmark}%`, background: ORANGE }}
+                  />
+                </div>
+                <div className={isMobile ? "flex justify-between" : "flex justify-between mt-1"}>
+                  <span className="text-[10px] font-bold" style={{ color: B1 }}>
+                    {s.progress}%
+                  </span>
+                  <span className="text-[10px] font-bold" style={{ color: ORANGE }}>
+                    {benchmark}% target
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        <div
+          className="flex items-start gap-[7px] pt-3"
+          style={{ borderTop: `0.5px solid ${SEP}` }}
+        >
+          <div
+            className="w-4 h-4 rounded-[4px] flex items-center justify-center shrink-0 mt-0.5"
+            style={{ background: "rgba(0,85,255,0.10)", border: "0.5px solid rgba(0,85,255,0.16)" }}
+          >
+            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke={B1} strokeWidth={2.5} strokeLinecap="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+          </div>
+          {/* Honest copy: the target is the school's configured standard,
+              NOT a "national benchmark". Memory bug_pattern_fabricated_fallback:
+              never make claims you can't source. */}
+          <span className="text-[11px] italic leading-[1.6]" style={{ color: T4 }}>
+            Target reflects your school's configured academic standard ({benchmark}%). No other student's data is shown. Fully private.
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ════════════════════════════════════════════════════════════════════════
+   PERFORMANCE SNAPSHOT — 6-tile stat row at the top of the page.
+   Shows every signal a parent needs to track: subjects, tests, assignments,
+   attendance, behaviour, ratings. Each tile clickable → deep-link to the
+   dedicated page for that metric.
+   ════════════════════════════════════════════════════════════════════════ */
+
+interface SnapshotTileProps {
+  icon: ComponentType<{ className?: string; strokeWidth?: number; style?: React.CSSProperties }>;
+  label: string;
+  value: string;
+  sub?: string;
+  tone: "blue" | "green" | "amber" | "red" | "neutral";
+  onClick?: () => void;
+}
+
+const SnapshotTile = ({ icon: Icon, label, value, sub, tone, onClick }: SnapshotTileProps) => {
+  const toneMap = {
+    blue:    { color: T_PALETTE.B1,    bg: "rgba(0,85,255,0.10)",   bdr: "rgba(0,85,255,0.18)" },
+    green:   { color: T_PALETTE.GREEN, bg: T_PALETTE.GREEN_S,        bdr: T_PALETTE.GREEN_B },
+    amber:   { color: "#CC6A00",       bg: "rgba(255,136,0,0.12)",   bdr: "rgba(255,136,0,0.25)" },
+    red:     { color: T_PALETTE.RED,   bg: "rgba(255,51,85,0.10)",   bdr: "rgba(255,51,85,0.22)" },
+    neutral: { color: T_PALETTE.T3,    bg: "rgba(15,23,42,0.04)",    bdr: "rgba(15,23,42,0.08)" },
+  }[tone];
+  return (
+    <div
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-label={onClick ? `Open ${label} detail` : undefined}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (onClick && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      className={`bg-white rounded-[16px] p-3 flex flex-col gap-[6px] relative overflow-hidden ${onClick ? "cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40" : ""}`}
+      style={{
+        boxShadow: T_PALETTE.SH,
+        border: "0.5px solid rgba(0,85,255,0.10)",
+      }}
+    >
+      <div
+        className="w-8 h-8 rounded-[10px] flex items-center justify-center"
+        style={{ background: toneMap.bg, border: `0.5px solid ${toneMap.bdr}` }}
+      >
+        <Icon className="w-[15px] h-[15px]" style={{ color: toneMap.color }} strokeWidth={2.3} />
+      </div>
+      <div>
+        <div
+          className="text-[18px] font-bold leading-[1]"
+          style={{ color: T_PALETTE.T1, letterSpacing: "-0.4px" }}
+        >
+          {value}
+        </div>
+        <div
+          className="text-[9px] font-bold uppercase tracking-[0.09em] mt-[3px]"
+          style={{ color: T_PALETTE.T4 }}
+        >
+          {label}
+        </div>
+        {sub && (
+          <div className="text-[10px] mt-[2px]" style={{ color: T_PALETTE.T3 }}>
+            {sub}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+interface SnapshotProps {
+  snap: PerformanceSnapshot;
+  isMobile: boolean;
+  navigate: NavigateFunction;
+}
+
+const PerformanceSnapshotRow = ({ snap, isMobile, navigate }: SnapshotProps) => {
+  const fmt = (v: number | null) => (v == null ? "—" : `${Math.round(v)}%`);
+  const asgnRate =
+    snap.assignmentTotal > 0
+      ? Math.round((snap.assignmentSubmitted / snap.assignmentTotal) * 100)
+      : null;
+  return (
+    <div
+      className={
+        isMobile
+          ? "mx-5 mt-3 grid grid-cols-3 gap-[10px]"
+          : "grid grid-cols-3 md:grid-cols-6 gap-3 mb-5"
+      }
+    >
+      <SnapshotTile
+        icon={BookOpen}
+        label="Subjects Avg"
+        value={fmt(snap.subjectsAvg)}
+        tone={
+          snap.subjectsAvg == null ? "neutral" :
+          snap.subjectsAvg >= 75 ? "blue" :
+          snap.subjectsAvg >= 60 ? "amber" : "red"
+        }
+      />
+      <SnapshotTile
+        icon={FileText}
+        label="Tests"
+        value={snap.testCount === 0 ? "—" : fmt(snap.testsAvg)}
+        sub={snap.testCount > 0 ? `${snap.testCount} taken` : undefined}
+        tone={
+          snap.testsAvg == null ? "neutral" :
+          snap.testsAvg >= 75 ? "blue" :
+          snap.testsAvg >= 60 ? "amber" : "red"
+        }
+        onClick={() => navigate("/tests")}
+      />
+      <SnapshotTile
+        icon={CheckCircle2}
+        label="Assignments"
+        value={asgnRate == null ? "—" : `${asgnRate}%`}
+        sub={
+          snap.assignmentTotal === 0
+            ? undefined
+            : `${snap.assignmentSubmitted}/${snap.assignmentTotal} done`
+        }
+        tone={
+          asgnRate == null ? "neutral" :
+          asgnRate >= 80 ? "green" :
+          asgnRate >= 50 ? "amber" : "red"
+        }
+        onClick={() => navigate("/assignments")}
+      />
+      <SnapshotTile
+        icon={Calendar}
+        label="Attendance"
+        value={fmt(snap.attendanceRate)}
+        sub={snap.attendanceTotal > 0 ? `Last 30 days` : undefined}
+        tone={
+          snap.attendanceRate == null ? "neutral" :
+          snap.attendanceRate >= 85 ? "green" :
+          snap.attendanceRate >= 70 ? "amber" : "red"
+        }
+        onClick={() => navigate("/attendance")}
+      />
+      <SnapshotTile
+        icon={AlertTriangle}
+        label="Incidents"
+        value={String(snap.incidents30d)}
+        sub={snap.incidents30d > 0 ? "Last 30 days" : undefined}
+        tone={
+          snap.incidents30d === 0 ? "green" :
+          snap.incidents30d <= 2 ? "amber" : "red"
+        }
+        onClick={() => navigate("/behaviour")}
+      />
+      <SnapshotTile
+        icon={Heart}
+        label="Behaviour"
+        value={snap.ratingAvg == null ? "—" : `${snap.ratingAvg.toFixed(1)}/5`}
+        sub={snap.ratingCount > 0 ? `${snap.ratingCount} rated` : undefined}
+        tone={
+          snap.ratingAvg == null ? "neutral" :
+          snap.ratingAvg >= 4 ? "green" :
+          snap.ratingAvg >= 3 ? "amber" : "red"
+        }
+        onClick={() => navigate("/behaviour")}
+      />
+    </div>
+  );
+};
+
+/* ════════════════════════════════════════════════════════════════════════
+   TESTS & EXAMS CARD — pulls from `test_scores` only (not gradebook /
+   results), shows recent tests + stats. Cross-links to /tests.
+   ════════════════════════════════════════════════════════════════════════ */
+
+interface TestsCardProps {
+  rows: TestScoreRow[];
+  isMobile: boolean;
+  navigate: NavigateFunction;
+}
+
+const TestsAndExamsCard = ({ rows, isMobile, navigate }: TestsCardProps) => {
+  if (rows.length === 0) return null;
+  const recent = rows.slice(0, 5);
+  const top = Math.max(...rows.map((r) => r.pct));
+  const avg = Math.round(rows.reduce((a, r) => a + r.pct, 0) / rows.length);
+  return (
+    <div
+      className={isMobile ? "mx-5 mt-3 bg-white rounded-[24px] p-5" : "bg-white rounded-[24px] p-6"}
+      style={{ boxShadow: T_PALETTE.SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-[12px] flex items-center justify-center shrink-0"
+            style={{
+              background: `linear-gradient(135deg, ${T_PALETTE.B1}, ${T_PALETTE.B3})`,
+              boxShadow: "0 3px 10px rgba(0,85,255,0.28)",
+            }}
+          >
+            <FileText className="w-[18px] h-[18px] text-white" strokeWidth={2.2} />
+          </div>
+          <div>
+            <div
+              className={isMobile ? "text-[16px] font-bold" : "text-[17px] font-bold"}
+              style={{ color: T_PALETTE.T1, letterSpacing: "-0.3px" }}
+            >
+              Tests &amp; Exams
+            </div>
+            <div className={isMobile ? "text-[11px] mt-0.5" : "text-[12px] mt-0.5"} style={{ color: T_PALETTE.T3 }}>
+              {rows.length} taken · avg {avg}% · top {Math.round(top)}%
+            </div>
+          </div>
+        </div>
+        <button
+          onClick={() => navigate("/tests")}
+          className="text-[12px] font-bold flex items-center gap-1 px-3 py-1.5 rounded-full transition-colors hover:bg-[#EEF4FF]"
+          style={{ color: T_PALETTE.B1 }}
+        >
+          View all <ChevronRight className="w-[12px] h-[12px]" strokeWidth={2.4} />
+        </button>
+      </div>
+      <div className="flex flex-col gap-2">
+        {recent.map((r) => {
+          const tone =
+            r.pct >= 75
+              ? { color: T_PALETTE.GREEN_DEEP || "#007830", bg: T_PALETTE.GREEN_S, bdr: T_PALETTE.GREEN_B }
+              : r.pct >= 60
+                ? { color: "#AA5500", bg: "rgba(255,136,0,0.10)", bdr: "rgba(255,136,0,0.25)" }
+                : { color: "#AA2233", bg: "rgba(255,51,85,0.08)", bdr: "rgba(255,51,85,0.22)" };
+          return (
+            <div
+              key={r.id}
+              className="flex items-center justify-between py-[10px] px-3 rounded-[14px]"
+              style={{ background: T_PALETTE.BG, border: "0.5px solid rgba(0,85,255,0.10)" }}
+            >
+              <div className="min-w-0 flex-1">
+                <p
+                  className="text-[13px] font-bold truncate"
+                  style={{ color: T_PALETTE.T1, letterSpacing: "-0.1px" }}
+                >
+                  {r.name}
+                </p>
+                <p className="text-[11px] mt-[2px]" style={{ color: T_PALETTE.T4 }}>
+                  {r.subject || "—"}
+                  {r.date && ` · ${r.date.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
+                </p>
+              </div>
+              <span
+                className="text-[12px] font-bold px-[10px] py-[5px] rounded-full ml-2 shrink-0 tabular-nums"
+                style={{ background: tone.bg, color: tone.color, border: `0.5px solid ${tone.bdr}` }}
+              >
+                {Math.round(r.pct)}%
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+/* ════════════════════════════════════════════════════════════════════════
+   ASSIGNMENTS CARD — submission rate + on-time rate + recent list.
+   Cross-links to /assignments.
+   ════════════════════════════════════════════════════════════════════════ */
+
+interface AssignmentsCardProps {
+  rows: AssignmentRow[];
+  isMobile: boolean;
+  navigate: NavigateFunction;
+}
+
+const AssignmentsCard = ({ rows, isMobile, navigate }: AssignmentsCardProps) => {
+  if (rows.length === 0) return null;
+  const submitted = rows.filter((r) => r.submitted).length;
+  const onTimeEligible = rows.filter((r) => r.submitted && r.onTime !== null);
+  const onTime = onTimeEligible.filter((r) => r.onTime === true).length;
+  const submitRate = Math.round((submitted / rows.length) * 100);
+  const onTimeRate =
+    onTimeEligible.length > 0 ? Math.round((onTime / onTimeEligible.length) * 100) : null;
+  // Most-recent 5 by due date (descending); fallback alphabetical title for items without dueDate.
+  const recent = [...rows]
+    .sort((a, b) => {
+      const ad = a.dueDate?.getTime() ?? 0;
+      const bd = b.dueDate?.getTime() ?? 0;
+      return bd - ad;
+    })
+    .slice(0, 5);
+  return (
+    <div
+      className={isMobile ? "mx-5 mt-3 bg-white rounded-[24px] p-5" : "bg-white rounded-[24px] p-6"}
+      style={{ boxShadow: T_PALETTE.SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-[12px] flex items-center justify-center shrink-0"
+            style={{
+              background: `linear-gradient(135deg, ${T_PALETTE.GREEN}, #00A040)`,
+              boxShadow: "0 3px 10px rgba(0,200,83,0.28)",
+            }}
+          >
+            <CheckCircle2 className="w-[18px] h-[18px] text-white" strokeWidth={2.2} />
+          </div>
+          <div>
+            <div
+              className={isMobile ? "text-[16px] font-bold" : "text-[17px] font-bold"}
+              style={{ color: T_PALETTE.T1, letterSpacing: "-0.3px" }}
+            >
+              Assignment Performance
+            </div>
+            <div className={isMobile ? "text-[11px] mt-0.5" : "text-[12px] mt-0.5"} style={{ color: T_PALETTE.T3 }}>
+              {submitted}/{rows.length} submitted · {submitRate}% completion
+              {onTimeRate != null ? ` · ${onTimeRate}% on-time` : ""}
+            </div>
+          </div>
+        </div>
+        <button
+          onClick={() => navigate("/assignments")}
+          className="text-[12px] font-bold flex items-center gap-1 px-3 py-1.5 rounded-full transition-colors hover:bg-[#EEF4FF]"
+          style={{ color: T_PALETTE.B1 }}
+        >
+          View all <ChevronRight className="w-[12px] h-[12px]" strokeWidth={2.4} />
+        </button>
+      </div>
+
+      {/* Submission progress bar */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-[6px]">
+          <span
+            className="text-[11px] font-bold uppercase tracking-[0.08em]"
+            style={{ color: T_PALETTE.T4 }}
+          >
+            Submission Rate
+          </span>
+          <span className="text-[13px] font-bold" style={{ color: T_PALETTE.B1 }}>
+            {submitRate}%
+          </span>
+        </div>
+        <div
+          className="h-2 rounded-[4px] overflow-hidden"
+          style={{ background: T_PALETTE.BG2 }}
+        >
+          <div
+            className="h-full rounded-[4px] transition-all duration-700"
+            style={{
+              width: `${Math.max(submitRate, 3)}%`,
+              background:
+                submitRate >= 80
+                  ? `linear-gradient(90deg, ${T_PALETTE.GREEN}, #00A040)`
+                  : submitRate >= 50
+                    ? `linear-gradient(90deg, ${T_PALETTE.ORANGE}, #FFAA33)`
+                    : `linear-gradient(90deg, ${T_PALETTE.RED}, #FF6688)`,
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        {recent.map((r) => {
+          const dueLabel = r.dueDate
+            ? r.dueDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" })
+            : "—";
+          return (
+            <div
+              key={r.id}
+              className="flex items-center justify-between py-[10px] px-3 rounded-[14px]"
+              style={{ background: T_PALETTE.BG, border: "0.5px solid rgba(0,85,255,0.10)" }}
+            >
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <CheckCircle2
+                  className="w-[16px] h-[16px] shrink-0"
+                  style={{ color: r.submitted ? T_PALETTE.GREEN : T_PALETTE.T4 }}
+                  strokeWidth={2.2}
+                />
+                <div className="min-w-0">
+                  <p
+                    className="text-[13px] font-bold truncate"
+                    style={{ color: T_PALETTE.T1, letterSpacing: "-0.1px" }}
+                  >
+                    {r.title}
+                  </p>
+                  <p className="text-[11px] mt-[2px]" style={{ color: T_PALETTE.T4 }}>
+                    Due {dueLabel}
+                  </p>
+                </div>
+              </div>
+              {r.submitted ? (
+                r.onTime === false ? (
+                  <span
+                    className="text-[10px] font-bold px-[10px] py-[4px] rounded-full ml-2 shrink-0"
+                    style={{
+                      background: "rgba(255,136,0,0.12)",
+                      color: "#AA5500",
+                      border: "0.5px solid rgba(255,136,0,0.25)",
+                    }}
+                  >
+                    Late
+                  </span>
+                ) : (
+                  <span
+                    className="text-[10px] font-bold px-[10px] py-[4px] rounded-full ml-2 shrink-0"
+                    style={{
+                      background: T_PALETTE.GREEN_S,
+                      color: "#007830",
+                      border: `0.5px solid ${T_PALETTE.GREEN_B}`,
+                    }}
+                  >
+                    Submitted
+                  </span>
+                )
+              ) : (
+                <span
+                  className="text-[10px] font-bold px-[10px] py-[4px] rounded-full ml-2 shrink-0"
+                  style={{
+                    background: "rgba(255,51,85,0.08)",
+                    color: T_PALETTE.RED,
+                    border: "0.5px solid rgba(255,51,85,0.20)",
+                  }}
+                >
+                  Pending
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+/* ════════════════════════════════════════════════════════════════════════
+   ATTENDANCE SNAPSHOT — last 30 days breakdown. Cross-links to /attendance.
+   ════════════════════════════════════════════════════════════════════════ */
+
+interface AttendanceCardProps {
+  snap: PerformanceSnapshot;
+  isMobile: boolean;
+  navigate: NavigateFunction;
+}
+
+const AttendanceSnapshotCard = ({ snap, isMobile, navigate }: AttendanceCardProps) => {
+  if (snap.attendanceTotal === 0) return null;
+  const rate = snap.attendanceRate ?? 0;
+  const tone =
+    rate >= 85 ? { color: T_PALETTE.GREEN, bg: T_PALETTE.GREEN_S, bdr: T_PALETTE.GREEN_B } :
+    rate >= 70 ? { color: T_PALETTE.ORANGE, bg: "rgba(255,136,0,0.12)", bdr: "rgba(255,136,0,0.25)" } :
+                 { color: T_PALETTE.RED, bg: "rgba(255,51,85,0.10)", bdr: "rgba(255,51,85,0.22)" };
+  return (
+    <div
+      className={isMobile ? "mx-5 mt-3 bg-white rounded-[24px] p-5" : "bg-white rounded-[24px] p-6"}
+      style={{ boxShadow: T_PALETTE.SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-[12px] flex items-center justify-center shrink-0"
+            style={{
+              background: `linear-gradient(135deg, ${T_PALETTE.B1}, ${T_PALETTE.B2})`,
+              boxShadow: "0 3px 10px rgba(0,85,255,0.28)",
+            }}
+          >
+            <Calendar className="w-[18px] h-[18px] text-white" strokeWidth={2.2} />
+          </div>
+          <div>
+            <div
+              className={isMobile ? "text-[16px] font-bold" : "text-[17px] font-bold"}
+              style={{ color: T_PALETTE.T1, letterSpacing: "-0.3px" }}
+            >
+              Attendance
+            </div>
+            <div className={isMobile ? "text-[11px] mt-0.5" : "text-[12px] mt-0.5"} style={{ color: T_PALETTE.T3 }}>
+              Last 30 days · {snap.attendanceTotal} days recorded
+            </div>
+          </div>
+        </div>
+        <button
+          onClick={() => navigate("/attendance")}
+          className="text-[12px] font-bold flex items-center gap-1 px-3 py-1.5 rounded-full transition-colors hover:bg-[#EEF4FF]"
+          style={{ color: T_PALETTE.B1 }}
+        >
+          View all <ChevronRight className="w-[12px] h-[12px]" strokeWidth={2.4} />
+        </button>
+      </div>
+
+      <div className="flex items-center gap-4 mb-4">
+        <div
+          className="text-[42px] font-bold tabular-nums"
+          style={{ color: tone.color, letterSpacing: "-1px", lineHeight: "1" }}
+        >
+          {Math.round(rate)}%
+        </div>
+        <div
+          className="px-3 py-1 rounded-full text-[11px] font-bold"
+          style={{ background: tone.bg, color: tone.color, border: `0.5px solid ${tone.bdr}` }}
+        >
+          {rate >= 85 ? "Excellent" : rate >= 70 ? "On Track" : "Needs Attention"}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        <div
+          className="flex flex-col items-center gap-1 py-3 rounded-[14px]"
+          style={{ background: T_PALETTE.GREEN_S, border: `0.5px solid ${T_PALETTE.GREEN_B}` }}
+        >
+          <div className="text-[18px] font-bold" style={{ color: T_PALETTE.GREEN, letterSpacing: "-0.5px" }}>
+            {snap.attendancePresent}
+          </div>
+          <div className="text-[9px] font-bold uppercase tracking-[0.08em]" style={{ color: T_PALETTE.GREEN_DEEP || "#007830" }}>
+            Present
+          </div>
+        </div>
+        <div
+          className="flex flex-col items-center gap-1 py-3 rounded-[14px]"
+          style={{ background: "rgba(255,136,0,0.10)", border: "0.5px solid rgba(255,136,0,0.22)" }}
+        >
+          <div className="text-[18px] font-bold" style={{ color: T_PALETTE.ORANGE, letterSpacing: "-0.5px" }}>
+            {snap.attendanceLate}
+          </div>
+          <div className="text-[9px] font-bold uppercase tracking-[0.08em]" style={{ color: "#AA5500" }}>
+            Late
+          </div>
+        </div>
+        <div
+          className="flex flex-col items-center gap-1 py-3 rounded-[14px]"
+          style={{ background: "rgba(255,51,85,0.08)", border: "0.5px solid rgba(255,51,85,0.20)" }}
+        >
+          <div className="text-[18px] font-bold" style={{ color: T_PALETTE.RED, letterSpacing: "-0.5px" }}>
+            {snap.attendanceAbsent}
+          </div>
+          <div className="text-[9px] font-bold uppercase tracking-[0.08em]" style={{ color: "#AA2233" }}>
+            Absent
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ════════════════════════════════════════════════════════════════════════
+   BEHAVIOUR SNAPSHOT — incidents + ratings. Per memory
+   `cross_dashboard_behaviour_sync`: teacher writes student_ratings +
+   incidents, parent reads them here. Cross-links to /behaviour.
+   ════════════════════════════════════════════════════════════════════════ */
+
+interface BehaviourCardProps {
+  snap: PerformanceSnapshot;
+  recentIncidents: RawIncident[];
+  isMobile: boolean;
+  navigate: NavigateFunction;
+}
+
+const BehaviourSnapshotCard = ({ snap, recentIncidents, isMobile, navigate }: BehaviourCardProps) => {
+  if (snap.incidents30d === 0 && snap.ratingCount === 0) return null;
+  const incTone =
+    snap.incidents30d === 0 ? { color: T_PALETTE.GREEN, bg: T_PALETTE.GREEN_S } :
+    snap.incidents30d <= 2 ? { color: T_PALETTE.ORANGE, bg: "rgba(255,136,0,0.12)" } :
+                              { color: T_PALETTE.RED, bg: "rgba(255,51,85,0.10)" };
+  return (
+    <div
+      className={isMobile ? "mx-5 mt-3 bg-white rounded-[24px] p-5" : "bg-white rounded-[24px] p-6"}
+      style={{ boxShadow: T_PALETTE.SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-[12px] flex items-center justify-center shrink-0"
+            style={{
+              background: "linear-gradient(135deg, #FF6688, #FF3355)",
+              boxShadow: "0 3px 10px rgba(255,51,85,0.28)",
+            }}
+          >
+            <Heart className="w-[18px] h-[18px] text-white" strokeWidth={2.2} />
+          </div>
+          <div>
+            <div
+              className={isMobile ? "text-[16px] font-bold" : "text-[17px] font-bold"}
+              style={{ color: T_PALETTE.T1, letterSpacing: "-0.3px" }}
+            >
+              Behaviour Snapshot
+            </div>
+            <div className={isMobile ? "text-[11px] mt-0.5" : "text-[12px] mt-0.5"} style={{ color: T_PALETTE.T3 }}>
+              {snap.ratingCount > 0 && snap.ratingAvg != null
+                ? `${snap.ratingAvg.toFixed(1)}/5 from ${snap.ratingCount} teacher ratings`
+                : "Teacher observations tracked here"}
+            </div>
+          </div>
+        </div>
+        <button
+          onClick={() => navigate("/behaviour")}
+          className="text-[12px] font-bold flex items-center gap-1 px-3 py-1.5 rounded-full transition-colors hover:bg-[#EEF4FF]"
+          style={{ color: T_PALETTE.B1 }}
+        >
+          View all <ChevronRight className="w-[12px] h-[12px]" strokeWidth={2.4} />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div
+          className="flex flex-col gap-[3px] p-3 rounded-[14px]"
+          style={{ background: incTone.bg, border: `0.5px solid rgba(15,23,42,0.04)` }}
+        >
+          <div className="text-[24px] font-bold tabular-nums" style={{ color: incTone.color, letterSpacing: "-0.5px" }}>
+            {snap.incidents30d}
+          </div>
+          <div className="text-[10px] font-bold uppercase tracking-[0.09em]" style={{ color: T_PALETTE.T4 }}>
+            Incidents · 30d
+          </div>
+        </div>
+        <div
+          className="flex flex-col gap-[3px] p-3 rounded-[14px]"
+          style={{ background: T_PALETTE.BG, border: "0.5px solid rgba(0,85,255,0.10)" }}
+        >
+          <div className="text-[24px] font-bold tabular-nums" style={{ color: T_PALETTE.T1, letterSpacing: "-0.5px" }}>
+            {snap.ratingAvg != null ? snap.ratingAvg.toFixed(1) : "—"}
+          </div>
+          <div className="text-[10px] font-bold uppercase tracking-[0.09em]" style={{ color: T_PALETTE.T4 }}>
+            Avg Rating · /5
+          </div>
+        </div>
+      </div>
+
+      {recentIncidents.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <div
+            className="text-[10px] font-bold uppercase tracking-[0.10em]"
+            style={{ color: T_PALETTE.T4 }}
+          >
+            Recent Observations
+          </div>
+          {recentIncidents.slice(0, 3).map((inc) => (
+            <div
+              key={inc.id}
+              className="flex items-start gap-2 py-[10px] px-3 rounded-[14px]"
+              style={{ background: T_PALETTE.BG, border: "0.5px solid rgba(0,85,255,0.10)" }}
+            >
+              <AlertTriangle
+                className="w-[14px] h-[14px] mt-[2px] shrink-0"
+                style={{ color: T_PALETTE.ORANGE }}
+                strokeWidth={2.4}
+              />
+              <div className="min-w-0 flex-1">
+                <p
+                  className="text-[12px] font-bold"
+                  style={{ color: T_PALETTE.T1, letterSpacing: "-0.1px" }}
+                >
+                  {inc.type || "Observation"}
+                </p>
+                <p
+                  className="text-[11px] mt-[2px] leading-[1.5]"
+                  style={{ color: T_PALETTE.T3 }}
+                >
+                  {String(inc.description || inc.content || "").slice(0, 80) || "—"}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ════════════════════════════════════════════════════════════════════════
+   PAGE
+   ════════════════════════════════════════════════════════════════════════ */
 
 const PerformancePage = () => {
   const { studentData } = useAuth();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const settings = useSchoolSettings();
+
+  // Benchmark from school settings, fallback to 80. No more "national" claim.
+  const benchmark = useMemo(() => {
+    const fromSettings = (settings as { benchmarkPercentage?: number })?.benchmarkPercentage;
+    return typeof fromSettings === "number" && fromSettings > 0 && fromSettings <= 100
+      ? fromSettings
+      : 80;
+  }, [settings]);
+
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [subjects, setSubjects] = useState<any[]>([]);
-  const [trendData, setTrendData] = useState<any[]>([]);
-  const [overallStats, setOverallStats] = useState({ grade: "N/A", avg: 0, trend: "+8%" });
-  const [feedbacks, setFeedbacks] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<SubjectAgg[]>([]);
+  const [trendData, setTrendData] = useState<TrendPoint[]>([]);
+  const [overallStats, setOverallStats] = useState<OverallStats>({
+    grade: "—",
+    avg: 0,
+    trend: "—",
+    hasData: false,
+  });
+  const [feedbacks, setFeedbacks] = useState<RawFeedback[]>([]);
   const [goalSubject, setGoalSubject] = useState<string>("");
   const [goalTarget, setGoalTarget] = useState<number>(80);
-  const mountedRef = useRef(true);
-  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
+  const [listenerError, setListenerError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Additional collections for end-to-end performance visibility
+  const [assignmentsList, setAssignmentsList] = useState<RawAssignment[]>([]);
+  const [submissionsList, setSubmissionsList] = useState<RawSubmission[]>([]);
+  const [attendanceList, setAttendanceList] = useState<RawAttendance[]>([]);
+  const [incidentsList, setIncidentsList] = useState<RawIncident[]>([]);
+  const [ratingsList, setRatingsList] = useState<RawRating[]>([]);
 
   useEffect(() => {
-    if (!studentData?.id) return;
-    setLoading(true);
-    let snap1Cache: any = null, snap2Cache: any = null, snap3Cache: any = null;
+    if (!studentData?.id || !studentData?.schoolId) {
+      setLoading(false);
+      return;
+    }
+    setListenerError(null);
 
-    // Normalize any score doc to a percentage value
-    const getPct = (s: any): number => {
-      if (s.percentage != null && !isNaN(Number(s.percentage))) return Number(s.percentage);
-      if (s.mark != null && s.maxMarks) return (s.mark / s.maxMarks) * 100;
-      if (s.score != null && s.maxScore) return (s.score / s.maxScore) * 100;
-      if (s.score != null && !isNaN(Number(s.score))) return Number(s.score);
-      return 0;
-    };
+    // Listener-scoped state — caches keyed by docId so the 3-source merge
+    // is deterministic and an email-side listener can't replace the id-side.
+    let testScoreCache: RawScore[] = [];
+    let resultCache: RawScore[] = [];
+    let gradebookCache: RawScore[] = [];
+    let feedbackCache: RawFeedback[] = [];
+    let lastClassIdsKey = "";
+    let unsubGb: (() => void) | null = null;
+    let cancelled = false;
+    let callSeq = 0;
 
-    // Normalize any date-like value (Firestore Timestamp, seconds, ISO string, number)
-    // into a JS Date. Hoisted to the top of processScores because the sort on
-    // line below used to reference this before its declaration, which put the
-    // const in its TDZ and would ReferenceError as soon as scores.length >= 2.
-    const toSafeDate = (v: any): Date => {
-      if (v?.toDate) return v.toDate();
-      if (v?.seconds) return new Date(v.seconds * 1000);
-      if (typeof v === "string" || typeof v === "number") { const d = new Date(v); if (!isNaN(d.getTime())) return d; }
-      return new Date();
-    };
+    const recompute = () => {
+      const mySeq = ++callSeq;
+      if (cancelled || mySeq !== callSeq) return;
 
-    const processScores = () => {
-      if (!mountedRef.current) return;
-      const scoreMap = new Map();
-      // Merge all 3 sources: test_scores + results + gradebook_scores
-      [...(snap1Cache?.docs || []), ...(snap2Cache?.docs || []), ...(snap3Cache?.docs || [])].forEach((d: any) => {
-        if (!scoreMap.has(d.id)) {
-          const data = d.data();
-          scoreMap.set(d.id, {
-            id: d.id, ...data,
-            // Normalize percentage field for all sources
-            percentage: getPct(data),
-          });
-        }
+      // 3-source merge — dedup by id so duplicates across collections
+      // can't double-count. (Some teachers historically wrote the same
+      // assessment into both `test_scores` and `results`.)
+      const map = new Map<string, RawScore>();
+      [...testScoreCache, ...resultCache, ...gradebookCache].forEach((s) => {
+        if (!map.has(s.id)) map.set(s.id, s);
       });
-      const scores = Array.from(scoreMap.values()).filter(s => s.percentage > 0);
+      const allScores = Array.from(map.values());
 
-      const subMap = new Map();
-      scores.forEach(s => {
-        const sub = s.subject || s.subjectName || s.testName || s.columnName || "General";
-        if (!subMap.has(sub)) subMap.set(sub, { name: sub, total: 0, count: 0, scores: [] });
-        const curr = subMap.get(sub);
-        curr.total += s.percentage;
-        curr.count += 1;
-        curr.scores.push(s);
+      // Group by real subject only (no testName/columnName fallbacks).
+      const subMap = new Map<string, { total: number; count: number; scores: RawScore[] }>();
+      allScores.forEach((s) => {
+        const pct = pctOf(s);
+        if (pct == null) return; // truly no-data — skip
+        const sub = subjectKey(s);
+        if (!subMap.has(sub)) subMap.set(sub, { total: 0, count: 0, scores: [] });
+        const cur = subMap.get(sub)!;
+        cur.total += pct;
+        cur.count += 1;
+        cur.scores.push(s);
       });
 
-      const derivedSubjs = Array.from(subMap.values()).map(s => {
+      const derived: SubjectAgg[] = Array.from(subMap.entries()).map(([name, s]) => {
         const avg = Math.round(s.total / s.count);
-        const sorted = s.scores.sort((a: any, b: any) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
-        const last = sorted[sorted.length - 1]?.percentage || 0;
-        const prev = sorted[sorted.length - 2]?.percentage || last;
-        const trendDir = last > prev ? "up" : last < prev ? "down" : "stable";
-        const status = avg >= 90 ? "Outstanding" : avg >= 80 ? "Excellent" : avg >= 70 ? "Improving" : avg >= 60 ? "Stable" : "Needs Attention";
-        const barColor = avg >= 75 ? "bg-emerald-500" : avg >= 60 ? "bg-amber-500" : "bg-rose-500";
-        const grade = avg >= 90 ? "A+" : avg >= 85 ? "A" : avg >= 80 ? "A-" : avg >= 75 ? "B+" : avg >= 70 ? "B" : avg >= 65 ? "C+" : "C";
-        return { name: s.name, grade, progress: avg, status, trendDir, barColor, raw: s.scores };
+        const byTime = [...s.scores].sort((a, b) => scoreDateMs(a) - scoreDateMs(b));
+        const last = pctOf(byTime[byTime.length - 1]) ?? avg;
+        const prev =
+          byTime.length > 1 ? pctOf(byTime[byTime.length - 2]) ?? last : last;
+        const trendDir: "up" | "down" | "stable" =
+          last > prev ? "up" : last < prev ? "down" : "stable";
+        return {
+          name,
+          grade: gradeFor(avg),
+          progress: avg,
+          status: subjectStatusFor(avg),
+          trendDir,
+          raw: s.scores,
+        };
       });
 
-      setSubjects(derivedSubjs);
-      if (derivedSubjs.length > 0) {
-        const globalAvg = Math.round(derivedSubjs.reduce((a, b) => a + b.progress, 0) / derivedSubjs.length);
-        // Calculate real trend from recent vs older scores
-        const allSorted = scores.sort((a: any, b: any) => {
-          const da = toSafeDate(a.timestamp || a.createdAt || a.date).getTime();
-          const db2 = toSafeDate(b.timestamp || b.createdAt || b.date).getTime();
-          return db2 - da;
-        });
-        const recent = allSorted.slice(0, Math.ceil(allSorted.length / 2));
-        const older = allSorted.slice(Math.ceil(allSorted.length / 2));
-        const recentAvg = recent.length > 0 ? recent.reduce((a: number, s: any) => a + s.percentage, 0) / recent.length : globalAvg;
-        const olderAvg = older.length > 0 ? older.reduce((a: number, s: any) => a + s.percentage, 0) / older.length : globalAvg;
-        const trendDiff = Math.round(recentAvg - olderAvg);
-        const trendStr = trendDiff >= 0 ? `+${trendDiff}%` : `${trendDiff}%`;
-        setOverallStats({
-          avg: globalAvg,
-          grade: globalAvg >= 90 ? "A+" : globalAvg >= 85 ? "A" : globalAvg >= 80 ? "A-" : globalAvg >= 75 ? "B+" : globalAvg >= 70 ? "B" : "C",
-          trend: trendStr
-        });
+      // Sort subjects deterministically (alphabetical).
+      derived.sort((a, b) => a.name.localeCompare(b.name));
+      setSubjects(derived);
+
+      if (derived.length === 0) {
+        setOverallStats({ grade: "—", avg: 0, trend: "—", hasData: false });
+        setTrendData([]);
+        setLoading(false);
+        return;
       }
 
-      // Trend chart — handle all date formats (toSafeDate hoisted above)
-      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-      const scoresByMonth = new Map<string, Map<string, { total: number; count: number }>>();
-      scores.forEach(s => {
-        const date = toSafeDate(s.timestamp || s.createdAt || s.date);
-        const month = monthNames[date.getMonth()];
-        const sub = s.subject || s.subjectName || s.testName || "General";
-        if (!scoresByMonth.has(month)) scoresByMonth.set(month, new Map());
-        const mm = scoresByMonth.get(month)!;
-        if (!mm.has(sub)) mm.set(sub, { total: 0, count: 0 });
-        const curr = mm.get(sub)!;
-        curr.total += (parseFloat(s.percentage) || 0);
-        curr.count += 1;
+      const globalAvg = Math.round(
+        derived.reduce((a, b) => a + b.progress, 0) / derived.length,
+      );
+
+      // Real trend from recent half vs older half — no fake "+8%" placeholder.
+      const withPct = allScores
+        .map((s) => ({ s, pct: pctOf(s), ms: scoreDateMs(s) }))
+        .filter((x) => x.pct != null && x.ms > 0)
+        .sort((a, b) => b.ms - a.ms);
+
+      let trend = "—";
+      if (withPct.length >= 2) {
+        const half = Math.ceil(withPct.length / 2);
+        const recent = withPct.slice(0, half);
+        const older = withPct.slice(half);
+        if (older.length > 0) {
+          const r = recent.reduce((a, x) => a + (x.pct as number), 0) / recent.length;
+          const o = older.reduce((a, x) => a + (x.pct as number), 0) / older.length;
+          const diff = Math.round(r - o);
+          trend = diff >= 0 ? `+${diff}%` : `${diff}%`;
+        }
+      }
+
+      setOverallStats({
+        grade: gradeFor(globalAvg),
+        avg: globalAvg,
+        trend,
+        hasData: true,
+      });
+
+      // Trend chart — last 4 calendar months including current. Wraps year
+      // boundary so January correctly shows Oct-Nov-Dec-Jan (prev year is
+      // implicit; we only group by month-name for visual clarity).
+      const MONTH = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const byMonth = new Map<string, { total: number; count: number }>();
+      allScores.forEach((s) => {
+        const pct = pctOf(s);
+        if (pct == null) return;
+        const d = toSafeDate(s.timestamp) || toSafeDate(s.createdAt) || toSafeDate(s.testDate) || toSafeDate(s.date);
+        if (!d) return;
+        const m = MONTH[d.getMonth()];
+        if (!byMonth.has(m)) byMonth.set(m, { total: 0, count: 0 });
+        const cur = byMonth.get(m)!;
+        cur.total += pct;
+        cur.count += 1;
       });
       const currMonth = new Date().getMonth();
-      const displayMonths = monthNames.slice(Math.max(0, currMonth - 3), currMonth + 1);
-      const chartData = displayMonths.map(m => {
-        const entry: any = { month: m };
-        const mm = scoresByMonth.get(m);
-        derivedSubjs.forEach(s => {
-          const d = mm?.get(s.name);
-          entry[s.name] = d ? Math.round(d.total / d.count) : null;
+      const points: TrendPoint[] = [];
+      for (let off = 3; off >= 0; off--) {
+        const m = (currMonth - off + 12) % 12;
+        const mm = byMonth.get(MONTH[m]);
+        points.push({
+          month: MONTH[m],
+          score: mm && mm.count > 0 ? Math.round(mm.total / mm.count) : null,
         });
-        return entry;
-      });
-      setTrendData(chartData.filter(d => Object.keys(d).length > 1));
+      }
+      setTrendData(points);
+
+      setFeedbacks(feedbackCache);
       setLoading(false);
     };
 
-    const sid = studentData.id;
-    const email = (studentData.email || studentData.studentEmail || "").toLowerCase();
+    /* ── Dual-key listeners via shared helper ──────────────────────────
+       Memory `dual_query_pattern_studentid_email`: parent-dashboard must
+       query by BOTH studentId AND studentEmail. The helper handles merge
+       internally and stays consistent with every other parent page. */
 
-    // Query helper — tries studentId first, no schoolId filter (avoids composite index issues)
-    const byId = (col: string) => query(collection(db, col), where("studentId", "==", sid));
-    const byEmail = (col: string) => email
-      ? query(collection(db, col), where("studentEmail", "==", email))
-      : null;
+    const unsubTS = subscribePerStudent({
+      collection: "test_scores",
+      student: studentData,
+      onChange: (docs) => {
+        if (cancelled) return;
+        testScoreCache = docs.map((d) => ({ id: d.id, ...(d.data() as Omit<RawScore, "id">) }));
+        recompute();
+      },
+      onError: (err) => {
+        if (cancelled) return;
+        console.error("[Performance] test_scores listener error:", err);
+        setListenerError(err.message || "Some scores couldn't load. Retry?");
+      },
+    });
 
-    // 1. test_scores — by studentId
-    const u1 = onSnapshot(byId("test_scores"), s => { snap1Cache = s; processScores(); },
-      () => { /* silent fail if index missing */ });
+    const unsubR = subscribePerStudent({
+      collection: "results",
+      student: studentData,
+      onChange: (docs) => {
+        if (cancelled) return;
+        resultCache = docs.map((d) => ({ id: d.id, ...(d.data() as Omit<RawScore, "id">) }));
+        recompute();
+      },
+      onError: (err) => {
+        if (cancelled) return;
+        console.error("[Performance] results listener error:", err);
+        setListenerError(err.message || "Some scores couldn't load. Retry?");
+      },
+    });
 
-    // 2. results — by studentId (many schools store scores here instead)
-    const u2r = onSnapshot(byId("results"), s => { snap2Cache = s; processScores(); },
-      () => {});
+    const unsubF = subscribePerStudent({
+      collection: "performance_feedback",
+      student: studentData,
+      onChange: (docs) => {
+        if (cancelled) return;
+        feedbackCache = docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as Omit<RawFeedback, "id">),
+        }));
+        recompute();
+      },
+      onError: (err) => {
+        if (cancelled) return;
+        console.error("[Performance] performance_feedback listener error:", err);
+      },
+    });
 
-    // 3. Also fetch by email if available (covers email-based enrollments)
-    let u3r = () => {};
-    const emailQ = byEmail("test_scores");
-    if (emailQ) {
-      u3r = onSnapshot(emailQ, s => {
-        // Merge email-based scores into snap1Cache
-        if (snap1Cache) {
-          const existingIds = new Set(snap1Cache.docs.map((d: any) => d.id));
-          const newDocs = s.docs.filter((d: any) => !existingIds.has(d.id));
-          if (newDocs.length > 0) {
-            snap1Cache = { docs: [...snap1Cache.docs, ...newDocs] };
-            processScores();
-          }
-        } else {
-          snap1Cache = s;
-          processScores();
-        }
-      }, () => {});
-    }
+    /* ── End-to-end metric listeners (dual-key) ───────────────────────── */
 
-    // 4. gradebook_scores — fetch by classId (need enrollment first)
-    //
-    // CRITICAL: include schoolId in the server-side query. Previously the query
-    // only filtered by classId, then filtered to the current student CLIENT-side.
-    // That meant Firestore briefly returned every student's gradebook for the
-    // class to the browser before the filter ran — a leak both for performance
-    // and for security (an attacker reading the network response sees all
-    // classmates' marks).
-    let u4r = () => {};
-    const fetchGradebook = async () => {
-      try {
-        const enrolSnap = await getDocs(byId("enrollments"));
-        const classIds = [...new Set(enrolSnap.docs.map(d => d.data().classId).filter(Boolean))] as string[];
-        if (classIds.length > 0) {
-          const chunks: string[][] = [];
-          for (let i = 0; i < classIds.length; i += 10) chunks.push(classIds.slice(i, i + 10));
-          const buildGbQ = (ch: string[]) =>
-            studentData?.schoolId
-              ? query(
-                  collection(db, "gradebook_scores"),
-                  where("schoolId", "==", studentData.schoolId),
-                  where("classId", "in", ch),
-                  where("studentId", "==", sid),
-                )
-              : query(
-                  collection(db, "gradebook_scores"),
-                  where("classId", "in", ch),
-                  where("studentId", "==", sid),
-                );
-          const gbSnaps = await Promise.all(chunks.map(ch => getDocs(buildGbQ(ch))));
-          // Server already filtered to this student. Only keep email-fallback
-          // for legacy gradebook rows that may have used studentEmail instead
-          // of studentId.
-          const studentGbDocs = gbSnaps.flatMap(s => s.docs);
-          // Bail if component unmounted while gradebook was being fetched —
-          // otherwise processScores calls setState on an unmounted component.
-          if (!mountedRef.current) return;
-          if (studentGbDocs.length > 0) {
-            snap3Cache = { docs: studentGbDocs };
-            processScores();
-          }
-        }
-      } catch (e) {
-        console.warn("[Performance] Gradebook fetch failed:", e);
+    // Submissions — parent-uploaded homework. Used for assignment completion.
+    const unsubSubs = subscribePerStudent({
+      collection: "submissions",
+      student: studentData,
+      onChange: (docs) => {
+        if (cancelled) return;
+        setSubmissionsList(
+          docs.map((d) => ({ id: d.id, ...(d.data() as Omit<RawSubmission, "id">) })),
+        );
+      },
+      onError: (err) => {
+        if (cancelled) return;
+        console.error("[Performance] submissions listener error:", err);
+      },
+    });
+
+    // Attendance — teacher-marked. IST-aware compare on `date` field.
+    const unsubAtt = subscribePerStudent({
+      collection: "attendance",
+      student: studentData,
+      onChange: (docs) => {
+        if (cancelled) return;
+        setAttendanceList(
+          docs.map((d) => ({ id: d.id, ...(d.data() as Omit<RawAttendance, "id">) })),
+        );
+      },
+      onError: (err) => {
+        if (cancelled) return;
+        console.error("[Performance] attendance listener error:", err);
+      },
+    });
+
+    // Incidents — teacher-recorded behaviour notes. Memory cross_dashboard_behaviour_sync.
+    const unsubInc = subscribePerStudent({
+      collection: "incidents",
+      student: studentData,
+      onChange: (docs) => {
+        if (cancelled) return;
+        setIncidentsList(
+          docs.map((d) => ({ id: d.id, ...(d.data() as Omit<RawIncident, "id">) })),
+        );
+      },
+      onError: (err) => {
+        if (cancelled) return;
+        console.error("[Performance] incidents listener error:", err);
+      },
+    });
+
+    // Student ratings — teacher Quick Rate stars. Memory cross_dashboard_behaviour_sync.
+    const unsubRat = subscribePerStudent({
+      collection: "student_ratings",
+      student: studentData,
+      onChange: (docs) => {
+        if (cancelled) return;
+        setRatingsList(
+          docs.map((d) => ({ id: d.id, ...(d.data() as Omit<RawRating, "id">) })),
+        );
+      },
+      onError: (err) => {
+        if (cancelled) return;
+        console.error("[Performance] student_ratings listener error:", err);
+      },
+    });
+
+    /* ── Class-scoped listeners — gradebook + assignments ─────────────── */
+
+    let unsubAsgn: (() => void) | null = null;
+
+    const setupClassScopedListeners = (classIds: string[]) => {
+      const key = classIds.slice().sort().join("|");
+      if (key === lastClassIdsKey) return;
+      lastClassIdsKey = key;
+
+      if (unsubGb) { unsubGb(); unsubGb = null; }
+      if (unsubAsgn) { unsubAsgn(); unsubAsgn = null; }
+
+      if (classIds.length === 0) {
+        gradebookCache = [];
+        setAssignmentsList([]);
+        recompute();
+        return;
       }
+      const limited = classIds.slice(0, 30); // Firestore `in` cap
+
+      // Gradebook scores
+      unsubGb = onSnapshot(
+        scopedQuery(
+          "gradebook_scores",
+          studentData.schoolId,
+          where("classId", "in", limited),
+          where("studentId", "==", studentData.id),
+        ),
+        (snap) => {
+          if (cancelled) return;
+          gradebookCache = snap.docs.map((d) => ({
+            id: d.id,
+            ...(d.data() as Omit<RawScore, "id">),
+          }));
+          recompute();
+        },
+        (err) => {
+          if (cancelled) return;
+          console.error("[Performance] gradebook_scores listener error:", err);
+        },
+      );
+
+      // Assignments (class-scoped — published to whole class)
+      unsubAsgn = onSnapshot(
+        scopedQuery(
+          "assignments",
+          studentData.schoolId,
+          where("classId", "in", limited),
+        ),
+        (snap) => {
+          if (cancelled) return;
+          setAssignmentsList(
+            snap.docs.map((d) => ({
+              id: d.id,
+              ...(d.data() as Omit<RawAssignment, "id">),
+            })),
+          );
+        },
+        (err) => {
+          if (cancelled) return;
+          console.error("[Performance] assignments listener error:", err);
+        },
+      );
     };
-    fetchGradebook();
 
-    // 5. Feedback
-    const u5 = onSnapshot(byId("performance_feedback"), snap => {
-      if (!mountedRef.current) return;
-      const feedMap = new Map(snap.docs.map(d => [d.id, { id: d.id, ...d.data() }]));
-      setFeedbacks(Array.from(feedMap.values()));
-    }, () => {});
+    const unsubEnroll = subscribeEnrollments(
+      studentData,
+      (docs) => {
+        if (cancelled) return;
+        const classIds = Array.from(
+          new Set(
+            docs
+              .map((d) => (d.data() as { classId?: string }).classId)
+              .filter((id): id is string => !!id),
+          ),
+        );
+        setupClassScopedListeners(classIds);
+      },
+      (err) => {
+        if (cancelled) return;
+        console.error("[Performance] enrollments listener error:", err);
+      },
+    );
 
-    return () => { u1(); u2r(); u3r(); u4r(); u5(); };
-  }, [studentData?.id]);
+    return () => {
+      cancelled = true;
+      unsubTS();
+      unsubR();
+      unsubF();
+      unsubSubs();
+      unsubAtt();
+      unsubInc();
+      unsubRat();
+      unsubEnroll();
+      if (unsubGb) unsubGb();
+      if (unsubAsgn) unsubAsgn();
+    };
+  }, [studentData, refreshKey]);
 
-  // ── System-driven insight helpers (extracted to ai/system/performance-insights.ts) ──
-  const studentName = studentData?.name?.split(" ")[0] || "Your child";
+  const studentName = useMemo(
+    () => studentData?.name?.split(" ")[0] || "Your child",
+    [studentData?.name],
+  );
 
   const generateNarrative = () =>
-    generatePerformanceNarrative({ studentName, subjects, overallAvg: overallStats.avg });
-  // ────────────────────────────────────────────────────────────────────────────
+    generatePerformanceNarrative({
+      studentName,
+      subjects,
+      overallAvg: overallStats.avg,
+    });
 
-  // Subject detail view
-  if (selectedSubject) {
-    const s = subjects.find(sub => sub.name === selectedSubject);
-    if (!s) return null;
+  /* ── Derived: end-to-end performance snapshot + cards data ────────── */
 
-    const topicMasteryMap = new Map();
-    s.raw.forEach((score: any) => {
-      const topics = score.topics || [s.name];
-      topics.forEach((t: string) => {
-        if (!topicMasteryMap.has(t)) topicMasteryMap.set(t, { total: 0, count: 0 });
-        const curr = topicMasteryMap.get(t);
-        curr.total += (parseFloat(score.percentage) || 0);
-        curr.count += 1;
+  // Assignment rows — one per published assignment for this student's class(es).
+  // (We don't pre-build a "submitted ids" Set because assignmentRows already
+  //  inlines the match via submissionMatchesAssignment + isSubmissionCompleted.
+  //  Memory `bug_pattern_dual_id_writer_or_short_circuit` handled inside the
+  //  helper.)
+  const assignmentRows: AssignmentRow[] = useMemo(
+    () =>
+      assignmentsList.map((a) => {
+        const due = toSafeDate(a.dueDate);
+        const matchingSub = submissionsList
+          .filter(isSubmissionCompleted)
+          .find((s) => submissionMatchesAssignment(s, a.id));
+        return {
+          id: a.id,
+          title: a.title || "Assignment",
+          dueDate: due,
+          submitted: !!matchingSub,
+          onTime: matchingSub ? wasOnTime(matchingSub, due) : null,
+        };
+      }),
+    [assignmentsList, submissionsList],
+  );
+
+  // Test/exam rows — only from `test_scores` collection (gradebook + results
+  // are different sources). Recent 5 by score date desc.
+  const testRows: TestScoreRow[] = useMemo(() => {
+    const fromSubjects: TestScoreRow[] = [];
+    subjects.forEach((sub) => {
+      sub.raw.forEach((r) => {
+        // Only docs that LOOK like proper tests — have a testName OR no
+        // gradebook-specific field. Heuristic: testName present OR maxScore.
+        const isTest = !!(r.testName || r.maxScore != null);
+        if (!isTest) return;
+        const pct = pctOf(r);
+        if (pct == null) return;
+        fromSubjects.push({
+          id: r.id,
+          name: r.testName || `${sub.name} assessment`,
+          subject: sub.name,
+          date:
+            toSafeDate(r.timestamp) ||
+            toSafeDate(r.testDate) ||
+            toSafeDate(r.createdAt),
+          pct,
+        });
       });
     });
-    const processedTopics = Array.from(topicMasteryMap.entries())
-      .map(([name, data]: any) => ({ name, score: data.count > 0 ? Math.round(data.total / data.count) : 0 }))
+    // Sort by date desc, fallback by name
+    fromSubjects.sort((a, b) => {
+      const ad = a.date?.getTime() ?? 0;
+      const bd = b.date?.getTime() ?? 0;
+      if (ad !== bd) return bd - ad;
+      return a.name.localeCompare(b.name);
+    });
+    return fromSubjects;
+  }, [subjects]);
+
+  // Recent incidents (last 30 days) sorted by createdAt desc
+  const recentIncidents = useMemo(() => {
+    const cutoff = Date.now() - THIRTY_DAYS_MS;
+    return incidentsList
+      .filter((i) => {
+        const d = toSafeDate(i.createdAt) || toSafeDate(i.date);
+        return d ? d.getTime() >= cutoff : false;
+      })
+      .sort((a, b) => {
+        const ad = (toSafeDate(a.createdAt) || toSafeDate(a.date))?.getTime() ?? 0;
+        const bd = (toSafeDate(b.createdAt) || toSafeDate(b.date))?.getTime() ?? 0;
+        return bd - ad;
+      });
+  }, [incidentsList]);
+
+  // The end-to-end snapshot used by PerformanceSnapshotRow + the cards.
+  const snapshot: PerformanceSnapshot = useMemo(() => {
+    // Subjects avg
+    const subjectsAvg =
+      subjects.length > 0
+        ? Math.round(subjects.reduce((a, s) => a + s.progress, 0) / subjects.length)
+        : null;
+
+    // Tests: only from test_scores rows
+    const testsAvg =
+      testRows.length > 0
+        ? Math.round(testRows.reduce((a, r) => a + r.pct, 0) / testRows.length)
+        : null;
+
+    // Assignments
+    const assignmentTotal = assignmentRows.length;
+    const assignmentSubmitted = assignmentRows.filter((r) => r.submitted).length;
+    const onTimeEligible = assignmentRows.filter((r) => r.submitted && r.onTime !== null);
+    const assignmentOnTime = onTimeEligible.filter((r) => r.onTime === true).length;
+
+    // Attendance — last 30 days, IST-aware
+    const todayMs = Date.now();
+    const thirtyAgo = todayMs - THIRTY_DAYS_MS;
+    const recentAtt = attendanceList.filter((a) => {
+      if (!a.date) return false;
+      const d = new Date(`${a.date}T00:00:00`);
+      const t = d.getTime();
+      return !isNaN(t) && t >= thirtyAgo && t <= todayMs;
+    });
+    const attendancePresent = recentAtt.filter((a) => a.status === "present").length;
+    const attendanceLate = recentAtt.filter((a) => a.status === "late").length;
+    const attendanceAbsent = recentAtt.filter((a) => a.status === "absent").length;
+    const attendanceTotal = recentAtt.length;
+    const attendanceRate =
+      attendanceTotal > 0
+        ? Math.round(((attendancePresent + attendanceLate) / attendanceTotal) * 100)
+        : null;
+
+    // Incidents — last 30 days
+    const incidents30d = recentIncidents.length;
+
+    // Ratings — 1-5 scale per Quick Rate writer
+    const ratingValues = ratingsList
+      .map((r) => Number(r.rating))
+      .filter((v) => isFinite(v) && v > 0 && v <= 5);
+    const ratingAvg =
+      ratingValues.length > 0
+        ? ratingValues.reduce((a, b) => a + b, 0) / ratingValues.length
+        : null;
+    const ratingCount = ratingValues.length;
+
+    return {
+      subjectsAvg,
+      testsAvg,
+      testCount: testRows.length,
+      assignmentTotal,
+      assignmentSubmitted,
+      assignmentOnTime,
+      attendancePresent,
+      attendanceLate,
+      attendanceAbsent,
+      attendanceRate,
+      attendanceTotal,
+      incidents30d,
+      ratingAvg,
+      ratingCount,
+    };
+    // submittedAssignmentIds tracked indirectly via assignmentRows → suppress warning.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subjects, testRows, assignmentRows, attendanceList, ratingsList, recentIncidents]);
+
+  /* ── Subject detail view ──────────────────────────────────────────── */
+
+  if (selectedSubject) {
+    const s = subjects.find((sub) => sub.name === selectedSubject);
+    if (!s) return null;
+
+    // Real topic breakdown only — drop fallback to subject name (used to
+    // render a fake "Math" topic inside the Math subject view).
+    const topicMap = new Map<string, { total: number; count: number }>();
+    s.raw.forEach((score) => {
+      const t = score.topic || (score.topics && score.topics[0]) || "";
+      if (!t) return; // no real topic — skip
+      const pct = pctOf(score);
+      if (pct == null) return;
+      if (!topicMap.has(t)) topicMap.set(t, { total: 0, count: 0 });
+      const cur = topicMap.get(t)!;
+      cur.total += pct;
+      cur.count += 1;
+    });
+    const processedTopics = Array.from(topicMap.entries())
+      .map(([name, d]) => ({ name, score: Math.round(d.total / d.count) }))
       .sort((a, b) => b.score - a.score);
 
     const subFeedback = feedbacks
-      .filter(f => f.subject?.toLowerCase().includes(s.name.toLowerCase()) || s.name.toLowerCase().includes(f.subject?.toLowerCase()))
-      .sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0))[0]
-      || feedbacks.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0))[0];
+      .filter(
+        (f) =>
+          f.subject?.toLowerCase().includes(s.name.toLowerCase()) ||
+          (f.subject ? s.name.toLowerCase().includes(f.subject.toLowerCase()) : false),
+      )
+      .sort((a, b) => {
+        const ad = toSafeDate(a.timestamp) || toSafeDate(a.createdAt);
+        const bd = toSafeDate(b.timestamp) || toSafeDate(b.createdAt);
+        return (bd?.getTime() || 0) - (ad?.getTime() || 0);
+      })[0];
 
-    const avg = overallStats.avg;
-    const resources: any[] = [];
-    if (processedTopics.length > 0) {
-      processedTopics.filter(t => t.score < 85).slice(0, 2).forEach(t => {
-        resources.push({ icon: "PlayCircle", title: `${t.name} Concept Clarity`, subtitle: "Targeted Tutorial • Video", action: "Watch", color: "text-blue-500 bg-blue-50", url: `https://www.youtube.com/results?search_query=${t.name.replace(/\s+/g, "+")}+tutorial` });
+    const testScores = [...s.raw]
+      .sort((a, b) => scoreDateMs(b) - scoreDateMs(a))
+      .map((r) => {
+        const pct = pctOf(r);
+        const maxNum = Number(r.maxScore ?? r.maxMarks);
+        const rawValue = r.score ?? r.mark ?? r.marks;
+        const scoreLabel =
+          rawValue != null && Number.isFinite(maxNum) && maxNum > 0
+            ? `${rawValue}/${maxNum}`
+            : rawValue != null
+              ? String(rawValue)
+              : pct != null
+                ? `${Math.round(pct)}%`
+                : "—";
+        const d = toSafeDate(r.timestamp) || toSafeDate(r.testDate) || toSafeDate(r.createdAt);
+        return {
+          name: r.testName || "Untitled assessment",
+          date: d
+            ? d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+            : "—",
+          score: scoreLabel,
+          status:
+            pct != null && pct >= 75 ? "success" :
+            pct != null && pct >= 60 ? "warning" : "error",
+        };
       });
-    }
-    if (avg < 60) resources.push({ icon: "PlayCircle", title: "Study Techniques for Better Grades", subtitle: "Study Skills • Memory Tips", action: "Watch", color: "text-rose-500 bg-rose-50", url: "https://www.youtube.com/results?search_query=best+study+techniques+for+students" });
-    if (avg >= 90) resources.push({ icon: "Star", title: "Advanced Learning Resources", subtitle: "Beyond Curriculum • Excellence", action: "Watch", color: "text-indigo-500 bg-indigo-50", url: "https://www.youtube.com/results?search_query=advanced+learning+for+top+students" });
-    if (resources.length === 0) resources.push({ icon: "Star", title: "Continuous Learning Guide", subtitle: "Growth Strategies • Success", action: "Watch", color: "text-indigo-500 bg-indigo-50", url: "https://www.youtube.com/results?search_query=self+improvement+habits+for+students" });
 
     return (
       <SubjectPerformanceDetail
         subject={s.name}
-        // Honest "—" instead of a generic "Class Teacher" string when the
-        // subject's teacher hasn't been resolved from Firestore.
         teacher={subFeedback?.teacherName || "—"}
         grade={s.grade}
         average={s.progress}
-        // Only render synthesized "Overall" topic if there are no real topic
-        // breakdowns AND we actually have a score to show — otherwise empty.
-        topics={
-          processedTopics.length > 0
-            ? processedTopics
-            : (s.progress > 0 ? [{ name: "Overall", score: s.progress }] : [])
+        topics={processedTopics}
+        testScores={testScores}
+        feedback={
+          subFeedback?.content ||
+          "No teacher feedback recorded yet for this subject."
         }
-        testScores={s.raw.map((r: any) => {
-          // Derive a denominator only when Firestore has a real maxScore;
-          // never fake "/100" when the actual max could be 25, 50, etc.
-          const max = Number(r.maxScore);
-          const scoreLabel = Number.isFinite(max) && max > 0 ? `${r.score}/${max}` : `${r.score}`;
-          return {
-            name: r.testName || "Untitled assessment",
-            date: r.timestamp
-              ? new Date(r.timestamp.seconds * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
-              : "—",
-            score: scoreLabel,
-            status: r.percentage >= 75 ? "success" : r.percentage >= 60 ? "warning" : "error",
-          };
-        })}
-        // No fabricated "is progressing well" placeholder — when the teacher
-        // hasn't written feedback, say so explicitly so the parent knows
-        // there's nothing to read yet (and doesn't mistake it for real input).
-        feedback={subFeedback?.content || "No teacher feedback recorded yet for this subject."}
-        resources={resources.slice(0, 3)}
+        resources={[]}
         onBack={() => setSelectedSubject(null)}
       />
     );
   }
 
-  /* ═══════════════════════════════════════════════════════════════
-     MOBILE — Bright Blue Apple UI
-     ═══════════════════════════════════════════════════════════════ */
+  /* ── MOBILE branch ────────────────────────────────────────────────── */
+
   if (isMobile) {
-    const B1 = "#0055FF", B2 = "#1166FF", B3 = "#2277FF", B4 = "#4499FF";
-    const BG = "#EEF4FF", BG2 = "#E0ECFF";
-    const T1 = "#001040", T2 = "#002080", T3 = "#5070B0", T4 = "#99AACC";
-    const SEP = "rgba(0,85,255,0.07)";
-    const GREEN = "#00C853", GREEN_S = "rgba(0,200,83,0.12)", GREEN_B = "rgba(0,200,83,0.25)";
-    const RED = "#FF3355";
-    const ORANGE = "#FF8800";
-    const SH = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.09), 0 10px 28px rgba(0,85,255,0.11)";
-    const SH_LG = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 20px 48px rgba(0,85,255,0.14)";
-
-    // ── Overall monthly avg line (single series) ──
-    const overallTrend = trendData.map((row: any) => {
-      const vals = Object.entries(row)
-        .filter(([k, v]) => k !== "month" && typeof v === "number" && v > 0)
-        .map(([, v]) => v as number);
-      const avg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null;
-      return { month: row.month, score: avg };
-    }).filter((d: any) => d.score != null);
-
-    // Trend pill color
-    const trendNum = parseInt(overallStats.trend.replace(/[^0-9-]/g, ""), 10) || 0;
-    const trendColor = trendNum > 0 ? GREEN : trendNum < 0 ? RED : "#008844";
-
-    // Goal logic (same as desktop)
-    const activeGoalSub = subjects.find(s => s.name === (goalSubject || subjects[0]?.name));
-    const goalInsight = activeGoalSub ? getGoalInsight(activeGoalSub.progress, goalTarget, activeGoalSub.name) : null;
-    const goalGap = activeGoalSub ? Math.max(0, goalTarget - activeGoalSub.progress) : 0;
-
-    // Per-card blue-only accent rotation
-    const unitAccents = [
-      { icoBg: `linear-gradient(135deg, ${B1}, ${B3})`, icoShadow: "0 3px 10px rgba(0,85,255,0.28)" },
-      { icoBg: "linear-gradient(135deg, #0044EE, #2277FF)", icoShadow: "0 3px 10px rgba(0,68,238,0.28)" },
-      { icoBg: "linear-gradient(135deg, #002DBB, #0055FF)", icoShadow: "0 3px 10px rgba(0,45,187,0.28)" },
-      { icoBg: "linear-gradient(135deg, #1155EE, #44AAFF)", icoShadow: "0 3px 10px rgba(17,85,238,0.28)" },
-    ];
+    const { T1, T3 } = T_PALETTE;
+    const renderMain = () => {
+      if (loading) return <LoadingBlock isMobile />;
+      const hasAnyData =
+        subjects.length > 0 ||
+        snapshot.testCount > 0 ||
+        snapshot.assignmentTotal > 0 ||
+        snapshot.attendanceTotal > 0 ||
+        snapshot.incidents30d > 0 ||
+        snapshot.ratingCount > 0;
+      if (!hasAnyData) return <EmptyBlock isMobile />;
+      return (
+        <>
+          <PerformanceSnapshotRow snap={snapshot} isMobile navigate={navigate} />
+          {subjects.map((s, i) => (
+            <SubjectCard
+              key={s.name}
+              subject={s}
+              idx={i}
+              isMobile
+              onClick={() => setSelectedSubject(s.name)}
+            />
+          ))}
+          <TestsAndExamsCard rows={testRows} isMobile navigate={navigate} />
+          <AssignmentsCard rows={assignmentRows} isMobile navigate={navigate} />
+          <AttendanceSnapshotCard snap={snapshot} isMobile navigate={navigate} />
+          <BehaviourSnapshotCard
+            snap={snapshot}
+            recentIncidents={recentIncidents}
+            isMobile
+            navigate={navigate}
+          />
+          <TrendChartCard data={trendData} isMobile navigate={navigate} />
+          <NarrativeCard narrative={generateNarrative()} isMobile navigate={navigate} />
+          <GoalPlannerCard
+            subjects={subjects}
+            goalSubject={goalSubject}
+            setGoalSubject={setGoalSubject}
+            goalTarget={goalTarget}
+            setGoalTarget={setGoalTarget}
+            isMobile
+          />
+          <BenchmarkInsightsCard
+            subjects={subjects}
+            benchmark={benchmark}
+            studentName={studentName}
+            isMobile
+            onSubjectClick={setSelectedSubject}
+          />
+        </>
+      );
+    };
 
     return (
-      <div className="animate-in fade-in duration-500 -mx-3 -mt-3 md:mx-0 md:mt-0"
-        style={{ fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif", background: BG, minHeight: "100vh" }}>
-
-        {/* ── Page Head ── */}
+      <div
+        className="animate-in fade-in duration-500 -mx-3 -mt-3 md:mx-0 md:mt-0"
+        style={{
+          fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+          background: T_PALETTE.BG,
+          minHeight: "100vh",
+        }}
+      >
+        {/* Page head */}
         <div className="flex items-start justify-between px-[22px] pt-[18px]">
           <div>
-            <div className="text-[24px] font-bold" style={{ color: T1, letterSpacing: "-0.6px" }}>Performance Analytics</div>
-            <div className="text-[12px] mt-[3px] font-normal" style={{ color: T3 }}>Detailed breakdown of academic progress</div>
+            <div className="text-[24px] font-bold" style={{ color: T1, letterSpacing: "-0.6px" }}>
+              Performance Analytics
+            </div>
+            <div className="text-[12px] mt-[3px] font-normal" style={{ color: T3 }}>
+              Detailed breakdown of academic progress
+            </div>
           </div>
-          <div className="w-8 h-8 rounded-[10px] flex items-center justify-center text-[14px] font-bold text-white mt-0.5 shrink-0"
-            style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: "0 3px 10px rgba(0,85,255,0.32)" }}>
+          <div
+            className="w-8 h-8 rounded-[10px] flex items-center justify-center text-[14px] font-bold text-white mt-0.5 shrink-0"
+            style={{
+              background: `linear-gradient(135deg, ${T_PALETTE.B1}, ${T_PALETTE.B2})`,
+              boxShadow: "0 3px 10px rgba(0,85,255,0.32)",
+            }}
+          >
             {overallStats.grade}
           </div>
         </div>
 
-        {/* ── Overall Performance ── */}
-        <div
-          role="button"
-          tabIndex={0}
-          aria-label="Open reports page"
-          onClick={() => navigate("/reports")}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
-          className="mx-5 mt-4 bg-white rounded-[24px] p-5 relative overflow-hidden cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
-          style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-          <div className="absolute -top-[50px] -right-[30px] w-[160px] h-[160px] rounded-full pointer-events-none"
-            style={{ background: "radial-gradient(circle, rgba(0,85,255,0.06) 0%, transparent 70%)" }} />
-          <div className="text-[16px] font-bold relative z-10" style={{ color: T1, letterSpacing: "-0.3px", marginBottom: 3 }}>Overall Performance</div>
-          <div className="text-[11px] mb-4 relative z-10" style={{ color: T3 }}>Based on all assessments this term</div>
-          <div className="grid grid-cols-3 gap-[10px] relative z-10">
-            <div className="flex flex-col items-center gap-[5px] px-3 py-[14px] rounded-[16px]"
-              style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-              <div className="text-[22px] font-bold" style={{ color: B1, letterSpacing: "-0.5px" }}>{overallStats.grade}</div>
-              <div className="text-[9px] font-bold uppercase tracking-[0.09em]" style={{ color: T4 }}>Grade</div>
-            </div>
-            <div className="flex flex-col items-center gap-[5px] px-3 py-[14px] rounded-[16px]"
-              style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-              <div className="text-[22px] font-bold" style={{ color: T1, letterSpacing: "-0.5px" }}>{overallStats.avg > 0 ? `${overallStats.avg}%` : "—"}</div>
-              <div className="text-[9px] font-bold uppercase tracking-[0.09em]" style={{ color: T4 }}>Average</div>
-            </div>
-            <div className="flex flex-col items-center gap-[5px] px-3 py-[14px] rounded-[16px]"
-              style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-              <div className="text-[18px] font-bold" style={{ color: trendColor, letterSpacing: "-0.5px" }}>{overallStats.trend}</div>
-              <div className="text-[9px] font-bold uppercase tracking-[0.09em]" style={{ color: T4 }}>Trend</div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Subject / Unit Cards ── */}
-        {loading ? (
-          <div className="flex flex-col items-center gap-3 py-14" style={{ color: T4 }}>
-            <Loader2 className="w-8 h-8 animate-spin" style={{ color: B1 }} />
-            <p className="text-sm">Loading performance data…</p>
-          </div>
-        ) : subjects.length === 0 ? (
-          <div className="mx-5 mt-3 rounded-[22px] py-10 flex flex-col items-center text-center"
-            style={{ background: "white", border: "0.5px solid rgba(0,85,255,0.10)" }}>
-            <div className="w-14 h-14 rounded-[18px] flex items-center justify-center mb-3"
-              style={{ background: BG2, border: "0.5px solid rgba(0,85,255,0.14)" }}>
-              <BookOpen className="w-7 h-7" style={{ color: T4 }} />
-            </div>
-            <div className="text-[15px] font-bold" style={{ color: T2 }}>No assessments yet</div>
-            <div className="text-[12px] mt-1" style={{ color: T4 }}>Scores will appear here once graded.</div>
-          </div>
-        ) : (
-          subjects.map((s, i) => {
-            const acc = unitAccents[i % unitAccents.length];
-            const Icon = getSubIcon(s.name);
-            const needsAttention = s.progress < 60;
-            const fill = needsAttention
-              ? `linear-gradient(90deg, ${RED}, #FF6688)`
-              : s.progress < 75
-                ? `linear-gradient(90deg, ${ORANGE}, #FFAA33)`
-                : `linear-gradient(90deg, ${B1}, ${B4})`;
-            return (
-              <div key={i}
-                role="button"
-                tabIndex={0}
-                aria-label={`Open ${s.name} performance detail`}
-                onClick={() => setSelectedSubject(s.name)}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedSubject(s.name); } }}
-                className="mx-5 mt-3 bg-white rounded-[22px] px-5 py-[18px] relative overflow-hidden active:scale-[0.98] transition-transform cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
-                style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)", transitionTimingFunction: "cubic-bezier(0.34,1.56,0.64,1)" }}>
-                <div className="flex items-center justify-between mb-[14px]">
-                  <div className="flex items-center gap-[10px]">
-                    <div className="w-9 h-9 rounded-[12px] flex items-center justify-center"
-                      style={{ background: acc.icoBg, boxShadow: acc.icoShadow }}>
-                      <Icon className="w-[18px] h-[18px] text-white" strokeWidth={2.2} />
-                    </div>
-                    <span className="text-[15px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>{s.name}</span>
-                  </div>
-                  <div className="w-7 h-7 rounded-[9px] flex items-center justify-center text-[12px] font-bold text-white"
-                    style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: "0 2px 8px rgba(0,85,255,0.30)" }}>
-                    {s.grade}
-                  </div>
-                </div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-bold" style={{ color: T2, letterSpacing: "-0.1px" }}>Progress</span>
-                  <span className="text-[13px] font-bold" style={{ color: B1 }}>{s.progress}%</span>
-                </div>
-                <div className="h-[7px] rounded-[4px] overflow-hidden mb-[10px]" style={{ background: BG2 }}>
-                  <div className="h-full rounded-[4px] transition-all duration-700"
-                    style={{ width: `${Math.max(s.progress, 3)}%`, background: fill }} />
-                </div>
-                {needsAttention ? (
-                  <div className="inline-flex items-center gap-[5px] px-[11px] py-1 rounded-full text-[10px] font-bold"
-                    style={{ background: "rgba(255,51,85,0.10)", color: RED, border: "0.5px solid rgba(255,51,85,0.22)" }}>
-                    <span className="w-[10px] h-[1.5px]" style={{ background: RED }} />
-                    Needs Attention
-                  </div>
-                ) : s.progress >= 75 ? (
-                  <div className="inline-flex items-center gap-[5px] px-[11px] py-1 rounded-full text-[10px] font-bold"
-                    style={{ background: GREEN_S, color: "#007830", border: `0.5px solid ${GREEN_B}` }}>
-                    ✓ On Track
-                  </div>
-                ) : (
-                  <div className="inline-flex items-center gap-[5px] px-[11px] py-1 rounded-full text-[10px] font-bold"
-                    style={{ background: "rgba(255,136,0,0.12)", color: ORANGE, border: "0.5px solid rgba(255,136,0,0.25)" }}>
-                    Stable
-                  </div>
-                )}
-              </div>
-            );
-          })
+        {listenerError && (
+          <ListenerErrorBanner
+            message={listenerError}
+            onRetry={() => setRefreshKey((k) => k + 1)}
+            marginClass="mx-5 mt-3"
+          />
         )}
 
-        {/* ── Performance Trend Chart ── */}
-        {!loading && overallTrend.length > 1 && (
-          <div
-            role="button"
-            tabIndex={0}
-            aria-label="Open reports page for detailed trend"
-            onClick={() => navigate("/reports")}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
-            className="mx-5 mt-3 bg-white rounded-[24px] px-5 pt-5 pb-4 cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
-            style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-            <div className="text-[16px] font-bold" style={{ color: T1, letterSpacing: "-0.3px", marginBottom: 4 }}>Performance Trend</div>
-            <div className="text-[11px] mb-4" style={{ color: T3 }}>Score progression across months</div>
-            <div className="h-[150px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={overallTrend} margin={{ top: 6, right: 6, left: -18, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="perfAreaBlue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={B1} stopOpacity={0.20} />
-                      <stop offset="100%" stopColor={B1} stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="perfLineBlue" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor={B1} />
-                      <stop offset="100%" stopColor="#66BBFF" />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="0" vertical={false} stroke="rgba(0,85,255,0.07)" />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: T4, fontWeight: 600 }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: T4, fontWeight: 600 }} domain={[0, 100]} width={30} />
-                  <Tooltip contentStyle={{ borderRadius: 12, border: "0.5px solid rgba(0,85,255,0.15)", boxShadow: "0 4px 20px rgba(0,85,255,0.12)", fontSize: 11, padding: "6px 10px" }} />
-                  <Area type="monotone" dataKey="score" stroke="url(#perfLineBlue)" strokeWidth={2.5} fill="url(#perfAreaBlue)" dot={{ r: 4, strokeWidth: 2, stroke: "#fff", fill: B1 }} activeDot={{ r: 6, strokeWidth: 2 }} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex items-center justify-center gap-[6px] mt-2">
-              <span className="w-6 h-[2.5px] rounded-[2px]" style={{ background: B1 }} />
-              <span className="text-[11px] font-medium" style={{ color: T3 }}>Overall Average</span>
-            </div>
-          </div>
-        )}
-
-        {/* ── AI Narrative Analysis ── */}
-        {!loading && subjects.length > 0 && (
-          <div
-            role="button"
-            tabIndex={0}
-            aria-label="Open reports page for full narrative"
-            onClick={() => navigate("/reports")}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
-            className="mx-5 mt-3 rounded-[24px] px-5 py-[18px] relative overflow-hidden cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-            style={{
-              background: "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)",
-              boxShadow: "0 8px 30px rgba(0,51,204,0.34), 0 0 0 0.5px rgba(255,255,255,0.14)",
-              border: "0.5px solid rgba(255,255,255,0.14)"
-            }}>
-            <div className="absolute -top-10 -right-7 w-[180px] h-[180px] rounded-full pointer-events-none"
-              style={{ background: "radial-gradient(circle, rgba(255,255,255,0.14) 0%, transparent 65%)" }} />
-            <div className="absolute inset-0 pointer-events-none" style={{
-              backgroundImage: "linear-gradient(rgba(255,255,255,0.014) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.014) 1px, transparent 1px)",
-              backgroundSize: "24px 24px"
-            }} />
-            <div className="flex items-center gap-[7px] mb-[14px] relative z-10">
-              <div className="w-[30px] h-[30px] rounded-[9px] flex items-center justify-center"
-                style={{ background: "rgba(255,255,255,0.18)", border: "0.5px solid rgba(255,255,255,0.26)" }}>
-                <Sparkles className="w-4 h-4" style={{ color: "rgba(255,255,255,0.9)" }} strokeWidth={2.2} />
-              </div>
-              <span className="text-[9px] font-bold uppercase tracking-[0.12em]" style={{ color: "rgba(255,255,255,0.55)" }}>AI Narrative Analysis</span>
-            </div>
-            <p className="text-[13px] leading-[1.72] font-normal mb-[14px] relative z-10" style={{ color: "rgba(255,255,255,0.92)", letterSpacing: "-0.1px" }}>
-              <strong style={{ color: "#fff", fontWeight: 700 }}>{studentName}</strong>{" "}
-              {generateNarrative().replace(new RegExp(`^${studentName}\\s*`), "")}
-            </p>
-            <div className="flex items-center gap-[6px] pt-3 relative z-10" style={{ borderTop: "0.5px solid rgba(255,255,255,0.12)" }}>
-              <div className="w-[6px] h-[6px] rounded-full" style={{ background: B4, boxShadow: "0 0 0 2px rgba(68,153,255,0.25)" }} />
-              <span className="text-[9px] font-bold uppercase tracking-[0.09em]" style={{ color: "rgba(255,255,255,0.42)" }}>Generated from real-time assessment data</span>
-            </div>
-          </div>
-        )}
-
-        {/* ── Goal Setting AI ── */}
-        {!loading && subjects.length > 0 && activeGoalSub && (
-          <div className="mx-5 mt-3 bg-white rounded-[24px] p-5"
-            style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-            <div className="flex items-center gap-3 mb-[18px]">
-              <div className="w-11 h-11 rounded-[14px] flex items-center justify-center shrink-0"
-                style={{ background: `linear-gradient(135deg, ${ORANGE}, #FFAA33)`, boxShadow: "0 3px 12px rgba(255,136,0,0.30)" }}>
-                <Target className="w-[22px] h-[22px] text-white" strokeWidth={2.2} />
-              </div>
-              <div>
-                <div className="text-[16px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Goal Setting AI</div>
-                <div className="text-[11px] mt-0.5" style={{ color: T3 }}>Set a target score and get a personalised plan</div>
-              </div>
-            </div>
-
-            <div className="text-[9px] font-bold uppercase tracking-[0.10em] mb-2" style={{ color: T4 }}>Subject</div>
-            <select
-              value={goalSubject || subjects[0]?.name || ""}
-              onChange={e => setGoalSubject(e.target.value)}
-              className="w-full py-3 px-[14px] rounded-[14px] text-[14px] font-bold mb-4 cursor-pointer appearance-none"
-              style={{
-                border: "0.5px solid rgba(0,85,255,0.16)",
-                background: `${BG} url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%230055FF' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") right 14px center / auto no-repeat`,
-                color: T1,
-                fontFamily: "inherit",
-              }}
-            >
-              {subjects.map(s => (
-                <option key={s.name} value={s.name}>{s.name} — Current: {s.progress}%</option>
-              ))}
-            </select>
-
-            <div className="flex items-center justify-between mb-[10px]">
-              <span className="text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color: T4 }}>Target Score</span>
-              <span className="text-[16px] font-bold" style={{ color: ORANGE }}>{goalTarget}%</span>
-            </div>
-
-            <input
-              type="range"
-              min={50}
-              max={100}
-              value={goalTarget}
-              onChange={e => setGoalTarget(Number(e.target.value))}
-              className="w-full cursor-pointer"
-              style={{
-                WebkitAppearance: "none",
-                appearance: "none",
-                height: 6,
-                borderRadius: 3,
-                background: `linear-gradient(90deg, ${ORANGE} ${((goalTarget - 50) / 50) * 100}%, ${BG2} ${((goalTarget - 50) / 50) * 100}%)`,
-                outline: "none",
-              }}
-            />
-            <style>{`
-              .perf-mobile-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: linear-gradient(135deg, #FF8800, #FFAA33); box-shadow: 0 2px 10px rgba(255,136,0,0.40); cursor: pointer; border: 2.5px solid #fff; }
-              input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: linear-gradient(135deg, #FF8800, #FFAA33); box-shadow: 0 2px 10px rgba(255,136,0,0.40); cursor: pointer; border: 2.5px solid #fff; }
-              input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: linear-gradient(135deg, #FF8800, #FFAA33); box-shadow: 0 2px 10px rgba(255,136,0,0.40); cursor: pointer; border: 2.5px solid #fff; }
-            `}</style>
-            <div className="flex justify-between mt-[6px]">
-              <span className="text-[10px] font-semibold" style={{ color: T4 }}>50%</span>
-              <span className="text-[10px] font-semibold" style={{ color: T4 }}>75%</span>
-              <span className="text-[10px] font-semibold" style={{ color: T4 }}>100%</span>
-            </div>
-
-            {goalInsight && (
-              <div className="mt-[14px] rounded-[16px] px-4 py-[14px]"
-                style={{
-                  background: goalGap > 25 ? "rgba(255,51,85,0.06)" : goalGap > 15 ? "rgba(255,136,0,0.07)" : "rgba(0,85,255,0.05)",
-                  border: `0.5px solid ${goalGap > 25 ? "rgba(255,51,85,0.18)" : goalGap > 15 ? "rgba(255,136,0,0.22)" : "rgba(0,85,255,0.18)"}`
-                }}>
-                <div className="text-[14px] font-bold mb-[5px]" style={{ color: goalGap > 25 ? RED : goalGap > 15 ? ORANGE : B1, letterSpacing: "-0.2px" }}>
-                  {goalInsight.line1}
-                </div>
-                <div className="text-[12px] leading-[1.6] font-normal" style={{ color: goalGap > 25 ? "#AA2233" : goalGap > 15 ? "#AA5500" : T3 }}>
-                  {goalInsight.line2}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Benchmark Insights ── */}
-        {!loading && subjects.length > 0 && (
-          <div className="mx-5 mt-3 mb-2 bg-white rounded-[24px] p-5"
-            style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-            <div className="flex items-center gap-3 mb-[18px]">
-              <div className="w-11 h-11 rounded-[14px] flex items-center justify-center shrink-0"
-                style={{ background: GREEN_S, border: `0.5px solid ${GREEN_B}` }}>
-                <Trophy className="w-[22px] h-[22px]" style={{ color: GREEN }} strokeWidth={2.2} />
-              </div>
-              <div>
-                <div className="text-[16px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Benchmark Insights</div>
-                <div className="text-[11px] mt-0.5" style={{ color: T3 }}>Where {studentName} stands vs academic benchmarks</div>
-              </div>
-            </div>
-
-            {subjects.map((s, i) => {
-              const tier = getBenchmarkTier(s.progress);
-              const acc = unitAccents[i % unitAccents.length];
-              const Icon = getSubIcon(s.name);
-              const benchmark = 80; // visual benchmark target
-              const isOnTrack = s.progress >= 70;
-              // Mini bar chart — last 4 score percentages for this subject
-              const miniScores = (s.raw || [])
-                .slice(-4)
-                .map((r: any) => parseFloat(r.percentage) || 0);
-              while (miniScores.length < 4) miniScores.unshift(s.progress);
-
-              return (
-                <div key={i} className="mb-3">
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Open ${s.name} performance detail`}
-                    onClick={() => setSelectedSubject(s.name)}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedSubject(s.name); } }}
-                    className="flex items-center justify-between px-4 py-[14px] rounded-[16px] cursor-pointer active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
-                    style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-                    <div className="flex items-center gap-[10px]">
-                      <div className="w-10 h-10 rounded-[13px] flex items-center justify-center shrink-0"
-                        style={{ background: acc.icoBg, boxShadow: acc.icoShadow }}>
-                        <Icon className="w-[18px] h-[18px] text-white" strokeWidth={2.2} />
-                      </div>
-                      <div>
-                        <div className="text-[14px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>{s.name}</div>
-                        <div className="flex items-center gap-2 mt-1">
-                          {isOnTrack ? (
-                            <div className="px-[11px] py-1 rounded-full text-[10px] font-bold"
-                              style={{ background: GREEN_S, color: "#007830", border: `0.5px solid ${GREEN_B}` }}>
-                              {tier.label}
-                            </div>
-                          ) : (
-                            <div className="px-[11px] py-1 rounded-full text-[10px] font-bold"
-                              style={{ background: "rgba(255,51,85,0.10)", color: RED, border: "0.5px solid rgba(255,51,85,0.20)" }}>
-                              Needs Work
-                            </div>
-                          )}
-                        </div>
-                        <div className="text-[12px] font-bold mt-[5px]" style={{ color: T3 }}>Score: {s.progress}%</div>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-[6px]">
-                      <div className="flex items-end gap-[3px] h-8">
-                        {miniScores.map((val: number, k: number) => (
-                          <div key={k}
-                            style={{
-                              width: 8,
-                              borderRadius: "3px 3px 0 0",
-                              background: `linear-gradient(180deg, ${B1}, ${B3})`,
-                              height: `${Math.max(Math.min(val, 100), 10) * 0.32}px`
-                            }} />
-                        ))}
-                      </div>
-                      <div className="text-[9px] font-bold uppercase tracking-[0.08em]" style={{ color: T4 }}>Score</div>
-                    </div>
-                  </div>
-
-                  {/* benchmark progress bar */}
-                  <div className="mt-[10px] px-1">
-                    <div className="flex justify-between mb-[7px]">
-                      <span className="text-[11px] font-bold" style={{ color: T3 }}>Your score</span>
-                      <span className="text-[11px] font-bold" style={{ color: T3 }}>Benchmark</span>
-                    </div>
-                    <div className="h-2 rounded-[4px] overflow-hidden relative mb-[5px]" style={{ background: BG2 }}>
-                      <div className="h-full rounded-[4px]"
-                        style={{
-                          width: `${Math.min(s.progress, 100)}%`,
-                          background: `linear-gradient(90deg, ${B1}, ${B4})`
-                        }} />
-                      <div className="absolute -top-[2px] w-[2px] h-3 rounded-[1px]"
-                        style={{ left: `${benchmark}%`, background: ORANGE }} />
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[10px] font-bold" style={{ color: B1 }}>{s.progress}%</span>
-                      <span className="text-[10px] font-bold" style={{ color: ORANGE }}>{benchmark}% target</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-
-            <div className="flex items-start gap-[7px] pt-3" style={{ borderTop: `0.5px solid ${SEP}` }}>
-              <div className="w-4 h-4 rounded-[4px] flex items-center justify-center shrink-0 mt-0.5"
-                style={{ background: "rgba(0,85,255,0.10)", border: "0.5px solid rgba(0,85,255,0.16)" }}>
-                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke={B1} strokeWidth={2.5} strokeLinecap="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-              </div>
-              <span className="text-[11px] italic leading-[1.6]" style={{ color: T4 }}>
-                Rankings based on national academic performance benchmarks. No other student's data is used. Fully private.
-              </span>
-            </div>
-          </div>
-        )}
+        <OverallPerformanceHero stats={overallStats} isMobile navigate={navigate} />
+        {renderMain()}
 
         <div className="h-6" />
       </div>
     );
   }
 
-  /* ═══════════════════════════════════════════════════════════════
-     DESKTOP — Bright Blue Apple UI (matches mobile)
-     ═══════════════════════════════════════════════════════════════ */
-  const B1 = "#0055FF", B2 = "#1166FF", B3 = "#2277FF", B4 = "#4499FF";
-  const BG = "#EEF4FF", BG2 = "#E0ECFF";
-  const T1 = "#001040", T2 = "#002080", T3 = "#5070B0", T4 = "#99AACC";
-  const SEP = "rgba(0,85,255,0.07)";
-  const GREEN = "#00C853", GREEN_S = "rgba(0,200,83,0.12)", GREEN_B = "rgba(0,200,83,0.25)";
-  const RED = "#FF3355";
-  const ORANGE = "#FF8800";
-  const SH = "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.09), 0 10px 28px rgba(0,85,255,0.11)";
-  const SH_LG = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 20px 48px rgba(0,85,255,0.14)";
+  /* ── DESKTOP branch ───────────────────────────────────────────────── */
 
-  // Overall monthly avg trend (for the small area chart)
-  const overallTrend = trendData.map((row: any) => {
-    const vals = Object.entries(row)
-      .filter(([k, v]) => k !== "month" && typeof v === "number" && v > 0)
-      .map(([, v]) => v as number);
-    const avg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null;
-    return { month: row.month, score: avg };
-  }).filter((d: any) => d.score != null);
-
-  const trendNum = parseInt(overallStats.trend.replace(/[^0-9-]/g, ""), 10) || 0;
-  const trendColor = trendNum > 0 ? GREEN : trendNum < 0 ? RED : "#008844";
-
-  const activeGoalSub = subjects.find(s => s.name === (goalSubject || subjects[0]?.name));
-  const goalInsight = activeGoalSub ? getGoalInsight(activeGoalSub.progress, goalTarget, activeGoalSub.name) : null;
-  const goalGap = activeGoalSub ? Math.max(0, goalTarget - activeGoalSub.progress) : 0;
-
-  const unitAccents = [
-    { icoBg: `linear-gradient(135deg, ${B1}, ${B3})`, icoShadow: "0 3px 10px rgba(0,85,255,0.28)" },
-    { icoBg: "linear-gradient(135deg, #0044EE, #2277FF)", icoShadow: "0 3px 10px rgba(0,68,238,0.28)" },
-    { icoBg: "linear-gradient(135deg, #002DBB, #0055FF)", icoShadow: "0 3px 10px rgba(0,45,187,0.28)" },
-    { icoBg: "linear-gradient(135deg, #1155EE, #44AAFF)", icoShadow: "0 3px 10px rgba(17,85,238,0.28)" },
-  ];
-
+  const { T1, T3, T4, B1, B2 } = T_PALETTE;
   return (
-    <div className="animate-in fade-in duration-500 -m-4 sm:-m-6 md:-m-8 min-h-[calc(100vh-64px)]"
-      style={{ fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif", background: BG }}>
+    <div
+      className="animate-in fade-in duration-500 -m-4 sm:-m-6 md:-m-8 min-h-[calc(100vh-64px)]"
+      style={{
+        fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+        background: T_PALETTE.BG,
+      }}
+    >
       <div className="w-full px-6 pt-8 pb-12">
-
-        {/* ── Toolbar ── */}
+        {/* Toolbar */}
         <div className="flex items-start justify-between gap-6 flex-wrap mb-6">
           <div>
-            <div className="text-[32px] font-bold" style={{ color: T1, letterSpacing: "-0.9px" }}>Performance Analytics</div>
-            <div className="text-[14px] mt-2 font-normal" style={{ color: T3 }}>Detailed breakdown of academic progress</div>
+            <div className="text-[32px] font-bold" style={{ color: T1, letterSpacing: "-0.9px" }}>
+              Performance Analytics
+            </div>
+            <div className="text-[14px] mt-2 font-normal" style={{ color: T3 }}>
+              Detailed breakdown of academic progress
+            </div>
           </div>
-          <div className="w-14 h-14 rounded-[16px] flex items-center justify-center text-[20px] font-bold text-white shrink-0"
-            style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: "0 4px 16px rgba(0,85,255,0.38)" }}>
+          <div
+            className="w-14 h-14 rounded-[16px] flex items-center justify-center text-[20px] font-bold text-white shrink-0"
+            style={{
+              background: `linear-gradient(135deg, ${B1}, ${B2})`,
+              boxShadow: "0 4px 16px rgba(0,85,255,0.38)",
+            }}
+          >
             {overallStats.grade}
           </div>
         </div>
 
-        {/* ── Overall Performance Hero ── */}
-        <div
-          role="button"
-          tabIndex={0}
-          aria-label="Open reports page"
-          onClick={() => navigate("/reports")}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
-          className="bg-white rounded-[24px] p-7 relative overflow-hidden mb-5 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
-          style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-          <div className="absolute -top-[60px] -right-[40px] w-[240px] h-[240px] rounded-full pointer-events-none"
-            style={{ background: "radial-gradient(circle, rgba(0,85,255,0.06) 0%, transparent 70%)" }} />
-          <div className="flex items-center justify-between gap-6 flex-wrap relative z-10">
-            <div>
-              <div className="text-[20px] font-bold" style={{ color: T1, letterSpacing: "-0.4px" }}>Overall Performance</div>
-              <div className="text-[13px] mt-1" style={{ color: T3 }}>Based on all assessments this term</div>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="flex flex-col items-center gap-[6px] px-6 py-4 rounded-[18px] min-w-[140px]"
-                style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-                <div className="text-[36px] font-bold" style={{ color: B1, letterSpacing: "-1px" }}>{overallStats.grade}</div>
-                <div className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: T4 }}>Grade</div>
-              </div>
-              <div className="flex flex-col items-center gap-[6px] px-6 py-4 rounded-[18px] min-w-[140px]"
-                style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-                <div className="text-[36px] font-bold" style={{ color: T1, letterSpacing: "-1px" }}>{overallStats.avg > 0 ? `${overallStats.avg}%` : "—"}</div>
-                <div className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: T4 }}>Average</div>
-              </div>
-              <div className="flex flex-col items-center gap-[6px] px-6 py-4 rounded-[18px] min-w-[140px]"
-                style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-                <div className="flex items-center gap-1">
-                  {trendNum > 0 ? <ArrowUp className="w-5 h-5" style={{ color: trendColor }} /> : trendNum < 0 ? <ArrowDown className="w-5 h-5" style={{ color: trendColor }} /> : <Minus className="w-5 h-5" style={{ color: trendColor }} />}
-                  <div className="text-[28px] font-bold" style={{ color: trendColor, letterSpacing: "-0.8px" }}>{overallStats.trend}</div>
-                </div>
-                <div className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: T4 }}>Trend</div>
-              </div>
-            </div>
-          </div>
-        </div>
+        {listenerError && (
+          <ListenerErrorBanner
+            message={listenerError}
+            onRetry={() => setRefreshKey((k) => k + 1)}
+            marginClass="mb-5"
+          />
+        )}
 
-        {/* ── Subject Cards Grid ── */}
+        <OverallPerformanceHero stats={overallStats} isMobile={false} navigate={navigate} />
+
         {loading ? (
-          <div className="bg-white rounded-[22px] py-20 flex flex-col items-center gap-3"
-            style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-            <Loader2 className="w-10 h-10 animate-spin" style={{ color: B1 }} />
-            <p className="text-[13px] font-bold uppercase tracking-widest" style={{ color: T4 }}>Loading performance data…</p>
-          </div>
-        ) : subjects.length === 0 ? (
-          <div className="bg-white rounded-[22px] py-20 flex flex-col items-center gap-3 text-center"
-            style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-            <div className="w-16 h-16 rounded-[20px] flex items-center justify-center"
-              style={{ background: BG2, border: "0.5px solid rgba(0,85,255,0.14)" }}>
-              <BookOpen className="w-8 h-8" style={{ color: T4 }} />
-            </div>
-            <div className="text-[16px] font-bold" style={{ color: T2 }}>No assessments yet</div>
-            <div className="text-[13px] mt-1" style={{ color: T4 }}>Scores will appear here once graded.</div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {subjects.map((s, i) => {
-              const acc = unitAccents[i % unitAccents.length];
-              const Icon = getSubIcon(s.name);
-              const needsAttention = s.progress < 60;
-              const fill = needsAttention
-                ? `linear-gradient(90deg, ${RED}, #FF6688)`
-                : s.progress < 75
-                  ? `linear-gradient(90deg, ${ORANGE}, #FFAA33)`
-                  : `linear-gradient(90deg, ${B1}, ${B4})`;
-              return (
-                <div key={i}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Open ${s.name} performance detail`}
-                  onClick={() => setSelectedSubject(s.name)}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedSubject(s.name); } }}
-                  className="bg-white rounded-[22px] px-5 py-5 relative overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
-                  style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-[10px]">
-                      <div className="w-10 h-10 rounded-[13px] flex items-center justify-center"
-                        style={{ background: acc.icoBg, boxShadow: acc.icoShadow }}>
-                        <Icon className="w-5 h-5 text-white" strokeWidth={2.2} />
-                      </div>
-                      <span className="text-[16px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>{s.name}</span>
-                    </div>
-                    <div className="w-8 h-8 rounded-[10px] flex items-center justify-center text-[13px] font-bold text-white"
-                      style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: "0 2px 8px rgba(0,85,255,0.30)" }}>
-                      {s.grade}
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-bold" style={{ color: T2, letterSpacing: "-0.1px" }}>Progress</span>
-                    <span className="text-[14px] font-bold" style={{ color: B1 }}>{s.progress}%</span>
-                  </div>
-                  <div className="h-2 rounded-[4px] overflow-hidden mb-3" style={{ background: BG2 }}>
-                    <div className="h-full rounded-[4px] transition-all duration-700"
-                      style={{ width: `${Math.max(s.progress, 3)}%`, background: fill }} />
-                  </div>
-                  {needsAttention ? (
-                    <div className="inline-flex items-center gap-[5px] px-3 py-1 rounded-full text-[10px] font-bold"
-                      style={{ background: "rgba(255,51,85,0.10)", color: RED, border: "0.5px solid rgba(255,51,85,0.22)" }}>
-                      <span className="w-[10px] h-[1.5px]" style={{ background: RED }} />
-                      Needs Attention
-                    </div>
-                  ) : s.progress >= 75 ? (
-                    <div className="inline-flex items-center gap-[5px] px-3 py-1 rounded-full text-[10px] font-bold"
-                      style={{ background: GREEN_S, color: "#007830", border: `0.5px solid ${GREEN_B}` }}>
-                      ✓ On Track
-                    </div>
-                  ) : (
-                    <div className="inline-flex items-center gap-[5px] px-3 py-1 rounded-full text-[10px] font-bold"
-                      style={{ background: "rgba(255,136,0,0.12)", color: ORANGE, border: "0.5px solid rgba(255,136,0,0.25)" }}>
-                      Stable
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+          <LoadingBlock isMobile={false} />
+        ) : (() => {
+          const hasAnyData =
+            subjects.length > 0 ||
+            snapshot.testCount > 0 ||
+            snapshot.assignmentTotal > 0 ||
+            snapshot.attendanceTotal > 0 ||
+            snapshot.incidents30d > 0 ||
+            snapshot.ratingCount > 0;
+          if (!hasAnyData) return <EmptyBlock isMobile={false} />;
+          return (
+            <>
+              <PerformanceSnapshotRow snap={snapshot} isMobile={false} navigate={navigate} />
 
-        {/* ── Trend + AI Narrative row ── */}
-        {!loading && subjects.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 mt-5">
-
-            {/* Performance Trend chart (lg:col-span-3) */}
-            {overallTrend.length > 1 ? (
-              <div
-                role="button"
-                tabIndex={0}
-                aria-label="Open reports page for detailed trend"
-                onClick={() => navigate("/reports")}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
-                className="lg:col-span-3 bg-white rounded-[24px] px-6 pt-6 pb-5 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
-                style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-                <div className="text-[18px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Performance Trend</div>
-                <div className="text-[12px] mt-1 mb-4" style={{ color: T3 }}>Score progression across months</div>
-                <div className="h-[240px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={overallTrend} margin={{ top: 6, right: 6, left: -10, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="perfAreaBlueD" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor={B1} stopOpacity={0.22} />
-                          <stop offset="100%" stopColor={B1} stopOpacity={0} />
-                        </linearGradient>
-                        <linearGradient id="perfLineBlueD" x1="0%" y1="0%" x2="100%" y2="0%">
-                          <stop offset="0%" stopColor={B1} />
-                          <stop offset="100%" stopColor="#66BBFF" />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="0" vertical={false} stroke="rgba(0,85,255,0.07)" />
-                      <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: T4, fontWeight: 600 }} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: T4, fontWeight: 600 }} domain={[0, 100]} width={36} />
-                      <Tooltip contentStyle={{ borderRadius: 12, border: "0.5px solid rgba(0,85,255,0.15)", boxShadow: "0 4px 20px rgba(0,85,255,0.12)", fontSize: 12, padding: "8px 12px" }} />
-                      <Area type="monotone" dataKey="score" stroke="url(#perfLineBlueD)" strokeWidth={3} fill="url(#perfAreaBlueD)" dot={{ r: 5, strokeWidth: 2, stroke: "#fff", fill: B1 }} activeDot={{ r: 7, strokeWidth: 2 }} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="flex items-center justify-center gap-[6px] mt-2">
-                  <span className="w-7 h-[3px] rounded-[2px]" style={{ background: B1 }} />
-                  <span className="text-[12px] font-medium" style={{ color: T3 }}>Overall Average</span>
-                </div>
-              </div>
-            ) : (
-              <div className="lg:col-span-3" />
-            )}
-
-            {/* AI Narrative (lg:col-span-2) */}
-            <div
-              role="button"
-              tabIndex={0}
-              aria-label="Open reports page for full narrative"
-              onClick={() => navigate("/reports")}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/reports"); } }}
-              className="lg:col-span-2 rounded-[24px] px-6 py-6 relative overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
-              style={{
-                background: "linear-gradient(140deg, #001888 0%, #0033CC 48%, #0055FF 100%)",
-                boxShadow: "0 8px 30px rgba(0,51,204,0.34), 0 0 0 0.5px rgba(255,255,255,0.14)",
-                border: "0.5px solid rgba(255,255,255,0.14)"
-              }}>
-              <div className="absolute -top-10 -right-7 w-[220px] h-[220px] rounded-full pointer-events-none"
-                style={{ background: "radial-gradient(circle, rgba(255,255,255,0.14) 0%, transparent 65%)" }} />
-              <div className="absolute inset-0 pointer-events-none" style={{
-                backgroundImage: "linear-gradient(rgba(255,255,255,0.014) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.014) 1px, transparent 1px)",
-                backgroundSize: "24px 24px"
-              }} />
-              <div className="flex items-center gap-[8px] mb-4 relative z-10">
-                <div className="w-[32px] h-[32px] rounded-[10px] flex items-center justify-center"
-                  style={{ background: "rgba(255,255,255,0.18)", border: "0.5px solid rgba(255,255,255,0.26)" }}>
-                  <Sparkles className="w-[17px] h-[17px]" style={{ color: "rgba(255,255,255,0.9)" }} strokeWidth={2.2} />
-                </div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "rgba(255,255,255,0.55)" }}>AI Narrative Analysis</span>
-              </div>
-              <p className="text-[14px] leading-[1.72] font-normal mb-4 relative z-10" style={{ color: "rgba(255,255,255,0.92)", letterSpacing: "-0.1px" }}>
-                <strong style={{ color: "#fff", fontWeight: 700 }}>{studentName}</strong>{" "}
-                {generateNarrative().replace(new RegExp(`^${studentName}\\s*`), "")}
-              </p>
-              <div className="flex items-center gap-[6px] pt-3 relative z-10" style={{ borderTop: "0.5px solid rgba(255,255,255,0.12)" }}>
-                <div className="w-[6px] h-[6px] rounded-full" style={{ background: B4, boxShadow: "0 0 0 2px rgba(68,153,255,0.25)" }} />
-                <span className="text-[10px] font-bold uppercase tracking-[0.09em]" style={{ color: "rgba(255,255,255,0.42)" }}>Generated from real-time assessment data</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── Goal + Benchmark row ── */}
-        {!loading && subjects.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
-
-            {/* Goal Setting AI */}
-            {activeGoalSub && (
-              <div className="bg-white rounded-[24px] p-6"
-                style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-                <div className="flex items-center gap-3 mb-5">
-                  <div className="w-12 h-12 rounded-[14px] flex items-center justify-center shrink-0"
-                    style={{ background: `linear-gradient(135deg, ${ORANGE}, #FFAA33)`, boxShadow: "0 3px 12px rgba(255,136,0,0.30)" }}>
-                    <Target className="w-[22px] h-[22px] text-white" strokeWidth={2.2} />
-                  </div>
-                  <div>
-                    <div className="text-[17px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Goal Setting AI</div>
-                    <div className="text-[12px] mt-0.5" style={{ color: T3 }}>Set a target score and get a personalised plan</div>
-                  </div>
-                </div>
-
-                <div className="text-[10px] font-bold uppercase tracking-[0.10em] mb-2" style={{ color: T4 }}>Subject</div>
-                <select
-                  value={goalSubject || subjects[0]?.name || ""}
-                  onChange={e => setGoalSubject(e.target.value)}
-                  className="w-full py-3 px-[14px] rounded-[14px] text-[14px] font-bold mb-5 cursor-pointer appearance-none"
-                  style={{
-                    border: "0.5px solid rgba(0,85,255,0.16)",
-                    background: `${BG} url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%230055FF' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") right 14px center / auto no-repeat`,
-                    color: T1,
-                    fontFamily: "inherit",
-                  }}>
-                  {subjects.map(s => (
-                    <option key={s.name} value={s.name}>{s.name} — Current: {s.progress}%</option>
+              {subjects.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {subjects.map((s, i) => (
+                    <SubjectCard
+                      key={s.name}
+                      subject={s}
+                      idx={i}
+                      isMobile={false}
+                      onClick={() => setSelectedSubject(s.name)}
+                    />
                   ))}
-                </select>
-
-                <div className="flex items-center justify-between mb-[10px]">
-                  <span className="text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color: T4 }}>Target Score</span>
-                  <span className="text-[18px] font-bold" style={{ color: ORANGE }}>{goalTarget}%</span>
                 </div>
+              )}
 
-                <input
-                  type="range" min={50} max={100} value={goalTarget}
-                  onChange={e => setGoalTarget(Number(e.target.value))}
-                  className="w-full cursor-pointer"
-                  style={{
-                    WebkitAppearance: "none", appearance: "none",
-                    height: 6, borderRadius: 3,
-                    background: `linear-gradient(90deg, ${ORANGE} ${((goalTarget - 50) / 50) * 100}%, ${BG2} ${((goalTarget - 50) / 50) * 100}%)`,
-                    outline: "none",
-                  }} />
-                <div className="flex justify-between mt-[6px]">
-                  <span className="text-[10px] font-semibold" style={{ color: T4 }}>50%</span>
-                  <span className="text-[10px] font-semibold" style={{ color: T4 }}>75%</span>
-                  <span className="text-[10px] font-semibold" style={{ color: T4 }}>100%</span>
-                </div>
+              {/* End-to-end metric cards — render only the ones with data */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+                <TestsAndExamsCard rows={testRows} isMobile={false} navigate={navigate} />
+                <AssignmentsCard rows={assignmentRows} isMobile={false} navigate={navigate} />
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+                <AttendanceSnapshotCard snap={snapshot} isMobile={false} navigate={navigate} />
+                <BehaviourSnapshotCard
+                  snap={snapshot}
+                  recentIncidents={recentIncidents}
+                  isMobile={false}
+                  navigate={navigate}
+                />
+              </div>
 
-                {goalInsight && (
-                  <div className="mt-5 rounded-[16px] px-4 py-[14px]"
-                    style={{
-                      background: goalGap > 25 ? "rgba(255,51,85,0.06)" : goalGap > 15 ? "rgba(255,136,0,0.07)" : "rgba(0,85,255,0.05)",
-                      border: `0.5px solid ${goalGap > 25 ? "rgba(255,51,85,0.18)" : goalGap > 15 ? "rgba(255,136,0,0.22)" : "rgba(0,85,255,0.18)"}`
-                    }}>
-                    <div className="text-[15px] font-bold mb-1" style={{ color: goalGap > 25 ? RED : goalGap > 15 ? ORANGE : B1, letterSpacing: "-0.2px" }}>
-                      {goalInsight.line1}
-                    </div>
-                    <div className="text-[13px] leading-[1.6] font-normal" style={{ color: goalGap > 25 ? "#AA2233" : goalGap > 15 ? "#AA5500" : T3 }}>
-                      {goalInsight.line2}
-                    </div>
-                  </div>
+              {/* Trend + Narrative row (existing) */}
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 mt-5">
+                {trendData.filter(p => p.score != null).length > 1 ? (
+                  <TrendChartCard data={trendData} isMobile={false} navigate={navigate} />
+                ) : (
+                  <div className="lg:col-span-3" />
                 )}
-              </div>
-            )}
-
-            {/* Benchmark Insights */}
-            <div className="bg-white rounded-[24px] p-6"
-              style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-              <div className="flex items-center gap-3 mb-5">
-                <div className="w-12 h-12 rounded-[14px] flex items-center justify-center shrink-0"
-                  style={{ background: GREEN_S, border: `0.5px solid ${GREEN_B}` }}>
-                  <Trophy className="w-[22px] h-[22px]" style={{ color: GREEN }} strokeWidth={2.2} />
-                </div>
-                <div>
-                  <div className="text-[17px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Benchmark Insights</div>
-                  <div className="text-[12px] mt-0.5" style={{ color: T3 }}>Where {studentName} stands vs academic benchmarks</div>
-                </div>
+                <NarrativeCard
+                  narrative={generateNarrative()}
+                  isMobile={false}
+                  navigate={navigate}
+                />
               </div>
 
-              <div className="flex flex-col gap-3">
-                {subjects.map((s, i) => {
-                  const tier = getBenchmarkTier(s.progress);
-                  const acc = unitAccents[i % unitAccents.length];
-                  const Icon = getSubIcon(s.name);
-                  const benchmark = 80;
-                  const isOnTrack = s.progress >= 70;
-                  const miniScores = (s.raw || [])
-                    .slice(-4)
-                    .map((r: any) => parseFloat(r.percentage) || 0);
-                  while (miniScores.length < 4) miniScores.unshift(s.progress);
-
-                  return (
-                    <div key={i}>
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        aria-label={`Open ${s.name} performance detail`}
-                        onClick={() => setSelectedSubject(s.name)}
-                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedSubject(s.name); } }}
-                        className="flex items-center justify-between px-4 py-3 rounded-[16px] cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
-                        style={{ background: BG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-                        <div className="flex items-center gap-[10px]">
-                          <div className="w-10 h-10 rounded-[13px] flex items-center justify-center shrink-0"
-                            style={{ background: acc.icoBg, boxShadow: acc.icoShadow }}>
-                            <Icon className="w-[18px] h-[18px] text-white" strokeWidth={2.2} />
-                          </div>
-                          <div>
-                            <div className="text-[14px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>{s.name}</div>
-                            <div className="flex items-center gap-2 mt-1">
-                              {isOnTrack ? (
-                                <div className="px-[11px] py-[3px] rounded-full text-[10px] font-bold"
-                                  style={{ background: GREEN_S, color: "#007830", border: `0.5px solid ${GREEN_B}` }}>
-                                  {tier.label}
-                                </div>
-                              ) : (
-                                <div className="px-[11px] py-[3px] rounded-full text-[10px] font-bold"
-                                  style={{ background: "rgba(255,51,85,0.10)", color: RED, border: "0.5px solid rgba(255,51,85,0.20)" }}>
-                                  Needs Work
-                                </div>
-                              )}
-                              <span className="text-[11px] font-bold" style={{ color: T3 }}>Score: {s.progress}%</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-end gap-[3px] h-10">
-                          {miniScores.map((val: number, k: number) => (
-                            <div key={k}
-                              style={{
-                                width: 9,
-                                borderRadius: "3px 3px 0 0",
-                                background: `linear-gradient(180deg, ${B1}, ${B3})`,
-                                height: `${Math.max(Math.min(val, 100), 10) * 0.4}px`
-                              }} />
-                          ))}
-                        </div>
-                      </div>
-                      <div className="mt-2 px-1">
-                        <div className="h-2 rounded-[4px] overflow-hidden relative" style={{ background: BG2 }}>
-                          <div className="h-full rounded-[4px]"
-                            style={{
-                              width: `${Math.min(s.progress, 100)}%`,
-                              background: `linear-gradient(90deg, ${B1}, ${B4})`
-                            }} />
-                          <div className="absolute -top-[2px] w-[2px] h-3 rounded-[1px]"
-                            style={{ left: `${benchmark}%`, background: ORANGE }} />
-                        </div>
-                        <div className="flex justify-between mt-1">
-                          <span className="text-[10px] font-bold" style={{ color: B1 }}>{s.progress}%</span>
-                          <span className="text-[10px] font-bold" style={{ color: ORANGE }}>{benchmark}% benchmark</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                <div className="flex items-start gap-[7px] pt-3" style={{ borderTop: `0.5px solid ${SEP}` }}>
-                  <div className="w-4 h-4 rounded-[4px] flex items-center justify-center shrink-0 mt-0.5"
-                    style={{ background: "rgba(0,85,255,0.10)", border: "0.5px solid rgba(0,85,255,0.16)" }}>
-                    <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke={B1} strokeWidth={2.5} strokeLinecap="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-                  </div>
-                  <span className="text-[11px] italic leading-[1.6]" style={{ color: T4 }}>
-                    Rankings based on national academic performance benchmarks. No other student's data is used. Fully private.
-                  </span>
+              {/* Goal + Benchmark row (existing) — only when subjects exist */}
+              {subjects.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+                  <GoalPlannerCard
+                    subjects={subjects}
+                    goalSubject={goalSubject}
+                    setGoalSubject={setGoalSubject}
+                    goalTarget={goalTarget}
+                    setGoalTarget={setGoalTarget}
+                    isMobile={false}
+                  />
+                  <BenchmarkInsightsCard
+                    subjects={subjects}
+                    benchmark={benchmark}
+                    studentName={studentName}
+                    isMobile={false}
+                    onSubjectClick={setSelectedSubject}
+                  />
                 </div>
-              </div>
-            </div>
-          </div>
-        )}
+              )}
+            </>
+          );
+        })()}
       </div>
     </div>
   );

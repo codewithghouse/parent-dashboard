@@ -53,9 +53,16 @@ Return ONLY this JSON (no markdown, no extra text):
   ]
 }`;
 
+  // Token budget scales with question count: ~180 output tokens per MCQ
+  // (4 options + explanation) + ~500 tokens overhead. Capped at the
+  // server's 6000-token ceiling. Without this hint the server defaults to
+  // 4096 which is fine up to ~20 questions but tight beyond that.
+  const estimatedMaxTokens = Math.min(6000, Math.max(2048, data.questionCount * 200 + 500));
+
   const result = await callAI(prompt, {
     jsonMode: true,
-    systemPrompt: "You are a precise exam question generator. Return ONLY valid JSON. No markdown fences.",
+    systemPrompt: "You are a precise exam question generator. Return ONLY valid JSON. No markdown fences. Keep explanations to 1-2 sentences each so the response fits the token budget.",
+    maxTokens: estimatedMaxTokens,
   });
 
   if (result?.questions?.length > 0) {
@@ -110,9 +117,14 @@ Return ONLY this JSON:
   "encouragement": "Motivating message for the student based on their score"
 }`;
 
+  // Evaluation output is roughly ~150 tokens per question (eval block +
+  // explanation). Scale with the question count, same ceiling.
+  const estimatedMaxTokens = Math.min(6000, Math.max(2048, data.questions.length * 180 + 600));
+
   const result = await callAI(prompt, {
     jsonMode: true,
-    systemPrompt: "You are a helpful exam evaluator. Return ONLY valid JSON.",
+    systemPrompt: "You are a helpful exam evaluator. Return ONLY valid JSON. Keep each explanation to 1-2 sentences so the response fits the token budget.",
+    maxTokens: estimatedMaxTokens,
   });
 
   if (result?.evaluations) return result;
