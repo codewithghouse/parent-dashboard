@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Printer, MessageSquare, AlertCircle, Loader2, ChevronLeft, ChevronRight, CheckCircle2, FileText, BookOpen, Calendar, TrendingUp, BarChart3, Activity } from "lucide-react";
+import { ArrowLeft, Printer, MessageSquare, AlertCircle, Loader2, ChevronLeft, ChevronRight, CheckCircle2, FileText, BookOpen, Calendar as CalIcon, TrendingUp, BarChart3, Activity, AlertTriangle, Clock } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, Radar } from "recharts";
-import { doc, onSnapshot, updateDoc, where, getDocs } from "firebase/firestore";
+import { doc, onSnapshot, where } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../lib/AuthContext";
-import { toast } from "sonner";
 import { useIsMobile } from "../hooks/use-mobile";
 import { subscribePerStudent } from "../lib/perStudentQuery";
 import { subscribeEnrollments } from "../lib/enrollmentQuery";
@@ -14,7 +13,7 @@ import { scopedQuery } from "../lib/scopedQuery";
 // ── Tokens ───────────────────────────────────────────────────────────────────
 const T = {
   bg: "#EEF4FF", white: "#ffffff", ink: "#0f172a", ink2: "#475569", ink3: "#94a3b8",
-  bdr: "#e2e8f0", s1: "#f1f5f9", s2: "#e2e8f0",
+  bdr: "#e2e8f0", s1: "#f1f5f9", s2: "#e2e8f0", s3: "#cbd5e1",
   blue: "#3B5BDB", blBg: "#EDF2FF", blBdr: "#BAC8FF",
   grn: "#16a34a", glBg: "#f0fdf4", red: "#dc2626", rlBg: "#fef2f2",
   amb: "#d97706", alBg: "#fffbeb", pur: "#7c3aed",
@@ -33,18 +32,53 @@ const istKey = (dt: Date | null | undefined): string =>
 //   percentage / mark / marks / score, with optional maxMark / maxMarks / outOf.
 // Returns 0 for missing/zero so caller can filter with > 0.
 const pctOf = (t: any): number => {
+  if (typeof t?.percentage === "number" && t.percentage > 0) return Math.min(100, t.percentage);
   const raw = t?.percentage ?? t?.mark ?? t?.marks ?? t?.score;
   const n = Number(raw);
   if (!isFinite(n) || n <= 0) return 0;
-  if (typeof t?.percentage === "number" && t.percentage > 0) return Math.min(100, t.percentage);
   const max = Number(t?.maxMark ?? t?.maxMarks ?? t?.totalMark ?? t?.outOf ?? 0);
   if (max > 0) return Math.min(100, Math.round((n / max) * 100));
-  // raw is already a percentage if 0-100, otherwise treat as marks-out-of-100
   return Math.min(100, n);
 };
 
 const scoreDateOf = (t: any): Date | null =>
   toDate(t?.testDate) || toDate(t?.timestamp) || toDate(t?.createdAt) || toDate(t?.date);
+
+// Generic descending-by-time comparator for items with createdAt/date/timestamp.
+const itemTimeMs = (it: any): number => {
+  const d = toDate(it?.createdAt) || toDate(it?.date) || toDate(it?.timestamp) || toDate(it?.updatedAt);
+  return d ? d.getTime() : 0;
+};
+const cmpDescTime = (a: any, b: any) => itemTimeMs(b) - itemTimeMs(a);
+
+// Submission counts as "completed" only when teacher hasn't flagged it as Not Submitted
+// (parent-uploaded submission docs default to no status; teacher-graded ones may set it).
+const isSubmissionCompleted = (s: any): boolean =>
+  String(s?.status || "").toLowerCase() !== "not submitted";
+
+// Severity → tone color for incidents. Writers (StudentBehaviour, Discipline) use
+// `severity` as "low"/"medium"/"high"/"critical" or capitalised variants.
+const severityTone = (raw: any): string => {
+  const s = String(raw || "").toLowerCase();
+  if (s.includes("crit") || s.includes("severe")) return T.red;
+  if (s.includes("high")) return T.red;
+  if (s.includes("med")) return T.amb;
+  if (s.includes("low") || s.includes("minor")) return T.blue;
+  return T.amb; // default — incidents are concerning by nature
+};
+
+// Due-date chip helper.
+const dueChipFor = (a: any): { label: string; color: string; bg: string } | null => {
+  const due = toDate(a?.dueDate);
+  if (!due) return null;
+  const ms = due.getTime() - Date.now();
+  const days = Math.round(ms / 86400000);
+  if (days < -1) return { label: `${Math.abs(days)}d overdue`, color: T.red, bg: T.rlBg };
+  if (days <= 0) return { label: "Due today", color: T.amb, bg: T.alBg };
+  if (days === 1) return { label: "Due tomorrow", color: T.amb, bg: T.alBg };
+  if (days <= 7) return { label: `Due in ${days}d`, color: T.blue, bg: T.blBg };
+  return { label: `Due ${due.toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}`, color: T.ink3, bg: T.s1 };
+};
 
 // ── Canonical blue-halo shadows (matches principal-dashboard tilt3D) ──────────
 const SH_REST = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 20px 48px rgba(0,85,255,0.14)";
@@ -98,6 +132,21 @@ const DetailLink = ({ to }: { to: string }) => {
   );
 };
 
+// Standalone live clock — isolates 1Hz re-renders from the parent page so charts
+// don't redraw every second.
+const LiveClock = () => {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <span style={{ color: T.blue, fontWeight: 600 }}>
+      {now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+    </span>
+  );
+};
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // PARENT MY CHILD — canonical design (matches owner/principal/teacher)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -117,15 +166,8 @@ const MyChildPage = () => {
   const [interventions, setInterventions] = useState<any[]>([]);
   const [enrollments, setEnrollments] = useState<any[]>([]);
   const [calMonth, setCalMonth] = useState(new Date());
-  const [now, setNow] = useState(() => new Date());
 
   const sid = studentData?.id || studentData?.studentId || "";
-
-  // Live clock (was frozen on render, lying for minutes at a time).
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
 
   // ── Live student master profile ────────────────────────────────────────────
   useEffect(() => {
@@ -227,22 +269,19 @@ const MyChildPage = () => {
     return active?.classId || "";
   }, [studentData?.classId, enrollments]);
 
-  // ── Class-scoped assignments (separate effect — only refires on classId) ────
+  // ── Class-scoped assignments — LIVE listener so newly-published HW shows up
+  // for the parent without a refresh. Was previously a one-shot getDocs.
   useEffect(() => {
     if (!classId || !studentData?.schoolId) { setAssignments([]); return; }
-    let aborted = false;
-    (async () => {
-      try {
-        const snap = await getDocs(scopedQuery("assignments", studentData.schoolId, where("classId", "==", classId)));
-        if (aborted) return;
-        setAssignments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      } catch (e) {
-        if (aborted) return;
-        console.error("[MyChild] assignments fetch error:", e);
+    const unsub = onSnapshot(
+      scopedQuery("assignments", studentData.schoolId, where("classId", "==", classId)),
+      (snap) => setAssignments(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      (err) => {
+        console.error("[MyChild] assignments listener error:", err);
         setAssignments([]);
-      }
-    })();
-    return () => { aborted = true; };
+      },
+    );
+    return () => unsub();
   }, [classId, studentData?.schoolId]);
 
   // Merged student (live master overrides cached studentData)
@@ -263,15 +302,21 @@ const MyChildPage = () => {
     const sums: Record<string, number> = {};
     const cnts: Record<string, number> = {};
     testScores.forEach(t => {
-      const sub = String(t.subject || t.subjectName || "General").toUpperCase();
+      const sub = String(t.subject || t.subjectName || "GENERAL").toUpperCase();
       const p = pctOf(t);
       if (p <= 0) return;
       sums[sub] = (sums[sub] || 0) + p;
       cnts[sub] = (cnts[sub] || 0) + 1;
     });
-    const subScores: Record<string, number> = Object.fromEntries(
+    let subScores: Record<string, number> = Object.fromEntries(
       Object.entries(sums).map(([k, sum]) => [k, Math.round(sum / cnts[k])])
     );
+    // Per memory `bug_pattern_fallback_bucket_alone`: hide GENERAL bucket if it
+    // is the only entry — no information vs the overall average.
+    const subKeys = Object.keys(subScores);
+    if (subKeys.length === 1 && subKeys[0] === "GENERAL") {
+      subScores = {};
+    }
 
     const sorted = [...testScores].sort((a, b) => (scoreDateOf(b)?.getTime() || 0) - (scoreDateOf(a)?.getTime() || 0));
     const r3 = sorted.slice(0, 3).map(pctOf).filter(n => n > 0);
@@ -292,9 +337,22 @@ const MyChildPage = () => {
       return { month: MONTHS[d.getMonth()], score: Math.round(scP), attendance: Math.round(attP) };
     });
 
-    // Submission completion: a submission counts if it matches assignment by id
-    // OR by legacy `homeworkId` field (teacher-dashboard writes both).
-    const submittedAsgIds = new Set(submissions.map((s: any) => s.assignmentId || s.homeworkId).filter(Boolean));
+    // Submission completion: a submission counts only if it matches the assignment
+    // AND is not flagged "Not Submitted" (teachers/parents can mint draft rows).
+    //
+    // CRITICAL: AssignmentsPage submission writer sets BOTH fields on every doc:
+    //   homeworkId   = the assignment doc id (the parent's `assignment.id`)
+    //   assignmentId = the teaching_assignment id (a DIFFERENT doc — falls back
+    //                  to the literal string "legacy" when missing)
+    // Naive `s.assignmentId || s.homeworkId` always picks `assignmentId` and
+    // therefore misses every match (assignments[].id never equals the
+    // teaching_assignment id or "legacy"). Add BOTH fields to the lookup set
+    // so either match flavor lands the assignment as "submitted".
+    const submittedAsgIds = new Set<string>();
+    submissions.filter(isSubmissionCompleted).forEach((s: any) => {
+      if (s.homeworkId)   submittedAsgIds.add(String(s.homeworkId));
+      if (s.assignmentId) submittedAsgIds.add(String(s.assignmentId));
+    });
     const subCount = assignments.filter(a => submittedAsgIds.has(a.id)).length;
     const asgCount = assignments.length;
     const completion = asgCount > 0 ? (subCount / asgCount) * 100 : 0;
@@ -307,7 +365,7 @@ const MyChildPage = () => {
       return d && d.getTime() >= cutoff;
     }).length;
 
-    return { tot, pres, late, abs, attRate, avg, subScores, trend, monthly, subCount, asgCount, completion, days, recentIncidents };
+    return { tot, pres, late, abs, attRate, avg, subScores, trend, monthly, subCount, asgCount, completion, days, recentIncidents, submittedAsgIds };
   }, [attendance, testScores, submissions, assignments, incidents]);
 
   // No-data guard: a brand-new student should show "NO DATA", not "CRITICAL".
@@ -333,6 +391,37 @@ const MyChildPage = () => {
   );
   const radarData = subEntries.slice(0, 8).map(([sub, sc]) => ({ subject: sub.slice(0, 10), score: sc, fullMark: 100 }));
 
+  // ── Sorted recency lists — Firestore returns docs in arbitrary order, so EVERY
+  // "recent X" view must sort by createdAt desc before slicing. Without these
+  // memos, "Recent Messages" / "Recent Incidents" cards display arbitrary docs
+  // (could be 6 months old). Trust killer.
+  const sortedIncidents = useMemo(() => [...incidents].sort(cmpDescTime), [incidents]);
+  const sortedParentNotes = useMemo(() => [...parentNotes].sort(cmpDescTime), [parentNotes]);
+  const sortedInterventions = useMemo(() => [...interventions].sort(cmpDescTime), [interventions]);
+
+  // Calendar lookup map — replaces O(days × attendance) per-cell .find() with O(1) get.
+  const attendanceMap = useMemo(() => {
+    const map = new Map<string, string>();
+    attendance.forEach((a: any) => {
+      const key = typeof a.date === "string" ? a.date : istKey(toDate(a.date));
+      if (key) map.set(key, String(a.status || ""));
+    });
+    return map;
+  }, [attendance]);
+
+  // Assignment ordering: unsubmitted first (urgent to parent), then by due date
+  // ascending so most-imminent appears at top.
+  const sortedAssignments = useMemo(() => {
+    return [...assignments].sort((a: any, b: any) => {
+      const aSub = m.submittedAsgIds.has(a.id);
+      const bSub = m.submittedAsgIds.has(b.id);
+      if (aSub !== bSub) return aSub ? 1 : -1;
+      const aDue = toDate(a.dueDate)?.getTime() ?? Number.POSITIVE_INFINITY;
+      const bDue = toDate(b.dueDate)?.getTime() ?? Number.POSITIVE_INFINITY;
+      return aDue - bDue;
+    });
+  }, [assignments, m.submittedAsgIds]);
+
   const calYear = calMonth.getFullYear();
   const calMon = calMonth.getMonth();
   const firstDay = new Date(calYear, calMon, 1).getDay();
@@ -342,61 +431,11 @@ const MyChildPage = () => {
     if (dayNum < 1 || dayNum > daysInMonth) return null;
     const d = new Date(calYear, calMon, dayNum);
     const dateStr = istKey(d);
-    const rec = attendance.find(a => {
-      if (typeof a.date === "string") return a.date === dateStr;
-      const ad = toDate(a.date);
-      return ad && istKey(ad) === dateStr;
-    });
-    return { dayNum, date: d, status: rec?.status || null };
+    return { dayNum, date: d, status: attendanceMap.get(dateStr) || null };
   });
   const calPresent = attendance.filter(a => { const d = toDate(a.date); return d && d.getMonth() === calMon && d.getFullYear() === calYear && a.status === "present"; }).length;
   const calLate = attendance.filter(a => { const d = toDate(a.date); return d && d.getMonth() === calMon && d.getFullYear() === calYear && a.status === "late"; }).length;
   const calAbsent = attendance.filter(a => { const d = toDate(a.date); return d && d.getMonth() === calMon && d.getFullYear() === calYear && a.status === "absent"; }).length;
-
-  // ── Quick profile edit (parent can update basic fields) ─────────────────────
-  const [editOpen, setEditOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ dob: "", bloodGroup: "", parentPhone: "", emergencyContact: "" });
-  const firstFieldRef = useRef<HTMLInputElement>(null);
-
-  // Re-sync form whenever the live master profile arrives (was keyed on
-  // `student?.id` which never changes after load — form stayed empty).
-  useEffect(() => {
-    const src = masterProfile || studentData || {};
-    const dobRaw = src.dob || src.dateOfBirth || "";
-    const dob = typeof dobRaw === "string"
-      ? dobRaw
-      : (toDate(dobRaw)?.toISOString().split("T")[0] || "");
-    setForm({
-      dob,
-      bloodGroup: src.bloodGroup || "",
-      parentPhone: src.parentPhone || "",
-      emergencyContact: src.emergencyContact || "",
-    });
-  }, [masterProfile, studentData]);
-
-  // Esc-to-close + autofocus on the modal.
-  useEffect(() => {
-    if (!editOpen) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setEditOpen(false); };
-    window.addEventListener("keydown", onKey);
-    setTimeout(() => firstFieldRef.current?.focus(), 50);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [editOpen]);
-
-  const handleSave = async () => {
-    if (!sid) return;
-    setSaving(true);
-    try {
-      await updateDoc(doc(db, "students", sid), form);
-      toast.success("Profile updated.");
-      setEditOpen(false);
-    } catch (e) {
-      console.error("[MyChild] profile save failed:", e);
-      toast.error("Failed to update.");
-    }
-    finally { setSaving(false); }
-  };
 
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", gap: 10 }}>
@@ -430,8 +469,17 @@ const MyChildPage = () => {
   return (
     <div style={{ minHeight: "100vh", background: T.bg, padding: isMobile ? "12px 12px 60px" : "20px 24px 60px", fontFamily: "'Inter','Plus Jakarta Sans',-apple-system,sans-serif" }}>
 
+      {/* Print stylesheet — hide page chrome (top bar, status bar, action buttons)
+          when the parent uses the browser's Print/Save-as-PDF flow. */}
+      <style>{`
+        @media print {
+          .my-child-no-print { display: none !important; }
+          body { background: #ffffff !important; }
+        }
+      `}</style>
+
       {/* ═══ TOP BAR ══════════════════════════════════════════════════════════ */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: isMobile ? 14 : 24, gap: 8, flexWrap: "wrap" }}>
+      <div className="my-child-no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: isMobile ? 14 : 24, gap: 8, flexWrap: "wrap" }}>
         <button onClick={() => navigate("/")} style={{ display: "flex", alignItems: "center", gap: 6, padding: isMobile ? "7px 12px" : "8px 16px", borderRadius: 10, border: `1px solid ${T.bdr}`, background: T.white, color: T.ink2, fontSize: isMobile ? 12 : 13, fontWeight: 500, cursor: "pointer", flexShrink: 0 }}>
           <ArrowLeft size={14} /> {isMobile ? "BACK" : "RETURN"}
         </button>
@@ -449,38 +497,56 @@ const MyChildPage = () => {
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 280px 1fr", gap: isMobile ? 14 : 20, marginBottom: isMobile ? 14 : 20 }}>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <Card title="Academic Performance">
-            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
-              <div style={{ position: "relative", width: 64, height: 64 }}>
-                <svg width="64" height="64" viewBox="0 0 64 64">
-                  <circle cx="32" cy="32" r="26" fill="none" stroke={T.s2} strokeWidth="6" />
-                  <circle cx="32" cy="32" r="26" fill="none" stroke={T.blue} strokeWidth="6" strokeLinecap="round"
-                    strokeDasharray={2 * Math.PI * 26} strokeDashoffset={2 * Math.PI * 26 * (1 - m.avg / 100)} transform="rotate(-90 32 32)"
+          {/* ─── Academic Performance — summary view (avg + trend + recent tests). */}
+          <Card title="Academic Performance" action={<DetailLink to="/performance" />}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 14 }}>
+              <div style={{ position: "relative", width: 72, height: 72 }}>
+                <svg width="72" height="72" viewBox="0 0 72 72">
+                  <circle cx="36" cy="36" r="28" fill="none" stroke={T.s2} strokeWidth="6" />
+                  <circle cx="36" cy="36" r="28" fill="none" stroke={T.blue} strokeWidth="6" strokeLinecap="round"
+                    strokeDasharray={2 * Math.PI * 28} strokeDashoffset={2 * Math.PI * 28 * (1 - m.avg / 100)} transform="rotate(-90 36 36)"
                     style={{ transition: "stroke-dashoffset 1s ease" }} />
                 </svg>
-                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: T.blue }}>{(m.avg / 10).toFixed(1)}</div>
+                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: T.blue }}>
+                  {m.avg > 0 ? (m.avg / 10).toFixed(1) : "—"}
+                </div>
               </div>
               <div>
-                <div style={{ fontSize: 28, fontWeight: 800, color: T.ink }}>{Math.round(m.avg)}%</div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: T.ink }}>
+                  {m.avg > 0 ? `${Math.round(m.avg)}%` : "—"}
+                </div>
                 <div style={{ fontSize: 11, color: T.ink3, display: "flex", alignItems: "center", gap: 4 }}>
-                  Avg Score · {testScores.length} {testScores.length === 1 ? "record" : "records"}
+                  Avg · {testScores.length} {testScores.length === 1 ? "record" : "records"}
                   {m.trend === "up" && <TrendingUp size={12} color={T.grn} />}
                   {m.trend === "down" && <TrendingUp size={12} color={T.red} style={{ transform: "scaleY(-1)" }} />}
                 </div>
               </div>
             </div>
-            {subEntries.slice(0, 5).map(([sub, sc]) => (
-              <div key={sub} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                <span style={{ fontSize: 11, color: T.ink3, width: 100, flexShrink: 0 }}>{sub}</span>
-                <div style={{ flex: 1, height: 6, background: T.s1, borderRadius: 3, overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${sc}%`, background: sc >= 75 ? T.blue : sc >= 50 ? T.amb : T.red, borderRadius: 3, transition: "width 1s ease" }} />
+
+            {/* Last 3 test chips — real recent scores. */}
+            {scoreHistory.length === 0 ? (
+              <p style={{ fontSize: 11, color: T.ink3, textAlign: "center", padding: "8px 0" }}>No test records yet</p>
+            ) : (
+              <>
+                <div style={{ fontSize: 10, fontWeight: 600, color: T.ink3, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Most recent</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {scoreHistory.slice(0, 3).map(t => {
+                    const p = pctOf(t);
+                    const dt = scoreDateOf(t);
+                    return (
+                      <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: T.s1, borderRadius: 8 }}>
+                        <span style={{ fontSize: 11, color: T.ink, flex: 1 }}>{String(t.subject || t.subjectName || "Test").slice(0, 24)}</span>
+                        <span style={{ fontSize: 10, color: T.ink3 }}>{dt ? dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : "—"}</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: p >= 75 ? T.blue : p >= 50 ? T.amb : T.red, minWidth: 36, textAlign: "right" }}>{p > 0 ? `${p}%` : "—"}</span>
+                      </div>
+                    );
+                  })}
                 </div>
-                <span style={{ fontSize: 12, fontWeight: 600, color: sc >= 75 ? T.blue : sc >= 50 ? T.amb : T.red, width: 30, textAlign: "right" }}>{sc}</span>
-              </div>
-            ))}
+              </>
+            )}
           </Card>
 
-          <Card title="Attendance">
+          <Card title="Attendance" action={<DetailLink to="/attendance" />}>
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
               <div style={{ position: "relative", width: 72, height: 72 }}>
                 <svg width="72" height="72" viewBox="0 0 72 72">
@@ -491,39 +557,47 @@ const MyChildPage = () => {
                     strokeDasharray={2 * Math.PI * 28} strokeDashoffset={2 * Math.PI * 28 * (1 - m.attRate / 100)}
                     transform="rotate(-90 36 36)" style={{ transition: "stroke-dashoffset 1s ease" }} />
                 </svg>
-                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, color: m.attRate >= 85 ? T.grn : T.amb }}>{Math.round(m.attRate)}%</div>
+                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, color: m.attRate >= 85 ? T.grn : T.amb }}>
+                  {m.tot > 0 ? `${Math.round(m.attRate)}%` : "—"}
+                </div>
               </div>
               <div>
                 <div style={{ fontSize: 15, fontWeight: 600, color: T.ink }}>Present</div>
                 <div style={{ fontSize: 12, color: T.ink3, marginTop: 2 }}>Late: {m.late} · Abs: {m.abs}</div>
-                <div style={{ fontSize: 11, color: T.ink3, marginTop: 2 }}>{m.pres + m.late} / {m.tot} days</div>
+                <div style={{ fontSize: 11, color: T.ink3, marginTop: 2 }}>{m.tot > 0 ? `${m.pres + m.late} / ${m.tot} days` : "No attendance marked yet"}</div>
               </div>
             </div>
           </Card>
 
           <Card title="Subject Mastery" action={<DetailLink to="/performance" />}>
-            {radarData.length >= 3 && (
-              <div style={{ height: 180, marginBottom: 12 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
-                    <PolarGrid stroke={T.s2} />
-                    <PolarAngleAxis dataKey="subject" tick={{ fill: T.ink3, fontSize: 10 }} />
-                    <Radar dataKey="score" stroke={T.blue} fill={T.blue} fillOpacity={0.15} strokeWidth={2} />
-                  </RadarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-            {subEntries.slice(0, 8).map(([sub, sc]) => (
-              <div key={sub} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                <span style={{ fontSize: 11, color: T.ink3, width: 90, flexShrink: 0 }}>{sub}</span>
-                <div style={{ flex: 1, height: 6, background: T.s1, borderRadius: 3, overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${sc}%`, background: sc >= 75 ? T.blue : sc >= 50 ? T.grn : T.red, borderRadius: 3 }} />
-                </div>
-                <span style={{ fontSize: 12, fontWeight: 600, color: T.ink, width: 28, textAlign: "right" }}>{sc}</span>
-              </div>
-            ))}
-            {subEntries.length > 8 && (
-              <div style={{ fontSize: 10, color: T.ink3, textAlign: "center", marginTop: 4 }}>+ {subEntries.length - 8} more subjects</div>
+            {subEntries.length === 0 ? (
+              <p style={{ fontSize: 12, color: T.ink3, textAlign: "center", padding: "16px 0" }}>No subject scores yet</p>
+            ) : (
+              <>
+                {radarData.length >= 3 && (
+                  <div style={{ height: 180, marginBottom: 12 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
+                        <PolarGrid stroke={T.s2} />
+                        <PolarAngleAxis dataKey="subject" tick={{ fill: T.ink3, fontSize: 10 }} />
+                        <Radar dataKey="score" stroke={T.blue} fill={T.blue} fillOpacity={0.15} strokeWidth={2} />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+                {subEntries.slice(0, 8).map(([sub, sc]) => (
+                  <div key={sub} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    <span style={{ fontSize: 11, color: T.ink3, width: 90, flexShrink: 0 }}>{sub}</span>
+                    <div style={{ flex: 1, height: 6, background: T.s1, borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${sc}%`, background: sc >= 75 ? T.blue : sc >= 50 ? T.grn : T.red, borderRadius: 3 }} />
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: T.ink, width: 28, textAlign: "right" }}>{sc}</span>
+                  </div>
+                ))}
+                {subEntries.length > 8 && (
+                  <div style={{ fontSize: 10, color: T.ink3, textAlign: "center", marginTop: 4 }}>+ {subEntries.length - 8} more subjects</div>
+                )}
+              </>
             )}
           </Card>
         </div>
@@ -539,26 +613,30 @@ const MyChildPage = () => {
             <span style={{ padding: "4px 12px", borderRadius: 20, background: T.glBg, color: T.grn, fontSize: 10, fontWeight: 600 }}>ACTIVE</span>
             <span style={{ padding: "4px 12px", borderRadius: 20, background: riskColor === T.grn ? T.glBg : riskColor === T.amb ? T.alBg : riskColor === T.red ? T.rlBg : T.s1, color: riskColor, fontSize: 10, fontWeight: 600 }}>{riskLevel}</span>
           </div>
-          <button onClick={() => setEditOpen(true)} style={{ marginTop: 14, padding: "6px 14px", borderRadius: 20, border: `1px solid ${T.bdr}`, background: T.white, color: T.ink2, fontSize: 11, fontWeight: 500, cursor: "pointer" }}>
-            Edit Profile
-          </button>
+          {/* Edit Profile removed — student master data (DOB, blood, contacts) is
+              owned by the school. Parent updates flow through the school office,
+              not this dashboard. Firestore rules also block parent self-edit. */}
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <Card title="Behaviour Record" action={<DetailLink to="/behaviour" />}>
-            {incidents.length === 0 ? (
+            {sortedIncidents.length === 0 ? (
               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: T.glBg, borderRadius: 10 }}>
                 <CheckCircle2 size={14} color={T.grn} /><span style={{ fontSize: 12, color: T.grn, fontWeight: 500 }}>No incidents recorded</span>
               </div>
-            ) : incidents.slice(0, 3).map(inc => (
-              <div key={inc.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 0", borderBottom: `1px solid ${T.s2}` }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: T.red, marginTop: 5, flexShrink: 0 }} />
-                <div>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: T.red }}>{String(inc.type || "Incident").toUpperCase()}</span>
-                  <p style={{ fontSize: 11, color: T.ink3, marginTop: 2 }}>{String(inc.description || inc.content || "").slice(0, 80)}</p>
+            ) : sortedIncidents.slice(0, 3).map(inc => {
+              const tone = severityTone(inc.severity);
+              return (
+                <div key={inc.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 0", borderBottom: `1px solid ${T.s2}` }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: tone, marginTop: 5, flexShrink: 0 }} />
+                  <div style={{ flex: 1 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: tone }}>{String(inc.type || "Incident").toUpperCase()}</span>
+                    <p style={{ fontSize: 11, color: T.ink3, marginTop: 2 }}>{String(inc.description || inc.content || "").slice(0, 80)}</p>
+                  </div>
+                  <span style={{ fontSize: 10, color: T.ink3, flexShrink: 0 }}>{timeAgo(inc.createdAt || inc.date)}</span>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </Card>
 
           <Card title="Performance Forecast" action={<DetailLink to="/performance" />}>
@@ -575,9 +653,9 @@ const MyChildPage = () => {
           </Card>
 
           <Card title="Teacher Messages" action={<DetailLink to="/teacher-notes" />}>
-            {parentNotes.length === 0 ? (
+            {sortedParentNotes.length === 0 ? (
               <p style={{ fontSize: 12, color: T.ink3, textAlign: "center", padding: "8px 0" }}>No messages yet</p>
-            ) : parentNotes.slice(0, 2).map(n => (
+            ) : sortedParentNotes.slice(0, 3).map(n => (
               <div key={n.id} style={{ padding: "8px 0", borderBottom: `1px solid ${T.s2}` }}>
                 <div style={{ fontSize: 10, color: n.from === "teacher" ? T.blue : T.grn, fontWeight: 600, marginBottom: 2 }}>
                   {n.from === "teacher" ? (n.teacherName || "TEACHER") : "YOU"} · {timeAgo(n.createdAt)}
@@ -586,18 +664,9 @@ const MyChildPage = () => {
               </div>
             ))}
           </Card>
-
-          <Card title="Teacher Observations">
-            {parentNotes.filter(n => n.from === "teacher").length === 0 ? (
-              <p style={{ fontSize: 12, color: T.ink3, textAlign: "center" }}>No observations yet</p>
-            ) : (
-              <div style={{ padding: "10px 14px", background: T.blBg, borderLeft: `3px solid ${T.blue}`, borderRadius: 8 }}>
-                <p style={{ fontSize: 12, color: T.ink2, lineHeight: 1.6, margin: 0, fontStyle: "italic" }}>
-                  "{String(parentNotes.find(n => n.from === "teacher")?.content || parentNotes.find(n => n.from === "teacher")?.message || "").slice(0, 150)}"
-                </p>
-              </div>
-            )}
-          </Card>
+          {/* Teacher Observations card removed — was duplicating Teacher Messages
+              with no separate data source. Communications card below has the
+              full thread. */}
         </div>
       </div>
 
@@ -624,34 +693,58 @@ const MyChildPage = () => {
       {/* ═══ ASSIGNMENTS + RISK ═══ */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 14 : 20, marginBottom: isMobile ? 14 : 20 }}>
         <Card title={`Assignments · ${m.subCount}/${m.asgCount}`} action={<DetailLink to="/assignments" />}>
-          {[...assignments].sort((a, b) => (toDate(b.dueDate)?.getTime() || 0) - (toDate(a.dueDate)?.getTime() || 0)).slice(0, 5).map(a => {
-            const sub = submissions.find((s: any) => (s.assignmentId || s.homeworkId) === a.id);
+          {sortedAssignments.length === 0 ? (
+            <p style={{ fontSize: 12, color: T.ink3, textAlign: "center", padding: "16px 0" }}>No assignments yet</p>
+          ) : sortedAssignments.slice(0, 5).map(a => {
+            const submitted = m.submittedAsgIds.has(a.id);
+            const due = dueChipFor(a);
             return (
-              <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: `1px solid ${T.s2}` }}>
-                <CheckCircle2 size={14} color={sub ? T.grn : T.ink3} />
-                <span style={{ fontSize: 13, color: T.ink, flex: 1 }}>{String(a.title || "Assignment").slice(0, 35)}</span>
+              <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 0", borderBottom: `1px solid ${T.s2}` }}>
+                <CheckCircle2 size={16} color={submitted ? T.grn : T.ink3} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, color: T.ink, lineHeight: 1.3 }}>{String(a.title || "Assignment").slice(0, 40)}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
+                    {a.subject && <span style={{ fontSize: 10, color: T.ink3 }}>{String(a.subject).slice(0, 18)}</span>}
+                    {!submitted && due && (
+                      <span style={{ padding: "1px 7px", borderRadius: 4, background: due.bg, color: due.color, fontSize: 9, fontWeight: 600, letterSpacing: "0.02em" }}>
+                        {due.label.toUpperCase()}
+                      </span>
+                    )}
+                    {submitted && (
+                      <span style={{ padding: "1px 7px", borderRadius: 4, background: T.glBg, color: T.grn, fontSize: 9, fontWeight: 600, letterSpacing: "0.02em" }}>SUBMITTED</span>
+                    )}
+                  </div>
+                </div>
               </div>
             );
           })}
-          {assignments.length === 0 && <p style={{ fontSize: 12, color: T.ink3, textAlign: "center" }}>No assignments</p>}
         </Card>
 
         <Card title="Risk Assessment" action={<DetailLink to="/alerts" />}>
           <div style={{ fontSize: 22, fontWeight: 800, color: riskColor, marginBottom: 14 }}>{riskLevel}</div>
-          {[
-            { label: "ATTENDANCE", val: m.attRate, color: m.attRate >= 85 ? T.blue : T.amb, extra: undefined as string | undefined },
-            { label: "ACADEMIC", val: m.avg, color: m.avg >= 75 ? T.blue : m.avg >= 50 ? T.amb : T.red, extra: undefined },
-            { label: "SUBMISSION", val: m.completion, color: m.completion >= 80 ? T.blue : T.amb, extra: undefined },
-            { label: "BEHAVIOURAL", val: m.recentIncidents > 0 ? -1 : 100, color: m.recentIncidents === 0 ? T.blue : T.red, extra: m.recentIncidents > 0 ? `${m.recentIncidents} recent` : undefined },
-          ].map(r => (
-            <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <span style={{ fontSize: 11, color: T.ink3, width: 100, flexShrink: 0 }}>{r.label}</span>
-              <div style={{ flex: 1, height: 6, background: T.s1, borderRadius: 3, overflow: "hidden" }}>
-                {r.val >= 0 && <div style={{ height: "100%", width: `${r.val}%`, background: r.color, borderRadius: 3, transition: "width 1s" }} />}
+          {!hasAnyData ? (
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", background: T.s1, borderRadius: 10 }}>
+              <AlertTriangle size={16} color={T.ink3} style={{ flexShrink: 0, marginTop: 2 }} />
+              <div style={{ fontSize: 12, color: T.ink2, lineHeight: 1.5 }}>
+                Risk tracking activates after the first records are entered. Once attendance is marked or a test is scored, this card will reflect your child's status.
               </div>
-              <span style={{ fontSize: 12, fontWeight: 600, color: r.color, width: 60, textAlign: "right" }}>{r.extra || `${Math.round(r.val >= 0 ? r.val : 0)}%`}</span>
             </div>
-          ))}
+          ) : (
+            [
+              { label: "ATTENDANCE", val: m.attRate, color: m.attRate >= 85 ? T.blue : T.amb, extra: undefined as string | undefined },
+              { label: "ACADEMIC", val: m.avg, color: m.avg >= 75 ? T.blue : m.avg >= 50 ? T.amb : T.red, extra: undefined },
+              { label: "SUBMISSION", val: m.completion, color: m.completion >= 80 ? T.blue : T.amb, extra: undefined },
+              { label: "BEHAVIOURAL", val: m.recentIncidents > 0 ? -1 : 100, color: m.recentIncidents === 0 ? T.blue : T.red, extra: m.recentIncidents > 0 ? `${m.recentIncidents} recent` : undefined },
+            ].map(r => (
+              <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <span style={{ fontSize: 11, color: T.ink3, width: 100, flexShrink: 0 }}>{r.label}</span>
+                <div style={{ flex: 1, height: 6, background: T.s1, borderRadius: 3, overflow: "hidden" }}>
+                  {r.val >= 0 && <div style={{ height: "100%", width: `${r.val}%`, background: r.color, borderRadius: 3, transition: "width 1s" }} />}
+                </div>
+                <span style={{ fontSize: 12, fontWeight: 600, color: r.color, width: 60, textAlign: "right" }}>{r.extra || `${Math.round(r.val >= 0 ? r.val : 0)}%`}</span>
+              </div>
+            ))
+          )}
         </Card>
       </div>
 
@@ -702,7 +795,7 @@ const MyChildPage = () => {
               { c: T.amb, l: "Late" },
               { c: T.red, l: "Absent" },
               { c: T.s2, l: "Weekend" },
-              { c: T.s1, l: "No Data" },
+              { c: T.s3, l: "No Data" },
             ].map(x => (
               <div key={x.l} style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <div style={{ width: 8, height: 8, borderRadius: 2, background: x.c, border: `1px solid ${T.s2}` }} />
@@ -713,9 +806,9 @@ const MyChildPage = () => {
         </Card>
 
         <Card title="Support Actions" action={<DetailLink to="/alerts" />}>
-          {interventions.length === 0 ? (
+          {sortedInterventions.length === 0 ? (
             <p style={{ fontSize: 12, color: T.ink3, textAlign: "center", padding: "20px 0" }}>No active interventions</p>
-          ) : interventions.map(iv => {
+          ) : sortedInterventions.map(iv => {
             const isDone = String(iv.status || "").toLowerCase() === "completed";
             return (
               <div key={iv.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 0", borderBottom: `1px solid ${T.s2}` }}>
@@ -740,23 +833,26 @@ const MyChildPage = () => {
       {/* ═══ INCIDENTS + OVERVIEW ═══ */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 14 : 20, marginBottom: isMobile ? 14 : 20 }}>
         <Card title="Incidents" action={<DetailLink to="/behaviour" />}>
-          {incidents.length === 0 ? (
+          {sortedIncidents.length === 0 ? (
             <div style={{ textAlign: "center", padding: "20px 0" }}>
               <CheckCircle2 size={24} color={T.grn} style={{ margin: "0 auto 8px" }} />
               <p style={{ fontSize: 12, color: T.grn, fontWeight: 500 }}>No incidents on record</p>
             </div>
-          ) : incidents.map(inc => (
-            <div key={inc.id} style={{ padding: "10px 0", borderBottom: `1px solid ${T.s2}` }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: T.red }}>• {String(inc.type || "Incident").toUpperCase()}</span>
-                <span style={{ fontSize: 10, color: T.ink3 }}>{timeAgo(inc.createdAt || inc.date)}</span>
+          ) : sortedIncidents.map(inc => {
+            const tone = severityTone(inc.severity);
+            return (
+              <div key={inc.id} style={{ padding: "10px 0", borderBottom: `1px solid ${T.s2}` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: tone }}>• {String(inc.type || "Incident").toUpperCase()}</span>
+                  <span style={{ fontSize: 10, color: T.ink3 }}>{timeAgo(inc.createdAt || inc.date)}</span>
+                </div>
+                <p style={{ fontSize: 11, color: T.ink2, marginTop: 4, lineHeight: 1.5 }}>{String(inc.description || inc.content || "").slice(0, 120)}</p>
               </div>
-              <p style={{ fontSize: 11, color: T.ink2, marginTop: 4, lineHeight: 1.5 }}>{String(inc.description || inc.content || "").slice(0, 120)}</p>
-            </div>
-          ))}
-          {incidents.length > 0 && (
+            );
+          })}
+          {sortedIncidents.length > 0 && (
             <div style={{ textAlign: "center", padding: "10px 0", marginTop: 8, background: T.rlBg, borderRadius: 8 }}>
-              <span style={{ fontSize: 11, color: T.red, fontWeight: 500 }}>Total: {incidents.length} incident{incidents.length > 1 ? "s" : ""} recorded</span>
+              <span style={{ fontSize: 11, color: T.red, fontWeight: 500 }}>Total: {sortedIncidents.length} incident{sortedIncidents.length > 1 ? "s" : ""} recorded</span>
             </div>
           )}
         </Card>
@@ -765,9 +861,9 @@ const MyChildPage = () => {
           {[
             { icon: FileText, label: "TOTAL TESTS", val: testScores.length },
             { icon: BookOpen, label: "SUBJECTS TRACKED", val: subEntries.length },
-            { icon: Calendar, label: "DAYS ON RECORD", val: m.days },
-            { icon: Activity, label: "AVG ATTENDANCE", val: `${Math.round(m.attRate)}%` },
-            { icon: BarChart3, label: "ASSIGNMENT RATE", val: `${Math.round(m.completion)}%` },
+            { icon: CalIcon, label: "DAYS ON RECORD", val: m.days },
+            { icon: Activity, label: "AVG ATTENDANCE", val: m.tot > 0 ? `${Math.round(m.attRate)}%` : "—" },
+            { icon: BarChart3, label: "ASSIGNMENT RATE", val: m.asgCount > 0 ? `${Math.round(m.completion)}%` : "—" },
             { icon: MessageSquare, label: "TEACHER MESSAGES", val: parentNotes.length },
           ].map(item => (
             <div key={item.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${T.s2}` }}>
@@ -783,8 +879,10 @@ const MyChildPage = () => {
 
       {/* ═══ COMMS + SCORE HISTORY ═══ */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 14 : 20, marginBottom: isMobile ? 14 : 20 }}>
-        <Card title={`Communications · ${parentNotes.length} entries`} action={<DetailLink to="/teacher-notes" />}>
-          {parentNotes.slice(0, 3).map(n => (
+        <Card title={`Communications · ${sortedParentNotes.length} entries`} action={<DetailLink to="/teacher-notes" />}>
+          {sortedParentNotes.length === 0 ? (
+            <p style={{ fontSize: 12, color: T.ink3, textAlign: "center", padding: "16px 0" }}>No communications</p>
+          ) : sortedParentNotes.slice(0, 3).map(n => (
             <div key={n.id} style={{ padding: "12px 0", borderBottom: `1px solid ${T.s2}` }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: T.ink }}>{n.from === "teacher" ? (n.teacherName || "TEACHER") : "YOU"}</span>
@@ -794,7 +892,6 @@ const MyChildPage = () => {
               <p style={{ fontSize: 12, color: T.ink2, lineHeight: 1.5, margin: 0 }}>{String(n.content || n.message || "").slice(0, 120)}</p>
             </div>
           ))}
-          {parentNotes.length === 0 && <p style={{ fontSize: 12, color: T.ink3, textAlign: "center", padding: "16px 0" }}>No communications</p>}
         </Card>
 
         <Card title={`Score History · ${testScores.length} records`} action={<DetailLink to="/tests" />}>
@@ -817,7 +914,9 @@ const MyChildPage = () => {
               <tr>{["SUBJECT", "DATE", "SCORE"].map(h => <th key={h} style={{ textAlign: "left", padding: "6px 8px", fontSize: 10, color: T.ink3, fontWeight: 600, borderBottom: `1px solid ${T.s2}` }}>{h}</th>)}</tr>
             </thead>
             <tbody>
-              {scoreHistory.map(t => {
+              {scoreHistory.length === 0 ? (
+                <tr><td colSpan={3} style={{ padding: "16px 8px", textAlign: "center", color: T.ink3, fontSize: 12 }}>No test records yet</td></tr>
+              ) : scoreHistory.map(t => {
                 const d = scoreDateOf(t);
                 const p = pctOf(t);
                 return (
@@ -834,48 +933,18 @@ const MyChildPage = () => {
         </Card>
       </div>
 
-      {/* ═══ BOTTOM STATUS BAR ═══ */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "10px 14px" : "10px 20px", background: T.white, border: `1px solid ${T.bdr}`, borderRadius: 12, fontSize: 10, color: T.ink3, flexWrap: "wrap", gap: isMobile ? 8 : 0, rowGap: 6 }}>
-        <span>★ ENGAGE: {Math.min(100, parentNotes.length * 20)}%</span>
-        {!isMobile && <span>★ Status: Active</span>}
-        {!isMobile && <span>★ Data: Live</span>}
+      {/* ═══ BOTTOM STATUS BAR — honest counters only, no fabricated metrics ═══ */}
+      <div className="my-child-no-print" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "10px 14px" : "10px 20px", background: T.white, border: `1px solid ${T.bdr}`, borderRadius: 12, fontSize: 10, color: T.ink3, flexWrap: "wrap", gap: isMobile ? 8 : 0, rowGap: 6 }}>
+        <span>★ {parentNotes.length} message{parentNotes.length === 1 ? "" : "s"}</span>
+        {!isMobile && <span>★ {testScores.length} test record{testScores.length === 1 ? "" : "s"}</span>}
+        {!isMobile && <span>★ Live data</span>}
         <span>★ Secured</span>
         <span>★ ID: {sid.slice(0, 8).toUpperCase()}</span>
-        <span style={{ color: T.blue, fontWeight: 600 }}>{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <Clock size={11} color={T.blue} />
+          <LiveClock />
+        </span>
       </div>
-
-      {/* ═══ EDIT PROFILE MODAL ═══ */}
-      {editOpen && (
-        <div role="dialog" aria-modal="true" aria-label="Edit profile" style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.4)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }} onClick={() => setEditOpen(false)}>
-          <div onClick={e => e.stopPropagation()} style={{ background: T.white, borderRadius: 16, width: 420, maxWidth: "90vw", padding: 24, boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: T.ink, marginBottom: 16 }}>Edit Profile</h3>
-            {([
-              { key: "dob", label: "Date of Birth", type: "date" },
-              { key: "bloodGroup", label: "Blood Group", type: "text" },
-              { key: "parentPhone", label: "Parent Phone", type: "tel" },
-              { key: "emergencyContact", label: "Emergency Contact", type: "tel" },
-            ] as const).map((f, idx) => (
-              <div key={f.key} style={{ marginBottom: 12 }}>
-                <label style={{ fontSize: 10, fontWeight: 600, color: T.ink3, textTransform: "uppercase", letterSpacing: "0.05em" }}>{f.label}</label>
-                <input
-                  ref={idx === 0 ? firstFieldRef : undefined}
-                  type={f.type}
-                  value={(form as any)[f.key]}
-                  onChange={e => setForm({ ...form, [f.key]: e.target.value })}
-                  maxLength={100}
-                  style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${T.bdr}`, fontSize: 13, outline: "none", marginTop: 4 }}
-                />
-              </div>
-            ))}
-            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-              <button onClick={() => setEditOpen(false)} style={{ flex: 1, padding: "10px 16px", borderRadius: 10, border: `1px solid ${T.bdr}`, background: T.white, color: T.ink2, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Cancel</button>
-              <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: "10px 16px", borderRadius: 10, border: "none", background: T.blue, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: saving ? 0.6 : 1 }}>
-                {saving ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

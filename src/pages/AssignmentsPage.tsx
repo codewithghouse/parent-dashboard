@@ -249,6 +249,22 @@ Return JSON: { hints: ["hint1 (gentle nudge)","hint2","hint3","hint4","hint5 (ne
     }
     return null;
   };
+
+  // Hoisted to outer scope so BOTH the mobile branch (`if (isMobile)`) and the
+  // desktop branch can call it. Previously was defined only inside the mobile
+  // branch — desktop's `isAssignmentPastDue(a)` calls at lines ~1125 and ~1241
+  // crashed with `ReferenceError: isAssignmentPastDue is not defined`. Mobile
+  // branch's identical local copy still works (just shadows this one).
+  const isAssignmentPastDue = (a: any): boolean => {
+    const due = parseDueForStats(a);
+    if (!due) return false;
+    // Late-window: assignments are submittable up to 23:59:59 of the due date
+    // in the user's local time. If due was 2026-05-01, the parent can submit
+    // until 2026-05-01 23:59:59 local. After that, closed.
+    const endOfDay = new Date(due);
+    endOfDay.setHours(23, 59, 59, 999);
+    return Date.now() > endOfDay.getTime();
+  };
   const toDateSafe = (v: any): Date | null => {
     if (!v) return null;
     if (typeof v?.toDate === "function") return v.toDate();
