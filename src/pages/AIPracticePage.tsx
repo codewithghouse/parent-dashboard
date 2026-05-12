@@ -112,6 +112,19 @@ const getStreak = (practiceDates: Set<string>) => {
   return streak;
 };
 
+// ── Stable shell wrapper (module scope) ──────────────────────────────────────
+// IMPORTANT: keep this OUTSIDE the component. When defined inline inside
+// AIPracticePage, every parent re-render (e.g. the 1-second timer tick during
+// an exam) creates a new function reference for DesktopShell. React then
+// treats `<DesktopShell>` as a different "component type" and unmounts +
+// remounts the entire subtree on every tick — visible as full-screen flicker.
+const DesktopShell = ({ children }: { children: any }) => (
+  <div className="-m-4 sm:-m-6 md:-m-8 min-h-[calc(100vh-64px)]"
+    style={{ fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif", background: "#EEF4FF" }}>
+    <div className="w-full px-6 pt-8 pb-12">{children}</div>
+  </div>
+);
+
 // ── Main component ────────────────────────────────────────────────────────────
 const AIPracticePage = () => {
   const { studentData } = useAuth();
@@ -851,13 +864,6 @@ const AIPracticePage = () => {
   const avgScoreD = attempts.length > 0
     ? Math.round(attempts.reduce((s, a) => s + (a.percentage || 0), 0) / attempts.length)
     : 0;
-
-  const DesktopShell = ({ children }: { children: any }) => (
-    <div className="animate-in fade-in duration-500 -m-4 sm:-m-6 md:-m-8 min-h-[calc(100vh-64px)]"
-      style={{ fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif", background: BG_D }}>
-      <div className="w-full px-6 pt-8 pb-12">{children}</div>
-    </div>
-  );
 
   // ── HOME VIEW (Desktop) ──────────────────────────────────────────────────
   if (view === "home") return (

@@ -539,6 +539,18 @@ service cloud.firestore {
       allow update:    if signedIn() && inSameSchool() && schoolIdImmutable() && hasStaffRole();
       allow delete:    if signedIn() && inSameSchool() && hasStaffRole();
     }
+    // Added: Firestore-backed daily cache for Pre-Result Predictor AI calls.
+    // Doc id is deterministic per (teacherId + classId + paperHash + rosterHash
+    // + IST day) so the same paper + roster + day across devices = ONE OpenAI
+    // call. Staff-only writes scoped by schoolId. The Predictor reads the
+    // cache before invoking the cloud function.
+    match /result_predictions/{id} {
+      allow get:  if signedIn() && inSameSchool();
+      allow list: if signedIn();  // TEMPORARY PHASE-1
+      allow create:    if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
+      allow update:    if signedIn() && inSameSchool() && schoolIdImmutable() && hasStaffRole();
+      allow delete:    if signedIn() && inSameSchool() && hasStaffRole();
+    }
     match /classes/{id} {
       allow get:  if signedIn() && inSameSchool();
       allow list: if signedIn();  // TEMPORARY PHASE-1: relaxed while client queries migrate. Re-tighten to inSameSchool() once all pages filter by schoolId.

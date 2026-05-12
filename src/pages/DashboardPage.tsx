@@ -14,12 +14,36 @@ import { useSchoolSettings, resolveAcademicYear } from "@/hooks/useSchoolSetting
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 
-function timeAgo(date: Date): string {
+function timeAgo(date: Date | null | undefined): string {
+  // Defensive: null/invalid date → empty (renderer hides the line cleanly).
+  // Previously fell back to "0 minutes ago" because callers defaulted to
+  // `new Date()` when the underlying alert had no real timestamp — so every
+  // alert without a createdAt rendered as "just now", which is a lie.
+  if (!date || !(date instanceof Date) || isNaN(date.getTime())) return "";
   const diff = (Date.now() - date.getTime()) / 1000;
-  if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
+  if (diff < 0) {
+    // Future date (eg upcoming assignment due-date) — show relative future.
+    const fut = -diff;
+    if (fut < 86400) return "Today";
+    const days = Math.ceil(fut / 86400);
+    return days === 1 ? "Tomorrow" : `In ${days} days`;
+  }
+  if (diff < 60) return "Just now";
+  if (diff < 3600) {
+    const m = Math.floor(diff / 60);
+    return `${m} minute${m === 1 ? "" : "s"} ago`;
+  }
+  if (diff < 86400) {
+    const h = Math.floor(diff / 3600);
+    return `${h} hour${h === 1 ? "" : "s"} ago`;
+  }
   if (diff < 172800) return "Yesterday";
-  return date.toLocaleDateString();
+  if (diff < 7 * 86400) {
+    const d = Math.floor(diff / 86400);
+    return `${d} days ago`;
+  }
+  // Older than a week — short month-day format reads better than locale slash.
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 // IST-anchored day-of-week (0=Sun..6=Sat). Avoids the "Friday window shifts by
@@ -772,10 +796,37 @@ const DashboardPage = () => {
       notes: notesRaw,
     });
     const top3 = all.slice(0, 3);
+    // Resolve a real Date from the alert's createdAt OR its `date` field
+    // (attendance writes YYYY-MM-DD strings; assignments write Timestamps for
+    // dueDate). Returns null when no usable timestamp exists — the renderer
+    // hides the line instead of lying with "Just now".
+    const resolveTime = (a: any): Date | null => {
+      const c = a.createdAt;
+      if (c?.toDate) {
+        const d = c.toDate();
+        if (d instanceof Date && !isNaN(d.getTime())) return d;
+      }
+      if (c instanceof Date && !isNaN(c.getTime())) return c;
+      if (typeof c === "string" && c) {
+        const d = new Date(c);
+        if (!isNaN(d.getTime())) return d;
+      }
+      if (typeof c === "number" && c > 0) {
+        const d = new Date(c);
+        if (!isNaN(d.getTime())) return d;
+      }
+      // Fall back to the alert's `date` field (eg attendance.date "YYYY-MM-DD"
+      // written by MarkAttendance.tsx in IST per bug_pattern_ist_vs_utc_date_filter).
+      if (typeof a.date === "string" && a.date) {
+        const d = new Date(`${a.date}T00:00:00`);
+        if (!isNaN(d.getTime())) return d;
+      }
+      return null;
+    };
     return top3.map(a => ({
       id: a.id,
       title: a.title,
-      time: a.createdAt?.toDate ? a.createdAt.toDate() : (a.createdAt instanceof Date ? a.createdAt : new Date()),
+      time: resolveTime(a),
       urgent: a.priority === "High Priority",
       subject: a.subject || "",
       category: a.subject || a.category || "General",
@@ -1174,7 +1225,9 @@ const DashboardPage = () => {
                       )}
                     </div>
                     <p className="text-sm font-medium leading-snug" style={{ color: T1 }}>{alert.title}</p>
-                    <p className="text-xs mt-0.5" style={{ color: T3 }}>{timeAgo(alert.time)}</p>
+                    {timeAgo(alert.time) && (
+                      <p className="text-xs mt-0.5" style={{ color: T3 }}>{timeAgo(alert.time)}</p>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1787,7 +1840,9 @@ const DashboardPage = () => {
                           )}
                         </div>
                         <p className="text-[14px] font-medium leading-snug" style={{ color: T1 }}>{alert.title}</p>
-                        <p className="text-[12px] mt-0.5" style={{ color: T3 }}>{timeAgo(alert.time)}</p>
+                        {timeAgo(alert.time) && (
+                          <p className="text-[12px] mt-0.5" style={{ color: T3 }}>{timeAgo(alert.time)}</p>
+                        )}
                       </div>
                     </div>
                   ))}
