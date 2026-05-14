@@ -333,8 +333,14 @@ const AIPracticePage = () => {
       // write is silently rejected by the tenant-isolation rule; the student
       // sees their score on screen but nothing is persisted.
       if (studentData?.schoolId) {
+        // Dual-key per memory `dual_query_pattern_studentid_email`: stamp BOTH
+        // studentId AND studentEmail so cross-dashboard readers (e.g. parent
+        // PerformancePage AI Practice card) can match by either field.
+        const studentEmail = (studentData?.email || studentData?.studentEmail || "")
+          .trim().toLowerCase();
         await addDoc(collection(db, "practice_attempts"), {
           studentId, studentName,
+          studentEmail,
           schoolId: studentData.schoolId,
           examTitle, topic, difficulty, questionType,
           questionCount: questions.length,
@@ -1527,7 +1533,7 @@ const AIPracticePage = () => {
                 <div className="flex items-center gap-2 mb-5">
                   <div className="px-[10px] py-[5px] rounded-full text-[10px] font-bold uppercase tracking-[0.10em]"
                     style={{ background: "rgba(0,85,255,0.10)", color: B1, border: `0.5px solid ${BLUE_BDR_D}` }}>
-                    {q.type.replace("_", " ")}
+                    {q.type.replace(/_/g, " ")}
                   </div>
                   <div className="text-[11px] font-medium" style={{ color: T4 }}>{difficulty}</div>
                 </div>

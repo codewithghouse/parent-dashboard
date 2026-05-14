@@ -6,6 +6,7 @@ import {
   Calculator, FlaskConical, Languages, Globe, Monitor, Palette, BookOpen,
   Sparkles, Target, Trophy,
   FileText, Calendar, CheckCircle2, Clock, Heart, AlertTriangle, Activity, ChevronRight,
+  Brain,
 } from "lucide-react";
 import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart,
@@ -96,6 +97,28 @@ interface RawAssignment {
   classId?: string;
   dueDate?: { toDate?: () => Date; seconds?: number } | string | number | null;
   createdAt?: { toDate?: () => Date; seconds?: number } | string | number | null;
+}
+
+// AI Practice attempt — saved by AIPracticePage.tsx into `practice_attempts`
+// when the student submits an exam. Contains the score, topic, difficulty,
+// and submission timestamp so PerformancePage can show self-study activity
+// alongside teacher-graded tests + assignments.
+interface RawAIAttempt {
+  id: string;
+  studentId?: string;
+  studentEmail?: string;
+  examTitle?: string;
+  topic?: string;
+  difficulty?: string;
+  questionType?: string;
+  questionCount?: number;
+  score?: number;
+  total?: number;
+  percentage?: number;
+  grade?: string;
+  weakTopics?: string[];
+  timeTaken?: number;
+  submittedAt?: { toDate?: () => Date; seconds?: number } | string | number | null;
 }
 
 interface RawSubmission {
@@ -1447,18 +1470,53 @@ interface TestsCardProps {
   navigate: NavigateFunction;
 }
 
+// Performance tier classification — used on test rows + assignment scores.
+// Pure function so it's safe to call inside render.
+const tierForPct = (pct: number): { label: string; color: string; bg: string; bdr: string } => {
+  if (pct >= 90) return { label: "Strong",     color: "#007830", bg: "rgba(0,200,83,0.12)",  bdr: "rgba(0,200,83,0.30)" };
+  if (pct >= 75) return { label: "Good",       color: "#0055D4", bg: "rgba(0,85,255,0.10)",  bdr: "rgba(0,85,255,0.25)" };
+  if (pct >= 50) return { label: "Developing", color: "#AA5500", bg: "rgba(255,136,0,0.10)", bdr: "rgba(255,136,0,0.28)" };
+  return            { label: "Weak",       color: "#AA2233", bg: "rgba(255,51,85,0.10)", bdr: "rgba(255,51,85,0.25)" };
+};
+
+const TESTS_PAGE_SIZE = 8;
+
 const TestsAndExamsCard = ({ rows, isMobile, navigate }: TestsCardProps) => {
+  const [page, setPage] = useState(0);
   if (rows.length === 0) return null;
-  const recent = rows.slice(0, 5);
+
+  // Newest-first; rows without a date sink to the bottom.
+  const sorted = useMemo(
+    () =>
+      [...rows].sort((a, b) => {
+        const ad = a.date?.getTime() ?? 0;
+        const bd = b.date?.getTime() ?? 0;
+        return bd - ad;
+      }),
+    [rows],
+  );
   const top = Math.max(...rows.map((r) => r.pct));
   const avg = Math.round(rows.reduce((a, r) => a + r.pct, 0) / rows.length);
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / TESTS_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const start = safePage * TESTS_PAGE_SIZE;
+  const visible = sorted.slice(start, start + TESTS_PAGE_SIZE);
+
+  // Tier mix summary — parent-friendly glance at how the child is doing overall.
+  const tierCounts = useMemo(() => {
+    const counts = { Strong: 0, Good: 0, Developing: 0, Weak: 0 };
+    rows.forEach((r) => { counts[tierForPct(r.pct).label as keyof typeof counts]++; });
+    return counts;
+  }, [rows]);
+
   return (
     <div
       className={isMobile ? "mx-5 mt-3 bg-white rounded-[24px] p-5" : "bg-white rounded-[24px] p-6"}
       style={{ boxShadow: T_PALETTE.SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}
     >
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <div
             className="w-10 h-10 rounded-[12px] flex items-center justify-center shrink-0"
             style={{
@@ -1468,7 +1526,7 @@ const TestsAndExamsCard = ({ rows, isMobile, navigate }: TestsCardProps) => {
           >
             <FileText className="w-[18px] h-[18px] text-white" strokeWidth={2.2} />
           </div>
-          <div>
+          <div className="min-w-0">
             <div
               className={isMobile ? "text-[16px] font-bold" : "text-[17px] font-bold"}
               style={{ color: T_PALETTE.T1, letterSpacing: "-0.3px" }}
@@ -1482,20 +1540,33 @@ const TestsAndExamsCard = ({ rows, isMobile, navigate }: TestsCardProps) => {
         </div>
         <button
           onClick={() => navigate("/tests")}
-          className="text-[12px] font-bold flex items-center gap-1 px-3 py-1.5 rounded-full transition-colors hover:bg-[#EEF4FF]"
+          className="text-[12px] font-bold flex items-center gap-1 px-3 py-1.5 rounded-full transition-colors hover:bg-[#EEF4FF] shrink-0"
           style={{ color: T_PALETTE.B1 }}
         >
-          View all <ChevronRight className="w-[12px] h-[12px]" strokeWidth={2.4} />
+          Open page <ChevronRight className="w-[12px] h-[12px]" strokeWidth={2.4} />
         </button>
       </div>
+
+      {/* Tier-mix glance row */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        {(["Strong", "Good", "Developing", "Weak"] as const).map((label) => {
+          if (tierCounts[label] === 0) return null;
+          const t = tierForPct(label === "Strong" ? 95 : label === "Good" ? 80 : label === "Developing" ? 60 : 30);
+          return (
+            <span
+              key={label}
+              className="text-[11px] font-bold px-[10px] py-[4px] rounded-full"
+              style={{ background: t.bg, color: t.color, border: `0.5px solid ${t.bdr}` }}
+            >
+              {label} · {tierCounts[label]}
+            </span>
+          );
+        })}
+      </div>
+
       <div className="flex flex-col gap-2">
-        {recent.map((r) => {
-          const tone =
-            r.pct >= 75
-              ? { color: T_PALETTE.GREEN_DEEP || "#007830", bg: T_PALETTE.GREEN_S, bdr: T_PALETTE.GREEN_B }
-              : r.pct >= 60
-                ? { color: "#AA5500", bg: "rgba(255,136,0,0.10)", bdr: "rgba(255,136,0,0.25)" }
-                : { color: "#AA2233", bg: "rgba(255,51,85,0.08)", bdr: "rgba(255,51,85,0.22)" };
+        {visible.map((r) => {
+          const tone = tierForPct(r.pct);
           return (
             <div
               key={r.id}
@@ -1511,19 +1582,57 @@ const TestsAndExamsCard = ({ rows, isMobile, navigate }: TestsCardProps) => {
                 </p>
                 <p className="text-[11px] mt-[2px]" style={{ color: T_PALETTE.T4 }}>
                   {r.subject || "—"}
-                  {r.date && ` · ${r.date.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
+                  {r.date && ` · ${r.date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`}
                 </p>
               </div>
-              <span
-                className="text-[12px] font-bold px-[10px] py-[5px] rounded-full ml-2 shrink-0 tabular-nums"
-                style={{ background: tone.bg, color: tone.color, border: `0.5px solid ${tone.bdr}` }}
-              >
-                {Math.round(r.pct)}%
-              </span>
+              <div className="flex items-center gap-2 shrink-0 ml-2">
+                <span
+                  className="text-[10px] font-bold px-[8px] py-[4px] rounded-full uppercase tracking-[0.08em]"
+                  style={{ background: tone.bg, color: tone.color, border: `0.5px solid ${tone.bdr}` }}
+                >
+                  {tone.label}
+                </span>
+                <span
+                  className="text-[12px] font-bold px-[10px] py-[5px] rounded-full tabular-nums"
+                  style={{ background: tone.bg, color: tone.color, border: `0.5px solid ${tone.bdr}` }}
+                >
+                  {Math.round(r.pct)}%
+                </span>
+              </div>
             </div>
           );
         })}
       </div>
+
+      {/* Pagination footer */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4 pt-3" style={{ borderTop: "0.5px solid rgba(0,85,255,0.10)" }}>
+          <span className="text-[11px] font-medium" style={{ color: T_PALETTE.T4 }}>
+            Showing {start + 1}–{Math.min(start + TESTS_PAGE_SIZE, sorted.length)} of {sorted.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={safePage === 0}
+              className="px-3 py-1.5 rounded-full text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#EEF4FF]"
+              style={{ color: T_PALETTE.B1, border: `0.5px solid ${safePage === 0 ? "rgba(0,85,255,0.10)" : "rgba(0,85,255,0.30)"}` }}
+            >
+              ← Prev
+            </button>
+            <span className="text-[11px] font-bold tabular-nums" style={{ color: T_PALETTE.T2 }}>
+              {safePage + 1} / {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={safePage >= totalPages - 1}
+              className="px-3 py-1.5 rounded-full text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#EEF4FF]"
+              style={{ color: T_PALETTE.B1, border: `0.5px solid ${safePage >= totalPages - 1 ? "rgba(0,85,255,0.10)" : "rgba(0,85,255,0.30)"}` }}
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -1539,7 +1648,10 @@ interface AssignmentsCardProps {
   navigate: NavigateFunction;
 }
 
+const ASSIGNMENTS_PAGE_SIZE = 8;
+
 const AssignmentsCard = ({ rows, isMobile, navigate }: AssignmentsCardProps) => {
+  const [page, setPage] = useState(0);
   if (rows.length === 0) return null;
   const submitted = rows.filter((r) => r.submitted).length;
   const onTimeEligible = rows.filter((r) => r.submitted && r.onTime !== null);
@@ -1547,14 +1659,16 @@ const AssignmentsCard = ({ rows, isMobile, navigate }: AssignmentsCardProps) => 
   const submitRate = Math.round((submitted / rows.length) * 100);
   const onTimeRate =
     onTimeEligible.length > 0 ? Math.round((onTime / onTimeEligible.length) * 100) : null;
-  // Most-recent 5 by due date (descending); fallback alphabetical title for items without dueDate.
-  const recent = [...rows]
-    .sort((a, b) => {
-      const ad = a.dueDate?.getTime() ?? 0;
-      const bd = b.dueDate?.getTime() ?? 0;
-      return bd - ad;
-    })
-    .slice(0, 5);
+  // Newest-first by due date; items without dueDate sink to the bottom.
+  const sorted = [...rows].sort((a, b) => {
+    const ad = a.dueDate?.getTime() ?? 0;
+    const bd = b.dueDate?.getTime() ?? 0;
+    return bd - ad;
+  });
+  const totalPages = Math.max(1, Math.ceil(sorted.length / ASSIGNMENTS_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const start = safePage * ASSIGNMENTS_PAGE_SIZE;
+  const visible = sorted.slice(start, start + ASSIGNMENTS_PAGE_SIZE);
   return (
     <div
       className={isMobile ? "mx-5 mt-3 bg-white rounded-[24px] p-5" : "bg-white rounded-[24px] p-6"}
@@ -1626,9 +1740,9 @@ const AssignmentsCard = ({ rows, isMobile, navigate }: AssignmentsCardProps) => 
       </div>
 
       <div className="flex flex-col gap-2">
-        {recent.map((r) => {
+        {visible.map((r) => {
           const dueLabel = r.dueDate
-            ? r.dueDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" })
+            ? r.dueDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
             : "—";
           return (
             <div
@@ -1694,6 +1808,239 @@ const AssignmentsCard = ({ rows, isMobile, navigate }: AssignmentsCardProps) => 
           );
         })}
       </div>
+
+      {/* Pagination footer */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4 pt-3" style={{ borderTop: "0.5px solid rgba(0,85,255,0.10)" }}>
+          <span className="text-[11px] font-medium" style={{ color: T_PALETTE.T4 }}>
+            Showing {start + 1}–{Math.min(start + ASSIGNMENTS_PAGE_SIZE, sorted.length)} of {sorted.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={safePage === 0}
+              className="px-3 py-1.5 rounded-full text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#EEF4FF]"
+              style={{ color: T_PALETTE.B1, border: `0.5px solid ${safePage === 0 ? "rgba(0,85,255,0.10)" : "rgba(0,85,255,0.30)"}` }}
+            >
+              ← Prev
+            </button>
+            <span className="text-[11px] font-bold tabular-nums" style={{ color: T_PALETTE.T2 }}>
+              {safePage + 1} / {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={safePage >= totalPages - 1}
+              className="px-3 py-1.5 rounded-full text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#EEF4FF]"
+              style={{ color: T_PALETTE.B1, border: `0.5px solid ${safePage >= totalPages - 1 ? "rgba(0,85,255,0.10)" : "rgba(0,85,255,0.30)"}` }}
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ════════════════════════════════════════════════════════════════════════
+   AI PRACTICE CARD — self-study attempts (practice_attempts collection).
+   Shows attempt history, tier classification, weak-topic surface, pagination.
+   Cross-links to /ai-practice for new sessions.
+   ════════════════════════════════════════════════════════════════════════ */
+
+interface AIPracticeCardProps {
+  rows: RawAIAttempt[];
+  isMobile: boolean;
+  navigate: NavigateFunction;
+}
+
+const AI_PRACTICE_PAGE_SIZE = 8;
+
+const AIPracticeCard = ({ rows, isMobile, navigate }: AIPracticeCardProps) => {
+  const [page, setPage] = useState(0);
+  if (rows.length === 0) return null;
+
+  // Convert + sort newest-first by submittedAt.
+  const enriched = useMemo(
+    () =>
+      rows
+        .map((r) => ({
+          ...r,
+          submittedDate: toSafeDate(r.submittedAt),
+          pct: typeof r.percentage === "number" ? r.percentage : 0,
+        }))
+        .sort((a, b) => {
+          const ad = a.submittedDate?.getTime() ?? 0;
+          const bd = b.submittedDate?.getTime() ?? 0;
+          return bd - ad;
+        }),
+    [rows],
+  );
+
+  const avg = Math.round(enriched.reduce((a, r) => a + r.pct, 0) / enriched.length);
+  const top = Math.max(...enriched.map((r) => r.pct));
+  const totalPages = Math.max(1, Math.ceil(enriched.length / AI_PRACTICE_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const start = safePage * AI_PRACTICE_PAGE_SIZE;
+  const visible = enriched.slice(start, start + AI_PRACTICE_PAGE_SIZE);
+
+  // Tier mix summary
+  const tierCounts = useMemo(() => {
+    const counts = { Strong: 0, Good: 0, Developing: 0, Weak: 0 };
+    enriched.forEach((r) => { counts[tierForPct(r.pct).label as keyof typeof counts]++; });
+    return counts;
+  }, [enriched]);
+
+  // Aggregate weak topics across all attempts — small, dedup, capped at 6.
+  const weakTopicsSet = new Set<string>();
+  enriched.forEach((r) => (r.weakTopics || []).forEach((t) => weakTopicsSet.add(t)));
+  const weakTopics = Array.from(weakTopicsSet).slice(0, 6);
+
+  return (
+    <div
+      className={isMobile ? "mx-5 mt-3 bg-white rounded-[24px] p-5" : "bg-white rounded-[24px] p-6"}
+      style={{ boxShadow: T_PALETTE.SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <div
+            className="w-10 h-10 rounded-[12px] flex items-center justify-center shrink-0"
+            style={{
+              background: "linear-gradient(135deg, #8B5CF6, #6D28D9)",
+              boxShadow: "0 3px 10px rgba(109,40,217,0.28)",
+            }}
+          >
+            <Brain className="w-[18px] h-[18px] text-white" strokeWidth={2.2} />
+          </div>
+          <div className="min-w-0">
+            <div
+              className={isMobile ? "text-[16px] font-bold" : "text-[17px] font-bold"}
+              style={{ color: T_PALETTE.T1, letterSpacing: "-0.3px" }}
+            >
+              AI Practice Activity
+            </div>
+            <div className={isMobile ? "text-[11px] mt-0.5" : "text-[12px] mt-0.5"} style={{ color: T_PALETTE.T3 }}>
+              {enriched.length} attempts · avg {avg}% · top {Math.round(top)}%
+            </div>
+          </div>
+        </div>
+        <button
+          onClick={() => navigate("/ai-practice")}
+          className="text-[12px] font-bold flex items-center gap-1 px-3 py-1.5 rounded-full transition-colors hover:bg-[#EEF4FF] shrink-0"
+          style={{ color: T_PALETTE.B1 }}
+        >
+          Practice now <ChevronRight className="w-[12px] h-[12px]" strokeWidth={2.4} />
+        </button>
+      </div>
+
+      {/* Tier-mix glance row */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        {(["Strong", "Good", "Developing", "Weak"] as const).map((label) => {
+          if (tierCounts[label] === 0) return null;
+          const t = tierForPct(label === "Strong" ? 95 : label === "Good" ? 80 : label === "Developing" ? 60 : 30);
+          return (
+            <span
+              key={label}
+              className="text-[11px] font-bold px-[10px] py-[4px] rounded-full"
+              style={{ background: t.bg, color: t.color, border: `0.5px solid ${t.bdr}` }}
+            >
+              {label} · {tierCounts[label]}
+            </span>
+          );
+        })}
+      </div>
+
+      {/* Weak topics surface — only render if at least one */}
+      {weakTopics.length > 0 && (
+        <div className="mb-4 px-3 py-[10px] rounded-[12px]" style={{ background: "rgba(255,136,0,0.06)", border: "0.5px solid rgba(255,136,0,0.20)" }}>
+          <div className="text-[10px] font-bold uppercase tracking-[0.10em] mb-[6px]" style={{ color: "#AA5500" }}>
+            Topics to revisit
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {weakTopics.map((t) => (
+              <span key={t} className="text-[11px] font-medium px-[10px] py-[3px] rounded-full"
+                style={{ background: "rgba(255,136,0,0.10)", color: "#AA5500", border: "0.5px solid rgba(255,136,0,0.25)" }}>
+                {t}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-2">
+        {visible.map((r) => {
+          const tone = tierForPct(r.pct);
+          const dateLabel = r.submittedDate
+            ? r.submittedDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+            : "—";
+          const title = r.examTitle || r.topic || "AI Practice Session";
+          const meta = [r.topic, r.difficulty, r.questionType?.replace(/_/g, " ")]
+            .filter(Boolean).join(" · ");
+          return (
+            <div
+              key={r.id}
+              className="flex items-center justify-between py-[10px] px-3 rounded-[14px]"
+              style={{ background: T_PALETTE.BG, border: "0.5px solid rgba(0,85,255,0.10)" }}
+            >
+              <div className="min-w-0 flex-1">
+                <p
+                  className="text-[13px] font-bold truncate"
+                  style={{ color: T_PALETTE.T1, letterSpacing: "-0.1px" }}
+                >
+                  {title}
+                </p>
+                <p className="text-[11px] mt-[2px] truncate" style={{ color: T_PALETTE.T4 }}>
+                  {meta || "Practice session"} · {dateLabel}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 ml-2">
+                <span
+                  className="text-[10px] font-bold px-[8px] py-[4px] rounded-full uppercase tracking-[0.08em]"
+                  style={{ background: tone.bg, color: tone.color, border: `0.5px solid ${tone.bdr}` }}
+                >
+                  {tone.label}
+                </span>
+                <span
+                  className="text-[12px] font-bold px-[10px] py-[5px] rounded-full tabular-nums"
+                  style={{ background: tone.bg, color: tone.color, border: `0.5px solid ${tone.bdr}` }}
+                >
+                  {Math.round(r.pct)}%
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Pagination footer */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4 pt-3" style={{ borderTop: "0.5px solid rgba(0,85,255,0.10)" }}>
+          <span className="text-[11px] font-medium" style={{ color: T_PALETTE.T4 }}>
+            Showing {start + 1}–{Math.min(start + AI_PRACTICE_PAGE_SIZE, enriched.length)} of {enriched.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={safePage === 0}
+              className="px-3 py-1.5 rounded-full text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#EEF4FF]"
+              style={{ color: T_PALETTE.B1, border: `0.5px solid ${safePage === 0 ? "rgba(0,85,255,0.10)" : "rgba(0,85,255,0.30)"}` }}
+            >
+              ← Prev
+            </button>
+            <span className="text-[11px] font-bold tabular-nums" style={{ color: T_PALETTE.T2 }}>
+              {safePage + 1} / {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={safePage >= totalPages - 1}
+              className="px-3 py-1.5 rounded-full text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#EEF4FF]"
+              style={{ color: T_PALETTE.B1, border: `0.5px solid ${safePage >= totalPages - 1 ? "rgba(0,85,255,0.10)" : "rgba(0,85,255,0.30)"}` }}
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -1970,6 +2317,7 @@ const PerformancePage = () => {
   const [attendanceList, setAttendanceList] = useState<RawAttendance[]>([]);
   const [incidentsList, setIncidentsList] = useState<RawIncident[]>([]);
   const [ratingsList, setRatingsList] = useState<RawRating[]>([]);
+  const [aiAttemptsList, setAiAttemptsList] = useState<RawAIAttempt[]>([]);
 
   useEffect(() => {
     if (!studentData?.id || !studentData?.schoolId) {
@@ -2160,6 +2508,24 @@ const PerformancePage = () => {
 
     /* ── End-to-end metric listeners (dual-key) ───────────────────────── */
 
+    // AI Practice attempts — student's self-study sessions. Written by
+    // AIPracticePage.tsx on exam submission. Dual-key per memory rule
+    // `dual_query_pattern_studentid_email`.
+    const unsubAI = subscribePerStudent({
+      collection: "practice_attempts",
+      student: studentData,
+      onChange: (docs) => {
+        if (cancelled) return;
+        setAiAttemptsList(
+          docs.map((d) => ({ id: d.id, ...(d.data() as Omit<RawAIAttempt, "id">) })),
+        );
+      },
+      onError: (err) => {
+        if (cancelled) return;
+        console.error("[Performance] practice_attempts listener error:", err);
+      },
+    });
+
     // Submissions — parent-uploaded homework. Used for assignment completion.
     const unsubSubs = subscribePerStudent({
       collection: "submissions",
@@ -2318,6 +2684,7 @@ const PerformancePage = () => {
       unsubInc();
       unsubRat();
       unsubEnroll();
+      unsubAI();
       if (unsubGb) unsubGb();
       if (unsubAsgn) unsubAsgn();
     };
@@ -2588,6 +2955,7 @@ const PerformancePage = () => {
           ))}
           <TestsAndExamsCard rows={testRows} isMobile navigate={navigate} />
           <AssignmentsCard rows={assignmentRows} isMobile navigate={navigate} />
+          <AIPracticeCard rows={aiAttemptsList} isMobile navigate={navigate} />
           <AttendanceSnapshotCard snap={snapshot} isMobile navigate={navigate} />
           <BehaviourSnapshotCard
             snap={snapshot}
@@ -2738,6 +3106,7 @@ const PerformancePage = () => {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
                 <TestsAndExamsCard rows={testRows} isMobile={false} navigate={navigate} />
                 <AssignmentsCard rows={assignmentRows} isMobile={false} navigate={navigate} />
+                <AIPracticeCard rows={aiAttemptsList} isMobile={false} navigate={navigate} />
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
                 <AttendanceSnapshotCard snap={snapshot} isMobile={false} navigate={navigate} />

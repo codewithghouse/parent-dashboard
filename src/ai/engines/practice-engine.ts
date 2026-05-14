@@ -69,6 +69,21 @@ Return ONLY this JSON (no markdown, no extra text):
     // Sanitize: ensure all questions have required fields
     result.questions.forEach((q: any, i: number) => {
       q.questionNo = i + 1;
+      // Normalize q.type — AI sometimes returns "fill-in-the-blank" (kebab)
+      // or "fill in the blank" (spaced) instead of the canonical "fill_blank".
+      // Map all variants to the snake_case form the UI + evaluator expect.
+      if (q.type) {
+        const t = String(q.type).toLowerCase().trim();
+        if (t === "fill-in-the-blank" || t === "fill in the blank" || t === "fillblank" || t === "fill_in_the_blank") {
+          q.type = "fill_blank";
+        } else if (t === "true-false" || t === "true/false" || t === "true false" || t === "truefalse") {
+          q.type = "true_false";
+        } else if (t === "short-answer" || t === "short answer" || t === "shortanswer") {
+          q.type = "short_answer";
+        } else if (t === "multiple-choice" || t === "multiple choice" || t === "multiplechoice") {
+          q.type = "mcq";
+        }
+      }
       if (!q.type) q.type = "mcq";
       if (!q.options) q.options = [];
       if (!q.correctAnswer) q.correctAnswer = q.options?.[0] || "N/A";
