@@ -947,6 +947,158 @@ exports.triggerLeaderboardManually = functions
         throw new functions.https.HttpsError("internal", "manual trigger failed");
     }
 });
+// ─────────────────────────────────────────────────────────────────────────────
+// CROSS-DASHBOARD RENAME CASCADE
+// Source of truth: teachers/{id}.name, classes/{id}.name, students/{id}.name.
+// Problem: teacherName / className / studentName are denormalized across 11+
+// collections (enrollments, attendance, test_scores, etc.). If only the source
+// doc is renamed, every other dashboard keeps reading the stale denormalized
+// copy — parent/owner/teacher dashboards diverge from principal.
+// Fix: onUpdate trigger detects name diff, cascades the new value to every
+// denormalized field via where(parentIdField == X) queries, chunked at 450
+// ops per batch (Firestore cap is 500).
+// Loop-safe: the cascade only writes teacherName/className/studentName;
+// no existing trigger watches those fields, so no recursive fire.
+// ─────────────────────────────────────────────────────────────────────────────
+async function cascadeFieldToCollection(db, collectionName, matchField, matchValue, updateField, newValue) {
+    const snap = await db.collection(collectionName)
+        .where(matchField, "==", matchValue)
+        .get();
+    if (snap.empty)
+        return 0;
+    const CHUNK = 450;
+    let updated = 0;
+    for (let i = 0; i < snap.docs.length; i += CHUNK) {
+        const slice = snap.docs.slice(i, i + CHUNK);
+        const batch = db.batch();
+        slice.forEach(d => {
+            batch.update(d.ref, {
+                [updateField]: newValue,
+                _renameCascadedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+        });
+        await batch.commit();
+        updated += slice.length;
+    }
+    return updated;
+}
+const TEACHER_CASCADE_COLLECTIONS = [
+    "classes",
+    "teaching_assignments",
+    "enrollments",
+    "students",
+    "attendance",
+    "test_scores",
+    "assignments",
+    "submissions",
+    "incidents",
+    "student_ratings",
+    "improvement_areas",
+];
+exports.cascadeTeacherRename = functions.firestore
+    .document("teachers/{teacherId}")
+    .onUpdate(async (change, context) => {
+    const before = change.before.data();
+    const after = change.after.data();
+    if (!before || !after)
+        return null;
+    const beforeName = String(before.name || "").trim();
+    const afterName = String(after.name || "").trim();
+    if (beforeName === afterName)
+        return null;
+    if (!afterName)
+        return null;
+    const teacherId = context.params.teacherId;
+    const db = admin.firestore();
+    let total = 0;
+    for (const coll of TEACHER_CASCADE_COLLECTIONS) {
+        try {
+            const n = await cascadeFieldToCollection(db, coll, "teacherId", teacherId, "teacherName", afterName);
+            total += n;
+        }
+        catch (err) {
+            console.error(`[cascadeTeacherRename] ${coll} failed for teacherId=${teacherId}:`, err);
+        }
+    }
+    console.log(`[cascadeTeacherRename] ${teacherId}: "${beforeName}" → "${afterName}" — ${total} docs across ${TEACHER_CASCADE_COLLECTIONS.length} collections`);
+    return null;
+});
+const CLASS_CASCADE_COLLECTIONS = [
+    "enrollments",
+    "students",
+    "teaching_assignments",
+    "attendance",
+    "test_scores",
+    "assignments",
+    "submissions",
+];
+exports.cascadeClassRename = functions.firestore
+    .document("classes/{classId}")
+    .onUpdate(async (change, context) => {
+    const before = change.before.data();
+    const after = change.after.data();
+    if (!before || !after)
+        return null;
+    const beforeName = String(before.name || "").trim();
+    const afterName = String(after.name || "").trim();
+    if (beforeName === afterName)
+        return null;
+    if (!afterName)
+        return null;
+    const classId = context.params.classId;
+    const db = admin.firestore();
+    let total = 0;
+    for (const coll of CLASS_CASCADE_COLLECTIONS) {
+        try {
+            const n = await cascadeFieldToCollection(db, coll, "classId", classId, "className", afterName);
+            total += n;
+        }
+        catch (err) {
+            console.error(`[cascadeClassRename] ${coll} failed for classId=${classId}:`, err);
+        }
+    }
+    console.log(`[cascadeClassRename] ${classId}: "${beforeName}" → "${afterName}" — ${total} docs across ${CLASS_CASCADE_COLLECTIONS.length} collections`);
+    return null;
+});
+const STUDENT_CASCADE_COLLECTIONS = [
+    "enrollments",
+    "attendance",
+    "test_scores",
+    "submissions",
+    "incidents",
+    "student_ratings",
+    "improvement_areas",
+    "parent_notes",
+    "principal_notes",
+];
+exports.cascadeStudentRename = functions.firestore
+    .document("students/{studentId}")
+    .onUpdate(async (change, context) => {
+    const before = change.before.data();
+    const after = change.after.data();
+    if (!before || !after)
+        return null;
+    const beforeName = String(before.name || "").trim();
+    const afterName = String(after.name || "").trim();
+    if (beforeName === afterName)
+        return null;
+    if (!afterName)
+        return null;
+    const studentId = context.params.studentId;
+    const db = admin.firestore();
+    let total = 0;
+    for (const coll of STUDENT_CASCADE_COLLECTIONS) {
+        try {
+            const n = await cascadeFieldToCollection(db, coll, "studentId", studentId, "studentName", afterName);
+            total += n;
+        }
+        catch (err) {
+            console.error(`[cascadeStudentRename] ${coll} failed for studentId=${studentId}:`, err);
+        }
+    }
+    console.log(`[cascadeStudentRename] ${studentId}: "${beforeName}" → "${afterName}" — ${total} docs across ${STUDENT_CASCADE_COLLECTIONS.length} collections`);
+    return null;
+});
 // 5️⃣  Seed realistic sample data into source collections (testing helper)
 exports.seedSampleData = functions
     .region(constants_1.REGION)
