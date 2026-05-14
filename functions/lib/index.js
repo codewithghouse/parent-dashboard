@@ -353,7 +353,11 @@ exports.parentAIProxy = functions
 // and the frontend can pass { schoolId: <chosen> } to pick one.
 // ─────────────────────────────────────────────────────────────────────────────
 exports.syncUserClaims = functions
-    .runWith({ timeoutSeconds: 30, memory: "256MB" })
+    .runWith({
+    serviceAccount: "edullent-2a399@appspot.gserviceaccount.com",
+    timeoutSeconds: 30,
+    memory: "256MB",
+})
     .https.onCall(async (data, context) => {
     requireAuth(context);
     const uid = context.auth.uid;
