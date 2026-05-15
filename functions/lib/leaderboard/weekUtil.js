@@ -4,12 +4,7 @@
 // is reading, otherwise parents see "leaderboard not yet ready" because the
 // cron wrote to a different bucket.
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getCurrentWeekId = getCurrentWeekId;
-exports.getPreviousWeekId = getPreviousWeekId;
-exports.weekIdToRange = weekIdToRange;
-exports.formatWeekShort = formatWeekShort;
-exports.toIsoDate = toIsoDate;
-exports.isoDatesInRange = isoDatesInRange;
+exports.isoDatesInRange = exports.toIsoDate = exports.formatWeekShort = exports.weekIdToRange = exports.getPreviousWeekId = exports.getCurrentWeekId = void 0;
 const MS_PER_DAY = 86400000;
 function startOfIsoWeek(date) {
     const d = new Date(date);
@@ -34,10 +29,12 @@ function getCurrentWeekId(date = new Date()) {
     const { year, week } = isoWeekParts(date);
     return `${year}-W${String(week).padStart(2, "0")}`;
 }
+exports.getCurrentWeekId = getCurrentWeekId;
 function getPreviousWeekId(date = new Date()) {
     const prev = new Date(date.getTime() - 7 * MS_PER_DAY);
     return getCurrentWeekId(prev);
 }
+exports.getPreviousWeekId = getPreviousWeekId;
 function weekIdToRange(weekId) {
     const match = /^(\d{4})-W(\d{1,2})$/.exec(weekId);
     if (!match)
@@ -50,10 +47,12 @@ function weekIdToRange(weekId) {
     const end = start + 7 * MS_PER_DAY - 1;
     return { start, end };
 }
+exports.weekIdToRange = weekIdToRange;
 function formatWeekShort(weekId) {
     const match = /^\d{4}-W(\d{1,2})$/.exec(weekId);
     return match ? `W${Number(match[1])}` : weekId;
 }
+exports.formatWeekShort = formatWeekShort;
 /**
  * Produce a YYYY-MM-DD string in IST (Asia/Kolkata) for a given timestamp.
  * Must match the format teachers' MarkAttendance.tsx writes:
@@ -71,6 +70,7 @@ function toIsoDate(ts) {
     // en-CA returns YYYY-MM-DD; timeZone option pins to IST.
     return new Date(ts).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 }
+exports.toIsoDate = toIsoDate;
 /**
  * Returns every YYYY-MM-DD string in [start, end] inclusive, in IST.
  * Used to build an `in` query on the attendance.date field — and since
@@ -101,4 +101,5 @@ function isoDatesInRange(start, end) {
         out.push(tail);
     return out;
 }
+exports.isoDatesInRange = isoDatesInRange;
 //# sourceMappingURL=weekUtil.js.map

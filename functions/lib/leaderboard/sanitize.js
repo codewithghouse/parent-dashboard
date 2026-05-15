@@ -12,7 +12,7 @@
 // re-emit canonical lowercase tags ONLY for the whitelist matches. Anything
 // that looks like a tag but isn't whitelisted becomes literal &lt;blah&gt;.
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sanitizeDiagnosisHtml = sanitizeDiagnosisHtml;
+exports.sanitizeDiagnosisHtml = void 0;
 const ALLOWED_TAG = /<\/?(strong|em)\b[^>]*>/gi;
 function escapeHtml(s) {
     return s
@@ -41,4 +41,5 @@ function sanitizeDiagnosisHtml(input) {
     result += escapeHtml(input.slice(last));
     return result;
 }
+exports.sanitizeDiagnosisHtml = sanitizeDiagnosisHtml;
 //# sourceMappingURL=sanitize.js.map

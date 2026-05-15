@@ -1279,3 +1279,10 @@ export const seedSampleData = functions
       throw new functions.https.HttpsError("internal", msg);
     }
   });
+
+// ── Razorpay payment functions (main-website /activate flow) ─────────────────
+export {
+  validateCoupon,
+  createRazorpayOrder,
+  verifyRazorpayPayment,
+} from "./razorpay";

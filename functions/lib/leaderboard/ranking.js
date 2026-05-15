@@ -3,10 +3,7 @@
 // trivially unit-testable and easy to reason about. The ordering decisions
 // here are LOAD-BEARING for fairness and stability of the leaderboard.
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.compareForRanking = compareForRanking;
-exports.buildRanking = buildRanking;
-exports.buildSubjectRankings = buildSubjectRankings;
-exports.updateRankHistory = updateRankHistory;
+exports.updateRankHistory = exports.buildSubjectRankings = exports.buildRanking = exports.compareForRanking = void 0;
 const weekUtil_1 = require("./weekUtil");
 /**
  * Sort comparator. Lower is better (so students[0] is rank #1).
@@ -40,6 +37,7 @@ function compareForRanking(a, b) {
     }
     return a.enrolledAt - b.enrolledAt;
 }
+exports.compareForRanking = compareForRanking;
 /** Avatar palette — recycled deterministically by student index so ranking
  *  re-runs produce stable colours for the same student. */
 const AVATAR_PALETTE = [
@@ -113,6 +111,7 @@ function buildRanking(snapshots, previousRankByStudentId) {
         };
     });
 }
+exports.buildRanking = buildRanking;
 /**
  * Build a per-subject ranking map. For each subject any student in the class
  * has a score in, sort students by that subject's score descending and
@@ -154,6 +153,7 @@ function buildSubjectRankings(snapshots) {
     }
     return out;
 }
+exports.buildSubjectRankings = buildSubjectRankings;
 /**
  * Append the current week's entry to the rolling history, capped at maxWeeks.
  * Preserves chronological order (oldest first). Idempotent: re-running the
@@ -169,4 +169,5 @@ function updateRankHistory(existing, weekId, rank, score, maxWeeks) {
     }
     return filtered;
 }
+exports.updateRankHistory = updateRankHistory;
 //# sourceMappingURL=ranking.js.map
