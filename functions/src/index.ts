@@ -1296,23 +1296,61 @@ exports.cascadeSchoolRename = functions.firestore
       }
     }
 
-    // Also update the owner's branches subcollection if the branch lives
-    // under schools/{ownerUid}/branches/{schoolId}. We don't know the
-    // ownerUid up front — query collection-group for any branch doc whose
-    // id matches the renamed schoolId.
+    // Also update the owner's branches subcollection. Branch docs live at
+    // `schools/{ownerUid}/branches/{branchId}` with `name` field. There are
+    // THREE possible ways to match the renamed schools/{schoolId} top-level
+    // doc against an owner's branch:
+    //
+    //   (a) branchId-on-doc match — `branches/{X}.branchId === schoolId`.
+    //   (b) doc-id match          — `branches/{X}` doc.id === schoolId.
+    //   (c) principal bridge      — find a principal where
+    //       `principal.schoolId === schoolId`, take their `branchId`, then
+    //       update every branch doc whose id OR branchId equals that.
+    //
+    // Cases (a) + (b) cover multi-branch setups. Case (c) covers single-
+    // tenant setups where the principal's schoolId is the OWNER's uid
+    // (not a branchId), so the trigger fires on a top-level schools/{uid}
+    // that has no direct branches-subcollection counterpart.
     try {
       const branchSnap = await db.collectionGroup("branches").get();
-      const matching = branchSnap.docs.filter(d => d.id === schoolId);
-      if (matching.length > 0) {
+      const matchedRefs = new Map<string, FirebaseFirestore.DocumentReference>();
+
+      // (a) + (b)
+      branchSnap.docs.forEach(d => {
+        const data = d.data() as { branchId?: string };
+        if (d.id === schoolId || data.branchId === schoolId) {
+          matchedRefs.set(d.ref.path, d.ref);
+        }
+      });
+
+      // (c) — principal bridge for single-tenant
+      const principalSnap = await db.collection("principals")
+        .where("schoolId", "==", schoolId).get();
+      const bridgeBranchIds = new Set<string>();
+      principalSnap.docs.forEach(d => {
+        const bid = (d.data() as { branchId?: string }).branchId;
+        if (typeof bid === "string" && bid) bridgeBranchIds.add(bid);
+      });
+      if (bridgeBranchIds.size > 0) {
+        branchSnap.docs.forEach(d => {
+          const data = d.data() as { branchId?: string };
+          if (bridgeBranchIds.has(d.id) || (data.branchId && bridgeBranchIds.has(data.branchId))) {
+            matchedRefs.set(d.ref.path, d.ref);
+          }
+        });
+      }
+
+      // Single commit covers all three match strategies (deduped by path).
+      if (matchedRefs.size > 0) {
         const batch = db.batch();
-        matching.forEach(d => {
-          batch.update(d.ref, {
+        matchedRefs.forEach(ref => {
+          batch.update(ref, {
             name: afterName,
             _renameCascadedAt: admin.firestore.FieldValue.serverTimestamp(),
           });
         });
         await batch.commit();
-        total += matching.length;
+        total += matchedRefs.size;
       }
     } catch (err) {
       console.error(`[cascadeSchoolRename] branches subcollection update failed:`, err);
