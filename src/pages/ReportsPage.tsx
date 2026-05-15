@@ -930,11 +930,52 @@ const PapersStrip = ({ papers, palette }: {
       </div>
       <div className="flex flex-col gap-2">
         {papers.map(p => {
-          const score = typeof p.marksScored === "number" ? p.marksScored : 0;
-          const total = typeof p.totalMarks === "number" ? p.totalMarks : 0;
-          const pct = typeof p.percentage === "number" ? p.percentage : (total > 0 ? (score / total) * 100 : 0);
-          const band = bandColor(p.gradeBand);
-          const subject = (p.subject || "").trim() || "Paper";
+          // Prefer the embedded `result` blob (the AI's raw output, source of
+          // truth) over the denormalized top-level fields. The denormalized
+          // fields can land as literal 0 if the writer's `?? 0` triggered on
+          // an undefined AI field while the same field IS populated inside
+          // the result blob — we want the real value, not the lie. Final
+          // fallback sums per-question marks_awarded.
+          const num = (v: any): number | null => {
+            if (v === null || v === undefined) return null;
+            const n = typeof v === "number" ? v : Number(v);
+            return Number.isFinite(n) ? n : null;
+          };
+          // Pick first non-null value (treating 0 as a valid value, but only
+          // returning it once we've checked every richer source first).
+          const firstOf = (...vals: Array<number | null>): number => {
+            for (const v of vals) if (v !== null) return v;
+            return 0;
+          };
+          const qSum = Array.isArray(p.result?.questions)
+            ? p.result.questions.reduce((s: number, q: any) => s + (num(q?.marks_awarded) ?? 0), 0)
+            : null;
+          // Order: AI result blob (richest) → per-question sum → top-level
+          // denorm. Sum is treated as null when zero (likely AI didn't emit
+          // per-question scores), so we don't override a real non-zero
+          // top-level field with a misleading 0.
+          const score = firstOf(
+            num(p.result?.marksScored),
+            num(p.result?.marks_scored),
+            qSum && qSum > 0 ? qSum : null,
+            num(p.marksScored),
+          );
+          const total = firstOf(
+            num(p.result?.totalMarks),
+            num(p.result?.total_marks),
+            num(p.totalMarks),
+          );
+          const pctRaw = firstOf(
+            num(p.result?.percentage),
+            num(p.percentage),
+          );
+          // Always recompute percentage from score/total if both exist —
+          // catches cases where AI returned a percentage that doesn't match
+          // its own marks fields.
+          const pct = total > 0 ? (score / total) * 100 : pctRaw;
+          const band = bandColor(p.gradeBand || p.result?.grade_band);
+          const gradeLabel = (p.gradeBand || p.result?.grade_band || "—").toString();
+          const subject = (p.subject || p.result?.subject || "").toString().trim() || "Paper";
           return (
             <div key={p.id} className="rounded-[14px] p-3 flex items-start gap-3"
               style={{ background: "#F4F7FE", border: "0.5px solid rgba(0,85,255,0.07)" }}>
@@ -949,7 +990,7 @@ const PapersStrip = ({ papers, palette }: {
                   </div>
                   <span className="text-[10px] font-bold px-[8px] py-[2px] rounded-full flex-shrink-0"
                     style={{ background: band.bg, color: band.color, letterSpacing: "0.04em" }}>
-                    {p.gradeBand || "—"}
+                    {gradeLabel}
                   </span>
                 </div>
                 <div className="text-[12px] font-semibold" style={{ color: palette.T3 }}>
