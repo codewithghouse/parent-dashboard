@@ -1093,6 +1093,71 @@ exports.cascadeStudentRename = functions.firestore
     console.log(`[cascadeStudentRename] ${studentId}: "${beforeName}" → "${afterName}" — ${total} docs across ${STUDENT_CASCADE_COLLECTIONS.length} collections`);
     return null;
 });
+// School-name cascade — when a principal updates the school/branch name in
+// Settings, that value lives at `schools/{schoolId}.name`, but every other
+// dashboard (principal header, teacher header, parent header, owner reports)
+// reads a denormalized `schoolName` field stamped on principals / teachers /
+// students / branch subcollection at write/login time. Without this cascade,
+// the principal sees the new name in Settings but everyone else's session
+// stays stale until they re-login. Mirror of cascadeTeacherRename.
+const SCHOOL_CASCADE_COLLECTIONS = [
+    "principals",
+    "teachers",
+    "students",
+    "enrollments",
+    "classes",
+    "teaching_assignments",
+];
+exports.cascadeSchoolRename = functions.firestore
+    .document("schools/{schoolId}")
+    .onUpdate(async (change, context) => {
+    const before = change.before.data();
+    const after = change.after.data();
+    if (!before || !after)
+        return null;
+    const beforeName = String(before.name || "").trim();
+    const afterName = String(after.name || "").trim();
+    if (beforeName === afterName)
+        return null;
+    if (!afterName)
+        return null;
+    const schoolId = context.params.schoolId;
+    const db = admin.firestore();
+    let total = 0;
+    for (const coll of SCHOOL_CASCADE_COLLECTIONS) {
+        try {
+            const n = await cascadeFieldToCollection(db, coll, "schoolId", schoolId, "schoolName", afterName);
+            total += n;
+        }
+        catch (err) {
+            console.error(`[cascadeSchoolRename] ${coll} failed for schoolId=${schoolId}:`, err);
+        }
+    }
+    // Also update the owner's branches subcollection if the branch lives
+    // under schools/{ownerUid}/branches/{schoolId}. We don't know the
+    // ownerUid up front — query collection-group for any branch doc whose
+    // id matches the renamed schoolId.
+    try {
+        const branchSnap = await db.collectionGroup("branches").get();
+        const matching = branchSnap.docs.filter(d => d.id === schoolId);
+        if (matching.length > 0) {
+            const batch = db.batch();
+            matching.forEach(d => {
+                batch.update(d.ref, {
+                    name: afterName,
+                    _renameCascadedAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+            });
+            await batch.commit();
+            total += matching.length;
+        }
+    }
+    catch (err) {
+        console.error(`[cascadeSchoolRename] branches subcollection update failed:`, err);
+    }
+    console.log(`[cascadeSchoolRename] ${schoolId}: "${beforeName}" → "${afterName}" — ${total} docs cascaded`);
+    return null;
+});
 // 5️⃣  Seed realistic sample data into source collections (testing helper)
 exports.seedSampleData = functions
     .region(constants_1.REGION)
