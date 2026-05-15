@@ -480,6 +480,15 @@ Return JSON: { emoji: "one emoji", overall: "short encouraging sentence", streng
             // Required by tenant-isolation rule — guaranteed non-empty because
             // handleOfficialSubmission() bails out early without schoolId.
             schoolId: studentData.schoolId,
+            // classId stamp — teacher-dashboard Gradebook's count chip
+            // filters submissions by classId. Without these fields the chip
+            // showed "0 of Y graded" even when submissions existed and were
+            // graded. Pull classId from the assignment doc the student is
+            // submitting against (it was joined into selectedTask on the
+            // assignments listener).
+            classId: (selectedTask as { classId?: string }).classId || studentData.classId || "",
+            className: (selectedTask as { className?: string }).className || studentData.className || "",
+            branchId: studentData.branchId || "",
             fileUrl: url,
             fileName: uploadFile.name,
             studentNote: studentNote,
