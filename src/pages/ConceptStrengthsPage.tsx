@@ -102,6 +102,8 @@ const ConceptStrengthsPage = () => {
   const [allScores, setAllScores] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
+  const [aiAttempts, setAiAttempts] = useState<any[]>([]);
+  const [submissions, setSubmissions] = useState<any[]>([]);
   const [aiAnalysis, setAiAnalysis] = useState<any>(null);
   const [activeSubject, setActiveSubject] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -201,7 +203,19 @@ const ConceptStrengthsPage = () => {
     const u7 = onSnapshot(query(collection(db, "attendance"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id)), snap => { a1 = snap; processAtt(); }, onListenerError("attendance (by id)"));
     const u8 = studentEmail ? onSnapshot(query(collection(db, "attendance"), where("schoolId", "==", schoolId), where("studentEmail", "==", studentEmail)), snap => { a2 = snap; processAtt(); }, onListenerError("attendance (by email)")) : () => {};
 
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); if (assignUnsub) assignUnsub(); };
+    // AI Practice attempts — dual-key (matches PerformancePage AI Practice card).
+    let ai1: any = null, ai2: any = null;
+    const processAi = () => setAiAttempts(Array.from(new Map([...(ai1?.docs || []), ...(ai2?.docs || [])].map(d => [d.id, { id: d.id, ...d.data() as any }])).values()));
+    const u9 = onSnapshot(query(collection(db, "practice_attempts"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id)), snap => { ai1 = snap; processAi(); }, onListenerError("practice_attempts (by id)"));
+    const u10 = studentEmail ? onSnapshot(query(collection(db, "practice_attempts"), where("schoolId", "==", schoolId), where("studentEmail", "==", studentEmail)), snap => { ai2 = snap; processAi(); }, onListenerError("practice_attempts (by email)")) : () => {};
+
+    // Submissions — needed to classify assignments by completion timing.
+    let sub1: any = null, sub2: any = null;
+    const processSubs = () => setSubmissions(Array.from(new Map([...(sub1?.docs || []), ...(sub2?.docs || [])].map(d => [d.id, { id: d.id, ...d.data() as any }])).values()));
+    const u11 = onSnapshot(query(collection(db, "submissions"), where("schoolId", "==", schoolId), where("studentId", "==", studentData.id)), snap => { sub1 = snap; processSubs(); }, onListenerError("submissions (by id)"));
+    const u12 = studentEmail ? onSnapshot(query(collection(db, "submissions"), where("schoolId", "==", schoolId), where("studentEmail", "==", studentEmail)), snap => { sub2 = snap; processSubs(); }, onListenerError("submissions (by email)")) : () => {};
+
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); u12(); if (assignUnsub) assignUnsub(); };
   }, [studentData?.id, studentData?.schoolId]);
 
   useEffect(() => {
@@ -221,23 +235,94 @@ const ConceptStrengthsPage = () => {
   // ── Derived data ──────────────────────────────────────────────────────────
   const studentName = studentData?.name?.split(" ")[0] || "Student";
 
+  // Each item carries a `source` so the UI can show a type pill ("Test" /
+  // "AI Practice" / "Assignment") alongside the title — parent can tell at a
+  // glance whether a strong/weak signal came from a graded test, self-study
+  // practice, or a homework submission.
+  type MasteryItem = { title: string; pct: number; source: "Test" | "AI Practice" | "Assignment" };
+
   const getLocalMasteryData = () => {
-    const subjectScores = allScores.filter(s => {
+    const subjectMatches = (sub: string) => {
       if (!activeSubject) return true;
-      const sub = (s.subject || s.className || "General").toLowerCase();
-      const active = activeSubject.toLowerCase();
-      return sub === active || sub.includes(active) || active.includes(sub) || sub === "general";
-    });
-    const strong: { title: string; pct: number }[] = [];
-    const developing: { title: string; pct: number }[] = [];
-    const attention: { title: string; pct: number }[] = [];
-    subjectScores.forEach(s => {
-      const pct = s.percentage ?? (s.maxScore ? (s.score / s.maxScore * 100) : 0);
-      const item = { title: s.testName || s.title || "Assessment", pct: Math.round(pct) };
+      const s = sub.toLowerCase();
+      const a = activeSubject.toLowerCase();
+      return s === a || s.includes(a) || a.includes(s) || s === "general";
+    };
+
+    const strong: MasteryItem[] = [];
+    const developing: MasteryItem[] = [];
+    const attention: MasteryItem[] = [];
+
+    const bucket = (pct: number, item: MasteryItem) => {
       if (pct >= 85) strong.push(item);
       else if (pct >= 70) developing.push(item);
       else attention.push(item);
+    };
+
+    // ── 1. Tests + gradebook scores (already in allScores, original logic) ──
+    allScores
+      .filter(s => subjectMatches(s.subject || s.className || "General"))
+      .forEach(s => {
+        const pct = s.percentage ?? (s.maxScore ? (s.score / s.maxScore * 100) : 0);
+        bucket(pct, {
+          title: s.testName || s.title || "Assessment",
+          pct: Math.round(pct),
+          source: "Test",
+        });
+      });
+
+    // ── 2. AI Practice attempts — each attempt's percentage as its own item ──
+    aiAttempts
+      .filter(a => {
+        const subj = (a.topic || a.examTitle || "General").toLowerCase();
+        return subjectMatches(subj);
+      })
+      .forEach(a => {
+        const pct = typeof a.percentage === "number" ? a.percentage : 0;
+        bucket(pct, {
+          title: a.examTitle || a.topic || "AI Practice",
+          pct: Math.round(pct),
+          source: "AI Practice",
+        });
+      });
+
+    // ── 3. Assignments — derive a completion score from submission timing.
+    //    Submitted on time → 100 (Strong)
+    //    Submitted late    → 65  (Developing)
+    //    Overdue + missing → 30  (Needs Work)
+    //    Still pending     → skip (not yet a signal)
+    const subById = new Map<string, any>();
+    submissions.forEach(s => {
+      const key = s.homeworkId || s.assignmentId;
+      if (key) subById.set(key, s);
     });
+    const now = Date.now();
+    assignments
+      .filter(a => {
+        const subj = (a.subject || a.classSubject || a.className || "General").toLowerCase();
+        return subjectMatches(subj);
+      })
+      .forEach(a => {
+        const title = a.title || "Assignment";
+        const sub = subById.get(a.id);
+        const dueMs = a.dueDate?.toDate?.()?.getTime?.() ?? (a.dueDate ? new Date(a.dueDate).getTime() : null);
+        if (sub) {
+          const submittedMs = sub.submittedAt?.toDate?.()?.getTime?.() ?? (sub.submittedAt ? new Date(sub.submittedAt).getTime() : null);
+          const onTime = dueMs && submittedMs ? submittedMs <= dueMs + 24 * 3600 * 1000 : true;
+          const pct = onTime ? 100 : 65;
+          bucket(pct, { title, pct, source: "Assignment" });
+        } else if (dueMs && dueMs < now) {
+          // Overdue + not submitted
+          bucket(30, { title, pct: 30, source: "Assignment" });
+        }
+        // else: still pending → don't add to any tier yet
+      });
+
+    // Sort within each tier: highest pct first for strong/developing, lowest first for attention.
+    strong.sort((a, b) => b.pct - a.pct);
+    developing.sort((a, b) => b.pct - a.pct);
+    attention.sort((a, b) => a.pct - b.pct);
+
     return { strong, developing, attention };
   };
 
@@ -526,8 +611,20 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
                 </div>
                 {currentData.strong.slice(0, 5).map((item, i, arr) => (
                   <div key={i} className={i < arr.length - 1 ? "mb-3" : ""}>
-                    <div className="flex items-center justify-between mb-[6px]">
-                      <span className="text-[12px] font-bold" style={{ color: T2, letterSpacing: "-0.1px" }}>{item.title}</span>
+                    <div className="flex items-center justify-between gap-2 mb-[6px]">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <span className="text-[12px] font-bold truncate" style={{ color: T2, letterSpacing: "-0.1px" }}>{item.title}</span>
+                        {(item as any).source && (
+                          <span className="shrink-0 text-[9px] font-bold px-[6px] py-[2px] rounded-full uppercase tracking-[0.06em]"
+                            style={{
+                              background: (item as any).source === "AI Practice" ? "rgba(109,40,217,0.10)" : (item as any).source === "Assignment" ? "rgba(0,85,255,0.10)" : "rgba(0,200,83,0.10)",
+                              color: (item as any).source === "AI Practice" ? "#6D28D9" : (item as any).source === "Assignment" ? "#0055FF" : "#007830",
+                              border: `0.5px solid ${(item as any).source === "AI Practice" ? "rgba(109,40,217,0.25)" : (item as any).source === "Assignment" ? "rgba(0,85,255,0.25)" : "rgba(0,200,83,0.25)"}`,
+                            }}>
+                            {(item as any).source === "AI Practice" ? "AI" : (item as any).source === "Assignment" ? "HW" : "Test"}
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[13px] font-bold" style={{ color: GREEN2 }}>{item.pct}%</span>
                     </div>
                     <div className="h-[7px] rounded-[4px] overflow-hidden" style={{ background: BG2 }}>
@@ -559,8 +656,20 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
                 </div>
                 {currentData.developing.slice(0, 5).map((item, i, arr) => (
                   <div key={i} className={i < arr.length - 1 ? "mb-3" : ""}>
-                    <div className="flex items-center justify-between mb-[6px]">
-                      <span className="text-[12px] font-bold" style={{ color: T2, letterSpacing: "-0.1px" }}>{item.title}</span>
+                    <div className="flex items-center justify-between gap-2 mb-[6px]">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <span className="text-[12px] font-bold truncate" style={{ color: T2, letterSpacing: "-0.1px" }}>{item.title}</span>
+                        {(item as any).source && (
+                          <span className="shrink-0 text-[9px] font-bold px-[6px] py-[2px] rounded-full uppercase tracking-[0.06em]"
+                            style={{
+                              background: (item as any).source === "AI Practice" ? "rgba(109,40,217,0.10)" : (item as any).source === "Assignment" ? "rgba(0,85,255,0.10)" : "rgba(0,200,83,0.10)",
+                              color: (item as any).source === "AI Practice" ? "#6D28D9" : (item as any).source === "Assignment" ? "#0055FF" : "#007830",
+                              border: `0.5px solid ${(item as any).source === "AI Practice" ? "rgba(109,40,217,0.25)" : (item as any).source === "Assignment" ? "rgba(0,85,255,0.25)" : "rgba(0,200,83,0.25)"}`,
+                            }}>
+                            {(item as any).source === "AI Practice" ? "AI" : (item as any).source === "Assignment" ? "HW" : "Test"}
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[13px] font-bold" style={{ color: ORANGE }}>{item.pct}%</span>
                     </div>
                     <div className="h-[7px] rounded-[4px] overflow-hidden" style={{ background: BG2 }}>
@@ -592,8 +701,20 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
                 </div>
                 {currentData.attention.slice(0, 5).map((item, i, arr) => (
                   <div key={i} className={i < arr.length - 1 ? "mb-3" : ""}>
-                    <div className="flex items-center justify-between mb-[6px]">
-                      <span className="text-[12px] font-bold" style={{ color: T2, letterSpacing: "-0.1px" }}>{item.title}</span>
+                    <div className="flex items-center justify-between gap-2 mb-[6px]">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <span className="text-[12px] font-bold truncate" style={{ color: T2, letterSpacing: "-0.1px" }}>{item.title}</span>
+                        {(item as any).source && (
+                          <span className="shrink-0 text-[9px] font-bold px-[6px] py-[2px] rounded-full uppercase tracking-[0.06em]"
+                            style={{
+                              background: (item as any).source === "AI Practice" ? "rgba(109,40,217,0.10)" : (item as any).source === "Assignment" ? "rgba(0,85,255,0.10)" : "rgba(0,200,83,0.10)",
+                              color: (item as any).source === "AI Practice" ? "#6D28D9" : (item as any).source === "Assignment" ? "#0055FF" : "#007830",
+                              border: `0.5px solid ${(item as any).source === "AI Practice" ? "rgba(109,40,217,0.25)" : (item as any).source === "Assignment" ? "rgba(0,85,255,0.25)" : "rgba(0,200,83,0.25)"}`,
+                            }}>
+                            {(item as any).source === "AI Practice" ? "AI" : (item as any).source === "Assignment" ? "HW" : "Test"}
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[13px] font-bold" style={{ color: RED }}>{item.pct}%</span>
                     </div>
                     <div className="h-[7px] rounded-[4px] overflow-hidden" style={{ background: BG2 }}>
@@ -1191,11 +1312,23 @@ Return JSON: { hints: ["hint1 (gentle nudge)", "hint2", "hint3", "hint4", "hint5
                   <div className="space-y-3 relative z-10">
                     {items.length === 0 ? (
                       <p className="text-[12px] py-5 text-center" style={{ color: T4 }}>No data yet</p>
-                    ) : items.slice(0, 5).map((c, i) => (
+                    ) : items.slice(0, 5).map((c: any, i) => (
                       <div key={i}>
-                        <div className="flex items-center justify-between mb-[6px]">
-                          <span className="text-[12px] font-bold truncate pr-2" style={{ color: T2 }}>{c.title}</span>
-                          <span className="text-[13px] font-bold" style={{ color: color2 }}>{c.pct}%</span>
+                        <div className="flex items-center justify-between gap-2 mb-[6px]">
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                            <span className="text-[12px] font-bold truncate" style={{ color: T2 }}>{c.title}</span>
+                            {c.source && (
+                              <span className="shrink-0 text-[9px] font-bold px-[6px] py-[2px] rounded-full uppercase tracking-[0.06em]"
+                                style={{
+                                  background: c.source === "AI Practice" ? "rgba(109,40,217,0.10)" : c.source === "Assignment" ? "rgba(0,85,255,0.10)" : "rgba(0,200,83,0.10)",
+                                  color: c.source === "AI Practice" ? "#6D28D9" : c.source === "Assignment" ? "#0055FF" : "#007830",
+                                  border: `0.5px solid ${c.source === "AI Practice" ? "rgba(109,40,217,0.25)" : c.source === "Assignment" ? "rgba(0,85,255,0.25)" : "rgba(0,200,83,0.25)"}`,
+                                }}>
+                                {c.source === "AI Practice" ? "AI" : c.source === "Assignment" ? "HW" : "Test"}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[13px] font-bold shrink-0" style={{ color: color2 }}>{c.pct}%</span>
                         </div>
                         <div className="h-[7px] rounded-[4px] overflow-hidden" style={{ background: BG2 }}>
                           <div className="h-full rounded-[4px]" style={{ width: `${c.pct}%`, background: bar, transition: "width 1s cubic-bezier(0.4,0,0.2,1)" }} />
