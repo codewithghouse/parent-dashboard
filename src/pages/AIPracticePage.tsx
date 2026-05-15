@@ -412,7 +412,7 @@ const AIPracticePage = () => {
      MOBILE — Blue Premium UI (HOME view)
      ═══════════════════════════════════════════════════════════════ */
   if (view === "home" && isMobile) {
-    // Blue theme tokens matching EduIntellect mobile design
+    // Blue theme tokens matching Edullent mobile design
     const B1 = "#0055FF", B2 = "#1166FF";
     const BG = "#EEF4FF", BG2 = "#E0ECFF", CARD = "#FFFFFF";
     const T1 = "#001040", T3 = "#5070B0", T4 = "#99AACC";
@@ -440,7 +440,7 @@ const AIPracticePage = () => {
         <div className="flex items-center justify-between px-5 pt-3">
           <div className="flex items-center gap-[7px]">
             <div className="w-[7px] h-[7px] rounded-full animate-pulse" style={{ background: "#00CC55", boxShadow: "0 0 0 2.5px rgba(0,204,85,0.2)" }} />
-            <span className="text-[15px] font-bold" style={{ color: B1 }}>EduIntellect</span>
+            <span className="text-[15px] font-bold" style={{ color: B1 }}>Edullent</span>
           </div>
           <div className="flex items-center gap-[9px]">
             <div className="w-[34px] h-[34px] rounded-full flex items-center justify-center relative"

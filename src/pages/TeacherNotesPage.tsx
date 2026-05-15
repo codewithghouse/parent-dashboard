@@ -9,13 +9,25 @@ import { db } from "../lib/firebase";
 import { scopedQuery } from "../lib/scopedQuery";
 import { subscribePerStudent } from "../lib/perStudentQuery";
 import {
-  collection, where, onSnapshot, addDoc, serverTimestamp, getDocs,
+  collection, where, onSnapshot, addDoc, serverTimestamp,
   updateDoc, doc
 } from "firebase/firestore";
 import { useAuth } from "../lib/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import { useLocation } from "react-router-dom";
+
+// Robust ms resolver — accepts Firestore Timestamp, Date, ISO string, epoch ms.
+// Returns 0 when missing so sorts don't crash on legacy / pending writes.
+const toMs = (ts: any): number => {
+  if (!ts) return 0;
+  if (typeof ts === "number") return ts;
+  if (typeof ts === "string") { const d = Date.parse(ts); return Number.isFinite(d) ? d : 0; }
+  if (typeof ts?.toMillis === "function") return ts.toMillis();
+  if (typeof ts?.toDate === "function") { try { return ts.toDate().getTime(); } catch { return 0; } }
+  if (ts instanceof Date) return ts.getTime();
+  return 0;
+};
 
 const TeacherNotesPage = () => {
   const { studentData } = useAuth();
@@ -50,7 +62,7 @@ const TeacherNotesPage = () => {
       onChange: (docs) => {
         const data = docs
           .map((d) => ({ id: d.id, ...d.data() }))
-          .sort((a: any, b: any) => (a.createdAt?.toMillis?.() || 0) - (b.createdAt?.toMillis?.() || 0));
+          .sort((a: any, b: any) => toMs(a.createdAt) - toMs(b.createdAt));
         setAllNotes(data);
         setLoading(false);
       },
@@ -63,39 +75,124 @@ const TeacherNotesPage = () => {
     return () => u1();
   }, [studentData?.id, studentData?.schoolId, studentData?.email]);
 
-  // Fetch available teachers for "New Message"
+  // Subscribe to ALL teachers of this student's class for "New Message".
+  // Union pattern (same as teacher-dashboard class pickers — see
+  // bug_pattern_teacher_class_pickers_single_source):
+  //   1. teaching_assignments where classId == student.classId → subject teachers
+  //   2. classes/{classId}.teacherId → legacy primary class teacher
+  // Union both id sources, then fetch teacher docs in 10-chunks (Firestore
+  // `in` cap). Realtime so principal additions appear without a refresh.
   useEffect(() => {
-    if (!studentData?.classId) return;
+    if (!studentData?.classId || !studentData?.schoolId) return;
     const schoolId = studentData.schoolId;
-    const fetchTeachers = async () => {
-      try {
-        const taQ = scopedQuery("teaching_assignments", schoolId, where("classId", "==", studentData.classId));
-        const snap = await getDocs(taQ);
-        const ids  = snap.docs.map(d => d.data().teacherId).filter(Boolean);
-        if (!ids.length) return;
-        const tQ = scopedQuery("teachers", schoolId, where("__name__", "in", ids.slice(0, 10)));
-        const tSnap = await getDocs(tQ);
-        setAvailableTeachers(tSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      } catch (err) {
-        // Don't silently hide a permission-denied — support needs the signal
-        // to debug "New Message" button showing an empty teachers list.
-        console.error("[TeacherNotes] available-teachers fetch error:", err);
-      }
+    const classId  = studentData.classId;
+
+    let assignedIds: string[] = [];   // from teaching_assignments
+    let primaryId:   string | null = null; // from classes.teacherId
+    let currentIds:  string[] = [];
+
+    const teacherSubs: Array<() => void> = [];
+    const teacherMap = new Map<string, any>();
+
+    const subscribeToTeachers = (ids: string[]) => {
+      teacherSubs.forEach(u => u());
+      teacherSubs.length = 0;
+      teacherMap.clear();
+      if (!ids.length) { setAvailableTeachers([]); return; }
+
+      // Firestore `in` allows max 10 values per query — chunk to defeat the cap.
+      const chunks: string[][] = [];
+      for (let i = 0; i < ids.length; i += 10) chunks.push(ids.slice(i, i + 10));
+
+      chunks.forEach(chunk => {
+        const tQ = scopedQuery("teachers", schoolId, where("__name__", "in", chunk));
+        const u = onSnapshot(
+          tQ,
+          (tSnap) => {
+            // Remove this chunk's stale entries, then re-insert fresh.
+            chunk.forEach(id => teacherMap.delete(id));
+            tSnap.docs.forEach(d => teacherMap.set(d.id, { id: d.id, ...d.data() }));
+            setAvailableTeachers(Array.from(teacherMap.values()));
+          },
+          (err) => console.error("[TeacherNotes] teachers chunk error:", err),
+        );
+        teacherSubs.push(u);
+      });
     };
-    fetchTeachers();
+
+    const recompute = () => {
+      const merged = new Set<string>(assignedIds);
+      if (primaryId) merged.add(primaryId);
+      const next = Array.from(merged);
+      // Only re-subscribe when the id set actually changes — avoids churn on
+      // unrelated field edits.
+      const same = next.length === currentIds.length && next.every(id => currentIds.includes(id));
+      if (!same) { currentIds = next; subscribeToTeachers(next); }
+    };
+
+    // 1. teaching_assignments — subject teachers for this class
+    const taQ = scopedQuery("teaching_assignments", schoolId, where("classId", "==", classId));
+    const uTa = onSnapshot(
+      taQ,
+      (snap) => {
+        assignedIds = Array.from(new Set(snap.docs.map(d => d.data().teacherId).filter(Boolean))) as string[];
+        recompute();
+      },
+      (err) => console.error("[TeacherNotes] teaching_assignments error:", err),
+    );
+
+    // 2. classes/{classId} — legacy primary class teacher (denormalized field).
+    //    Used in tandem with teaching_assignments to ensure freshly assigned
+    //    primary teachers (who may not have a teaching_assignments row) show up.
+    const uClass = onSnapshot(
+      doc(db, "classes", classId),
+      (snap) => {
+        const tid = (snap.data() as any)?.teacherId;
+        primaryId = typeof tid === "string" && tid ? tid : null;
+        recompute();
+      },
+      (err) => console.error("[TeacherNotes] class doc error:", err),
+    );
+
+    return () => {
+      uTa();
+      uClass();
+      teacherSubs.forEach(u => u());
+      teacherSubs.length = 0;
+      teacherMap.clear();
+    };
   }, [studentData?.classId, studentData?.schoolId]);
 
-  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [allNotes, selectedTeacher]);
+  // Autoscroll only when the OPEN conversation grows or the parent switches
+  // conversations. Previously fired on every `allNotes` change → side-chat
+  // traffic yanked the view while the parent was reading another thread.
+  const openChatLen = useMemo(
+    () => selectedTeacher ? allNotes.filter(n => n.teacherId === selectedTeacher.teacherId).length : 0,
+    [allNotes, selectedTeacher],
+  );
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [openChatLen, selectedTeacher?.teacherId]);
 
-  // Mark unread teacher messages as read when conversation is opened
+  // Mark unread teacher messages as read. Depend on `allNotes` so incoming
+  // messages also get marked while the conversation is open; track already-
+  // marked ids to avoid re-firing updateDoc on every snapshot.
+  const markedReadRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!selectedTeacher) return;
     allNotes.forEach(n => {
-      if (n.teacherId === selectedTeacher.teacherId && n.from === "teacher" && n.read !== true) {
-        updateDoc(doc(db, "parent_notes", n.id), { read: true }).catch(() => {});
+      if (
+        n.teacherId === selectedTeacher.teacherId &&
+        n.from === "teacher" &&
+        n.read !== true &&
+        !markedReadRef.current.has(n.id)
+      ) {
+        markedReadRef.current.add(n.id);
+        updateDoc(doc(db, "parent_notes", n.id), { read: true }).catch(err => {
+          markedReadRef.current.delete(n.id);
+          console.error("[TeacherNotes] mark-as-read failed:", err?.code, err?.message || err);
+        });
       }
     });
-  }, [selectedTeacher?.teacherId]);
+  }, [selectedTeacher?.teacherId, allNotes]);
 
   // Build teacher conversation list
   const teacherConversations = useMemo(() => {
@@ -112,7 +209,7 @@ const TeacherNotesPage = () => {
     });
     return Array.from(map.values())
       .filter(t => t.teacherName.toLowerCase().includes(searchQuery.toLowerCase()))
-      .sort((a, b) => (b.lastMessage.createdAt?.toMillis?.() || 0) - (a.lastMessage.createdAt?.toMillis?.() || 0));
+      .sort((a, b) => toMs(b.lastMessage?.createdAt) - toMs(a.lastMessage?.createdAt));
   }, [allNotes, searchQuery]);
 
   // Auto-select teacher from navigation state
@@ -148,6 +245,13 @@ const TeacherNotesPage = () => {
     const content = messageContent.trim();
     if (!studentData?.schoolId) {
       toast.error("Cannot send: missing school context. Please re-login.");
+      return;
+    }
+    // Refuse to persist orphaned writes when both student identifiers are empty
+    // — without either key, the teacher dashboard's dual-query reader can't
+    // match the note back to a student, so it becomes invisible.
+    if (!studentData.id && !studentData.email) {
+      toast.error("We couldn't identify your student record. Please sign in again.");
       return;
     }
     setMessageContent("");
@@ -203,11 +307,18 @@ const TeacherNotesPage = () => {
     finally { setIsSubmittingReview(false); }
   };
 
-  const fmtTime = (ts: any) =>
-    new Date(ts?.toDate?.() || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  // fmt helpers return "" when the timestamp is missing — never lie as "Today"
+  // / current-time. A pending serverTimestamp or a corrupt legacy doc must
+  // render blank, not fabricate a stamp that looks live.
+  const fmtTime = (ts: any) => {
+    const ms = toMs(ts);
+    return ms ? new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+  };
 
   const fmtDate = (ts: any) => {
-    const d     = ts?.toDate?.() || new Date();
+    const ms = toMs(ts);
+    if (!ms) return "";
+    const d     = new Date(ms);
     const today = new Date();
     if (d.toDateString() === today.toDateString()) return "Today";
     const y = new Date(today); y.setDate(today.getDate() - 1);
@@ -218,7 +329,9 @@ const TeacherNotesPage = () => {
   const groupedMessages = useMemo(() => {
     const groups: { date: string; messages: any[] }[] = [];
     chatMessages.forEach(msg => {
-      const label = fmtDate(msg.createdAt);
+      // Bucket undated messages under "Sending…" so they're visibly distinct
+      // from a real "Today" group and don't silently merge with it.
+      const label = fmtDate(msg.createdAt) || "Sending…";
       const last  = groups[groups.length - 1];
       if (last && last.date === label) last.messages.push(msg);
       else groups.push({ date: label, messages: [msg] });
@@ -558,7 +671,7 @@ const TeacherNotesPage = () => {
 
           {/* Section label */}
           <div className="px-5 pt-2 pb-1 text-[13px] font-medium" style={{ color: B1 }}>
-            Contacts on EduIntellect
+            Contacts on Edullent
           </div>
 
           {/* Teacher list — flat */}

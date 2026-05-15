@@ -1,13 +1,23 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Loader2, Send, CheckCheck, School, Mail, MessageSquare, Smile, Shield, ChevronLeft } from "lucide-react";
 import { db } from "../lib/firebase";
-import { scopedQuery } from "../lib/scopedQuery";
 import { subscribePerStudent } from "../lib/perStudentQuery";
-import { collection, where, onSnapshot, addDoc, serverTimestamp, updateDoc, doc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, updateDoc, doc } from "firebase/firestore";
 import { useAuth } from "../lib/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+
+// Robust ms resolver — accepts Firestore Timestamp, Date, ISO string, epoch ms.
+const toMs = (ts: any): number => {
+  if (!ts) return 0;
+  if (typeof ts === "number") return ts;
+  if (typeof ts === "string") { const d = Date.parse(ts); return Number.isFinite(d) ? d : 0; }
+  if (typeof ts?.toMillis === "function") return ts.toMillis();
+  if (typeof ts?.toDate === "function") { try { return ts.toDate().getTime(); } catch { return 0; } }
+  if (ts instanceof Date) return ts.getTime();
+  return 0;
+};
 
 const PrincipalNotesPage = () => {
   const { studentData } = useAuth();
@@ -18,6 +28,10 @@ const PrincipalNotesPage = () => {
   const [messageContent, setMessageContent] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // Track docs we've already marked-read so the snapshot callback doesn't fire
+  // a redundant updateDoc on every listener tick.
+  const markedReadRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     if (!studentData?.id) return;
     setLoading(true);
@@ -25,16 +39,21 @@ const PrincipalNotesPage = () => {
     const unsub = subscribePerStudent({
       collection: "principal_to_parent_notes",
       student: studentData,
-      onChange: async (docs) => {
+      onChange: (docs) => {
         const data = docs.map(d => ({ id: d.id, ...d.data() })) as any[];
-        data.sort((a, b) => (a.timestamp?.toMillis?.() || 0) - (b.timestamp?.toMillis?.() || 0));
+        data.sort((a, b) => toMs(a.timestamp) - toMs(b.timestamp));
         setAllMessages(data);
         setLoading(false);
-        // mark unread principal messages as read
+        // Mark unread principal messages as read once each. Logging the error
+        // (not silently swallowing) preserves the support signal.
         for (const d of docs) {
           const dd = d.data();
-          if (dd.read === false && dd.from === "principal") {
-            try { await updateDoc(doc(db, "principal_to_parent_notes", d.id), { read: true }); } catch { /* silent */ }
+          if (dd.read === false && dd.from === "principal" && !markedReadRef.current.has(d.id)) {
+            markedReadRef.current.add(d.id);
+            updateDoc(doc(db, "principal_to_parent_notes", d.id), { read: true }).catch(err => {
+              markedReadRef.current.delete(d.id);
+              console.error("[PrincipalNotes] mark-as-read failed:", err?.code, err?.message || err);
+            });
           }
         }
       },
@@ -42,12 +61,25 @@ const PrincipalNotesPage = () => {
     return () => unsub();
   }, [studentData?.id, studentData?.schoolId, studentData?.email]);
 
-  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [allMessages]);
+  // Autoscroll only when message count changes, not on field-level updates
+  // (e.g., a read-receipt write that re-fires the listener).
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [allMessages.length]);
 
   const stats = useMemo(() => ({
     total:  allMessages.length,
     unread: allMessages.filter(m => m.read === false && m.from === "principal").length,
   }), [allMessages]);
+
+  // Latest principal-authored message — defines the current "to" address for
+  // replies. Picking allMessages[0] (first chronologically) misroutes parent
+  // replies to a previous principal after a handover.
+  const latestPrincipalMsg = useMemo(() => {
+    for (let i = allMessages.length - 1; i >= 0; i--) {
+      const m = allMessages[i];
+      if (m?.from === "principal" && m?.principalId) return m;
+    }
+    return null;
+  }, [allMessages]);
 
   const handleSend = async () => {
     if (!messageContent.trim()) return;
@@ -64,16 +96,17 @@ const PrincipalNotesPage = () => {
     // to address. The server rule accepts the write but the note becomes
     // unaddressable (principal's inbox query filters by principalId). Surface
     // this explicitly instead of creating orphaned records.
-    const principalId = allMessages[0]?.principalId;
-    if (!principalId) {
+    if (!latestPrincipalMsg) {
       toast.error("No principal is assigned to your school yet. Please check back later.");
       return;
     }
+    const principalId   = latestPrincipalMsg.principalId;
+    const principalName = latestPrincipalMsg.principalName || "Principal";
     setMessageContent("");
     try {
       await addDoc(collection(db, "principal_to_parent_notes"), {
         principalId,
-        principalName: allMessages[0]?.principalName || "Principal",
+        principalName,
         studentId:     studentData.id,
         studentName:   studentData.name || "",
         parentName:    `Parent of ${studentData.name || "Student"}`,
@@ -97,11 +130,17 @@ const PrincipalNotesPage = () => {
     }
   };
 
-  const fmtTime = (ts: any) =>
-    new Date(ts?.toDate?.() || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  // fmt helpers return "" when the timestamp is missing — never lie as "Today"
+  // / current-time. A pending serverTimestamp must render blank, not fabricate.
+  const fmtTime = (ts: any) => {
+    const ms = toMs(ts);
+    return ms ? new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+  };
 
   const fmtDate = (ts: any) => {
-    const d = ts?.toDate?.() || new Date();
+    const ms = toMs(ts);
+    if (!ms) return "";
+    const d = new Date(ms);
     const today = new Date();
     if (d.toDateString() === today.toDateString()) return "Today";
     const y = new Date(today); y.setDate(today.getDate() - 1);
@@ -112,7 +151,9 @@ const PrincipalNotesPage = () => {
   const groupedMessages = useMemo(() => {
     const groups: { date: string; messages: any[] }[] = [];
     allMessages.forEach(msg => {
-      const label = fmtDate(msg.timestamp);
+      // Bucket undated messages under "Sending…" so they're visibly distinct
+      // from a real "Today" group.
+      const label = fmtDate(msg.timestamp) || "Sending…";
       const last  = groups[groups.length - 1];
       if (last && last.date === label) last.messages.push(msg);
       else groups.push({ date: label, messages: [msg] });
@@ -120,7 +161,10 @@ const PrincipalNotesPage = () => {
     return groups;
   }, [allMessages]);
 
-  const principalName = allMessages[0]?.principalName || "Principal";
+  // Header shows the CURRENT principal (latest principal-authored message),
+  // not the first one ever — survives a principal handover gracefully.
+  const principalName = latestPrincipalMsg?.principalName || "Principal";
+  const canReply      = !!latestPrincipalMsg;
 
   // ═══════════════════════════════════════════════════════════════
   // MOBILE — WhatsApp UI (Principal Chat — full bleed)
@@ -235,8 +279,9 @@ const PrincipalNotesPage = () => {
 
         {/* WA reply bar */}
         <div className="px-2 py-[7px] flex items-end gap-[6px] shrink-0" style={{ background: WA_HEADER_BG }}>
-          <div className="flex-1 flex items-center gap-1 px-3 py-[8px] rounded-[24px] bg-white">
-            <button className="w-7 h-7 flex items-center justify-center active:scale-90 shrink-0" aria-label="Emoji">
+          <div className="flex-1 flex items-center gap-1 px-3 py-[8px] rounded-[24px] bg-white"
+            style={{ opacity: canReply ? 1 : 0.6 }}>
+            <button className="w-7 h-7 flex items-center justify-center active:scale-90 shrink-0" aria-label="Emoji" disabled={!canReply}>
               <Smile className="w-[22px] h-[22px]" style={{ color: WA_T3 }} strokeWidth={1.8} />
             </button>
             <input
@@ -244,12 +289,13 @@ const PrincipalNotesPage = () => {
               value={messageContent}
               onChange={e => setMessageContent(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-              placeholder="Reply to principal"
-              className="flex-1 min-w-0 px-2 text-[15px] outline-none bg-transparent"
+              placeholder={canReply ? "Reply to principal" : "Waiting for first principal message"}
+              disabled={!canReply}
+              className="flex-1 min-w-0 px-2 text-[15px] outline-none bg-transparent disabled:cursor-not-allowed"
               style={{ color: WA_T1, fontFamily: FONT }}
             />
           </div>
-          <button onClick={handleSend} disabled={!messageContent.trim()}
+          <button onClick={handleSend} disabled={!messageContent.trim() || !canReply}
             className="w-11 h-11 rounded-full flex items-center justify-center active:scale-90 shrink-0 disabled:opacity-50"
             style={{ background: WA_GREEN }}
             aria-label="Send">
@@ -420,18 +466,21 @@ const PrincipalNotesPage = () => {
 
           {/* WA reply bar */}
           <div className="flex items-end gap-2 px-4 py-[10px] shrink-0" style={{ background: WA_HEADER_BG }}>
-            <button className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-[rgba(11,20,26,0.06)]">
+            <button disabled={!canReply}
+              className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-[rgba(11,20,26,0.06)] disabled:opacity-40 disabled:cursor-not-allowed">
               <Smile className="w-[22px] h-[22px]" style={{ color: WA_T3 }} strokeWidth={1.8} />
             </button>
-            <div className="flex-1 rounded-[8px] flex items-center min-h-[42px] px-4 py-2 bg-white">
+            <div className="flex-1 rounded-[8px] flex items-center min-h-[42px] px-4 py-2 bg-white"
+              style={{ opacity: canReply ? 1 : 0.6 }}>
               <textarea rows={1} value={messageContent}
                 onChange={e => setMessageContent(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                placeholder="Reply to principal"
-                className="flex-1 bg-transparent border-none focus:ring-0 text-[14px] resize-none outline-none leading-relaxed"
+                placeholder={canReply ? "Reply to principal" : "Waiting for first principal message"}
+                disabled={!canReply}
+                className="flex-1 bg-transparent border-none focus:ring-0 text-[14px] resize-none outline-none leading-relaxed disabled:cursor-not-allowed"
                 style={{ fontFamily: FONT_D, color: WA_T1 }} />
             </div>
-            <button onClick={handleSend} disabled={!messageContent.trim()}
+            <button onClick={handleSend} disabled={!messageContent.trim() || !canReply}
               className="w-11 h-11 rounded-full flex items-center justify-center transition-transform hover:scale-105 disabled:opacity-40"
               style={{ background: WA_GREEN }}>
               <Send className="w-[18px] h-[18px] text-white" strokeWidth={2.3} fill="#fff" />
@@ -450,7 +499,7 @@ const PrincipalNotesPage = () => {
             <div className="text-[13px] font-bold mb-[3px]" style={{ color: T1, letterSpacing: "-0.2px" }}>Official Communication Channel</div>
             <div className="text-[11px] leading-[1.55]" style={{ color: T3 }}>
               All messages here are from your school's administration. Please reply professionally — this conversation is archived for school records.
-              {!allMessages[0]?.principalId && <> You can reply once the principal has sent the first message.</>}
+              {!canReply && <> You can reply once the principal has sent the first message.</>}
             </div>
           </div>
           {stats.unread > 0 && (
