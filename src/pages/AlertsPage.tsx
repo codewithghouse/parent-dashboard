@@ -34,12 +34,19 @@ interface ParsedAlert {
   dismissed?: boolean;
 }
 
+const ALERTS_PAGE_SIZE = 12;
+
 const AlertsPage = () => {
   const { studentData } = useAuth();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState(0);
+  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  // Reset to page 0 whenever the user switches filter tabs — otherwise tab
+  // switch could leave you stranded on a page index that no longer exists.
+  useEffect(() => { setPage(0); }, [activeTab]);
   // Key scoped per user — prevents Parent A's dismissed list leaking to Parent B
   const dismissKey = `dismissed_alerts_${studentData?.id || "anon"}`;
   const [dismissed, setDismissed] = useState<Set<string>>(() => {
@@ -327,13 +334,17 @@ const AlertsPage = () => {
       if (diffMs < 0) {
         const daysOverdue = Math.abs(Math.ceil(diffMs / (1000 * 3600 * 24)));
         const urgency = daysOverdue > 7 ? "This significantly impacts the term grade and requires immediate attention." : daysOverdue > 3 ? "Submitting it now — even late — is better than leaving it incomplete. Contact the teacher if an extension is needed." : "This was just missed — submitting it now with a brief apology note to the teacher may still earn partial credit.";
+        // createdAt = assignment's own createdAt (when teacher assigned it),
+        // NOT the dueDate. Using dueDate here previously made overdue alerts
+        // look like they were "created on the due date" which broke the
+        // "Recent" badge logic and made fresh overdue alerts look weeks old.
         result.push({
           id: `assign_overdue_${a.id}`,
           title: `Assignment Overdue — ${daysOverdue} Day${daysOverdue > 1 ? "s" : ""}`,
           description: `"${a.title}" was due on ${fmtTs(a.dueDate)} and remains unsubmitted. ${urgency}`,
           category: "Academic",
           priority: "High Priority",
-          createdAt: a.dueDate,
+          createdAt: a.createdAt || a.dueDate,
           teacherName: a.teacherName || "",
           source: "assignments"
         });
@@ -367,13 +378,32 @@ const AlertsPage = () => {
       });
     });
 
-    // Deduplicate by id, filter dismissed
+    // Deduplicate by id, filter dismissed. Sort by priority first, THEN by
+    // createdAt desc within the same priority — fixes the P1 where older
+    // and newer alerts of the same priority were jumbled (parent couldn't
+    // tell what was fresh vs stale).
     const seen = new Set<string>();
+    const toMs = (ts: unknown): number => {
+      if (!ts) return 0;
+      if (typeof ts === "number") return ts;
+      const anyTs = ts as { toDate?: () => Date; seconds?: number };
+      if (typeof anyTs.toDate === "function") {
+        const d = anyTs.toDate();
+        return d.getTime();
+      }
+      if (typeof anyTs.seconds === "number") return anyTs.seconds * 1000;
+      const d = new Date(ts as string | number | Date);
+      const t = d.getTime();
+      return Number.isFinite(t) ? t : 0;
+    };
     return result
       .filter(a => !dismissed.has(a.id) && !seen.has(a.id) && seen.add(a.id))
       .sort((a, b) => {
         const order: Record<string, number> = { "High Priority": 0, "Medium Priority": 1, "Good News": 2, General: 3 };
-        return (order[a.priority] ?? 3) - (order[b.priority] ?? 3);
+        const pri = (order[a.priority] ?? 3) - (order[b.priority] ?? 3);
+        if (pri !== 0) return pri;
+        // Same priority → newest first.
+        return toMs(b.createdAt) - toMs(a.createdAt);
       });
   };
 
@@ -407,6 +437,14 @@ const AlertsPage = () => {
     const tab = filterTabs[activeTab];
     return tab === "All" || a.category === tab;
   });
+
+  // Pagination — handle large alert lists (high-volume schools easily produce
+  // 50+ alerts per term). Cap visible at ALERTS_PAGE_SIZE per page. safePage
+  // clamps to last valid index if user just dismissed enough to drop a page.
+  const totalPages = Math.max(1, Math.ceil(filteredAlerts.length / ALERTS_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const pageStart = safePage * ALERTS_PAGE_SIZE;
+  const visibleAlerts = filteredAlerts.slice(pageStart, pageStart + ALERTS_PAGE_SIZE);
 
   // ── Action recommendations ───────────────────────────────────────────────
   // Deterministic mapping: alert category + priority + source → CTA buttons.
@@ -484,10 +522,22 @@ const AlertsPage = () => {
     const SH_BTN = "0 6px 22px rgba(0,85,255,0.40), 0 2px 5px rgba(0,85,255,0.20)";
     const FONT = "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif";
 
+    // Robust isRecent — accepts Firestore Timestamp, JS Date, ISO string,
+    // number (ms epoch) and { seconds } objects. Previously only handled
+    // Firestore Timestamps so attendance / string-date alerts never showed
+    // "Recent" even when fresh.
     const isRecent = (ts: any) => {
-      const d = ts?.toDate?.() || null;
-      if (!d) return false;
-      return (Date.now() - d.getTime()) < 24 * 60 * 60 * 1000;
+      if (!ts) return false;
+      let ms = 0;
+      if (typeof ts === "number") ms = ts;
+      else if (typeof ts?.toDate === "function") ms = ts.toDate().getTime();
+      else if (typeof ts?.seconds === "number") ms = ts.seconds * 1000;
+      else {
+        const d = new Date(ts);
+        ms = d.getTime();
+      }
+      if (!Number.isFinite(ms) || ms <= 0) return false;
+      return (Date.now() - ms) < 24 * 60 * 60 * 1000;
     };
 
     const fmtAlertDate = (ts: any) => {
@@ -615,7 +665,7 @@ const AlertsPage = () => {
             </div>
           </div>
         ) : (
-          filteredAlerts.map(alert => {
+          visibleAlerts.map(alert => {
             const theme = themeFor(alert.priority);
             const Icon = iconFor(alert);
             const actions = getActions(alert);
@@ -723,6 +773,37 @@ const AlertsPage = () => {
           })
         )}
 
+        {/* Pagination footer (mobile) — only when alerts overflow one page */}
+        {totalPages > 1 && (
+          <div className="mx-5 mt-4 px-4 py-3 rounded-[16px] flex items-center justify-between"
+            style={{ background: CARD, boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+            <span className="text-[11px] font-medium" style={{ color: T4 }}>
+              {pageStart + 1}–{Math.min(pageStart + ALERTS_PAGE_SIZE, filteredAlerts.length)} / {filteredAlerts.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={safePage === 0}
+                className="px-3 py-1.5 rounded-full text-[11px] font-bold transition-colors disabled:opacity-40"
+                style={{ color: B1, border: `0.5px solid ${safePage === 0 ? "rgba(0,85,255,0.10)" : "rgba(0,85,255,0.30)"}` }}
+              >
+                ← Prev
+              </button>
+              <span className="text-[11px] font-bold tabular-nums" style={{ color: T2 }}>
+                {safePage + 1} / {totalPages}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                disabled={safePage >= totalPages - 1}
+                className="px-3 py-1.5 rounded-full text-[11px] font-bold transition-colors disabled:opacity-40"
+                style={{ color: B1, border: `0.5px solid ${safePage >= totalPages - 1 ? "rgba(0,85,255,0.10)" : "rgba(0,85,255,0.30)"}` }}
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Summary dark card */}
         {allAlerts.length > 0 && (
           <div className="mx-5 mt-[14px] rounded-[24px] px-[22px] py-5 relative overflow-hidden transition-transform active:scale-[0.98]"
@@ -767,10 +848,19 @@ const AlertsPage = () => {
   const SH_LG_D = "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 18px 44px rgba(0,85,255,0.14)";
   const SH_BTN_D = "0 6px 22px rgba(0,85,255,0.42), 0 2px 6px rgba(0,85,255,0.22)";
 
+  // Robust isRecent for desktop — same as mobile, accepts any timestamp shape.
   const isRecentD = (ts: any) => {
-    const d = ts?.toDate?.() || null;
-    if (!d) return false;
-    return (Date.now() - d.getTime()) < 24 * 60 * 60 * 1000;
+    if (!ts) return false;
+    let ms = 0;
+    if (typeof ts === "number") ms = ts;
+    else if (typeof ts?.toDate === "function") ms = ts.toDate().getTime();
+    else if (typeof ts?.seconds === "number") ms = ts.seconds * 1000;
+    else {
+      const d = new Date(ts);
+      ms = d.getTime();
+    }
+    if (!Number.isFinite(ms) || ms <= 0) return false;
+    return (Date.now() - ms) < 24 * 60 * 60 * 1000;
   };
   const fmtAlertDateD = (ts: any) => {
     if (isRecentD(ts)) return "Recent";
@@ -975,7 +1065,7 @@ const AlertsPage = () => {
               </div>
             ) : (
               <div className="space-y-3" style={{ perspective: "1200px" }}>
-                {filteredAlerts.map(alert => {
+                {visibleAlerts.map(alert => {
                   const theme = themeForD(alert.priority);
                   const Icon = iconForD(alert);
                   const actions = getActions(alert);
@@ -1098,6 +1188,37 @@ const AlertsPage = () => {
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Pagination footer (desktop) — only when alerts overflow one page */}
+            {!loading && totalPages > 1 && (
+              <div className="bg-white rounded-[16px] px-5 py-3 mt-4 flex items-center justify-between"
+                style={{ boxShadow: SH_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+                <span className="text-[11px] font-medium" style={{ color: T4 }}>
+                  Showing {pageStart + 1}–{Math.min(pageStart + ALERTS_PAGE_SIZE, filteredAlerts.length)} of {filteredAlerts.length} alerts
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    disabled={safePage === 0}
+                    className="px-4 py-1.5 rounded-full text-[12px] font-bold transition-colors disabled:opacity-40 hover:bg-[#EEF4FF]"
+                    style={{ color: B1, border: `0.5px solid ${safePage === 0 ? "rgba(0,85,255,0.10)" : "rgba(0,85,255,0.30)"}` }}
+                  >
+                    ← Prev
+                  </button>
+                  <span className="text-[12px] font-bold tabular-nums" style={{ color: T2 }}>
+                    {safePage + 1} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                    disabled={safePage >= totalPages - 1}
+                    className="px-4 py-1.5 rounded-full text-[12px] font-bold transition-colors disabled:opacity-40 hover:bg-[#EEF4FF]"
+                    style={{ color: B1, border: `0.5px solid ${safePage >= totalPages - 1 ? "rgba(0,85,255,0.10)" : "rgba(0,85,255,0.30)"}` }}
+                  >
+                    Next →
+                  </button>
+                </div>
               </div>
             )}
           </div>

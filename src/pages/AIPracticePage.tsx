@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { Loader2, Upload, Plus, Sparkles, Bell, FileText, Image as ImageIcon, MessageSquare, HardDrive, ChevronLeft, BarChart3, Clock, CheckCircle2, XCircle, Lightbulb, RefreshCw, Award } from "lucide-react";
+import { Loader2, Upload, Plus, Sparkles, Bell, FileText, Image as ImageIcon, MessageSquare, HardDrive, ChevronLeft, ChevronRight, BarChart3, Clock, CheckCircle2, XCircle, Lightbulb, RefreshCw, Award, X } from "lucide-react";
 import { useAuth } from "../lib/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ParentAIController } from "../ai/controller/ai-controller";
@@ -165,6 +165,11 @@ const AIPracticePage = () => {
   const [attempts, setAttempts] = useState<any[]>([]);
   const [practiceDates, setPracticeDates] = useState<Set<string>>(new Set());
   const [documents, setDocuments] = useState<any[]>([]);
+
+  // Type-topic modal (replaces window.prompt with proper UI)
+  const [topicModalOpen, setTopicModalOpen] = useState(false);
+  const [topicInput, setTopicInput] = useState("");
+  const [descriptionInput, setDescriptionInput] = useState("");
 
   const studentId = studentData?.studentId || studentData?.id || "";
   const studentName = studentData?.name || studentData?.studentName || "Student";
@@ -696,16 +701,33 @@ const AIPracticePage = () => {
 
     const hasFile = !!file || !!extractedText;
 
-    // Prompt user for a manual topic (Type Topic flow)
+    // Open the Type-Topic modal so the student can enter a topic + short
+    // description (better than the old window.prompt one-liner). Submission
+    // happens in handleTopicModalSubmit below.
     const handleTypeTopic = () => {
-      const input = window.prompt("Enter a topic or paste your notes:");
-      if (!input || input.trim().length < 3) return;
-      const text = input.trim();
+      setTopicInput("");
+      setDescriptionInput("");
+      setTopicModalOpen(true);
+    };
+
+    const handleTopicModalSubmit = () => {
+      const t = topicInput.trim();
+      const d = descriptionInput.trim();
+      if (t.length < 2) {
+        toast.error("Please enter a topic (at least 2 characters).");
+        return;
+      }
+      // Build the study material text the AI engine will use. Topic acts as
+      // the headline; description (if provided) is the body. If no description,
+      // the topic alone still works — AI generates from general knowledge of
+      // that subject.
+      const text = d ? `${t}\n\n${d}` : t;
       setExtractedText(text);
-      setExtractedTopics([text.slice(0, 60)]);
-      setTopic(text.slice(0, 60));
+      setExtractedTopics([t.slice(0, 60)]);
+      setTopic(t.slice(0, 60));
       setFile(null);
       setPageCount(0);
+      setTopicModalOpen(false);
       setView("configure");
     };
 
@@ -853,6 +875,112 @@ const AIPracticePage = () => {
         )}
 
         <div className="h-6" />
+
+        {/* Type-Topic modal — appears for both mobile + desktop upload views.
+            Topic field is required; description is optional context the AI
+            uses as study material. */}
+        {topicModalOpen && (
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200"
+            style={{ background: "rgba(0,16,64,0.45)", backdropFilter: "blur(8px)" }}
+            onClick={() => setTopicModalOpen(false)}
+          >
+            <div
+              className="w-full max-w-[460px] rounded-[24px] p-6 animate-in zoom-in-95 duration-200"
+              style={{ background: "#fff", boxShadow: "0 24px 80px rgba(0,16,64,0.35)", fontFamily: "'DM Sans', sans-serif" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h2 className="text-[20px] font-bold" style={{ color: "#001040", letterSpacing: "-0.4px" }}>
+                    Practice by Topic
+                  </h2>
+                  <p className="text-[12px] mt-1" style={{ color: "#5070B0" }}>
+                    Enter a topic and optional notes. The AI will build questions from this.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setTopicModalOpen(false)}
+                  className="w-8 h-8 rounded-[10px] flex items-center justify-center transition-colors hover:bg-slate-100"
+                  aria-label="Close"
+                >
+                  <X className="w-4 h-4" style={{ color: "#5070B0" }} strokeWidth={2.4} />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-[0.1em] mb-[6px] block" style={{ color: "#5070B0" }}>
+                    Topic <span style={{ color: "#FF3355" }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={topicInput}
+                    onChange={(e) => setTopicInput(e.target.value)}
+                    placeholder="e.g. Photosynthesis, Quadratic Equations, World War II"
+                    maxLength={120}
+                    autoFocus
+                    className="w-full px-4 py-3 rounded-[14px] text-[14px] font-medium outline-none transition-all"
+                    style={{
+                      background: "#EEF4FF",
+                      border: "0.5px solid rgba(0,85,255,0.18)",
+                      color: "#001040",
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-[0.1em] mb-[6px] block" style={{ color: "#5070B0" }}>
+                    Short description <span className="font-normal normal-case tracking-normal" style={{ color: "#99AACC" }}>(optional)</span>
+                  </label>
+                  <textarea
+                    value={descriptionInput}
+                    onChange={(e) => setDescriptionInput(e.target.value)}
+                    placeholder="Add a few lines of notes, key concepts, or focus areas — the AI will use this as study material."
+                    maxLength={2000}
+                    rows={5}
+                    className="w-full px-4 py-3 rounded-[14px] text-[13px] outline-none resize-none leading-[1.5] transition-all"
+                    style={{
+                      background: "#EEF4FF",
+                      border: "0.5px solid rgba(0,85,255,0.18)",
+                      color: "#001040",
+                      fontFamily: "'DM Sans', sans-serif",
+                    }}
+                  />
+                  <p className="text-[10px] mt-1.5" style={{ color: "#99AACC" }}>
+                    {descriptionInput.length}/2000 characters · Leave empty to let AI use general knowledge
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-2 mt-5">
+                <button
+                  onClick={() => setTopicModalOpen(false)}
+                  className="flex-1 h-11 rounded-[12px] text-[13px] font-bold transition-colors hover:bg-slate-50"
+                  style={{
+                    background: "#fff",
+                    border: "0.5px solid rgba(0,85,255,0.20)",
+                    color: "#5070B0",
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleTopicModalSubmit}
+                  disabled={topicInput.trim().length < 2}
+                  className="flex-1 h-11 rounded-[12px] text-[13px] font-bold flex items-center justify-center gap-2 transition-transform hover:scale-[1.01] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  style={{
+                    background: "linear-gradient(135deg, #0055FF, #2277FF)",
+                    color: "#fff",
+                    boxShadow: "0 6px 22px rgba(0,85,255,0.42), 0 2px 6px rgba(0,85,255,0.22)",
+                  }}
+                >
+                  Continue <ChevronRight className="w-[14px] h-[14px]" strokeWidth={2.5} />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -1286,6 +1414,110 @@ const AIPracticePage = () => {
           )}
         </div>
       </div>
+
+      {/* Type-Topic modal (desktop) — same shape as the mobile one. */}
+      {topicModalOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          style={{ background: "rgba(0,16,64,0.45)", backdropFilter: "blur(8px)" }}
+          onClick={() => setTopicModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-[480px] rounded-[24px] p-7 animate-in zoom-in-95 duration-200"
+            style={{ background: "#fff", boxShadow: "0 24px 80px rgba(0,16,64,0.35)", fontFamily: "'DM Sans', sans-serif" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between mb-5">
+              <div>
+                <h2 className="text-[22px] font-bold" style={{ color: T1, letterSpacing: "-0.4px" }}>
+                  Practice by Topic
+                </h2>
+                <p className="text-[13px] mt-1.5" style={{ color: T3 }}>
+                  Enter a topic and optional notes. The AI will build questions from this.
+                </p>
+              </div>
+              <button
+                onClick={() => setTopicModalOpen(false)}
+                className="w-9 h-9 rounded-[11px] flex items-center justify-center transition-colors hover:bg-slate-100"
+                aria-label="Close"
+              >
+                <X className="w-[16px] h-[16px]" style={{ color: T3 }} strokeWidth={2.4} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-[0.1em] mb-[6px] block" style={{ color: T3 }}>
+                  Topic <span style={{ color: RED_D }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  value={topicInput}
+                  onChange={(e) => setTopicInput(e.target.value)}
+                  placeholder="e.g. Photosynthesis, Quadratic Equations, World War II"
+                  maxLength={120}
+                  autoFocus
+                  className="w-full px-4 py-3 rounded-[14px] text-[14px] font-medium outline-none transition-all focus:ring-2"
+                  style={{
+                    background: BG_D,
+                    border: `0.5px solid ${BLUE_BDR_D}`,
+                    color: T1,
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-[0.1em] mb-[6px] block" style={{ color: T3 }}>
+                  Short description <span className="font-normal normal-case tracking-normal" style={{ color: T4 }}>(optional)</span>
+                </label>
+                <textarea
+                  value={descriptionInput}
+                  onChange={(e) => setDescriptionInput(e.target.value)}
+                  placeholder="Add a few lines of notes, key concepts, or focus areas — the AI will use this as study material."
+                  maxLength={2000}
+                  rows={6}
+                  className="w-full px-4 py-3 rounded-[14px] text-[13px] outline-none resize-none leading-[1.5] transition-all"
+                  style={{
+                    background: BG_D,
+                    border: `0.5px solid ${BLUE_BDR_D}`,
+                    color: T1,
+                    fontFamily: "'DM Sans', sans-serif",
+                  }}
+                />
+                <p className="text-[10px] mt-1.5" style={{ color: T4 }}>
+                  {descriptionInput.length}/2000 characters · Leave empty to let AI use general knowledge
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setTopicModalOpen(false)}
+                className="flex-1 h-12 rounded-[13px] text-[13px] font-bold transition-colors hover:bg-slate-50"
+                style={{
+                  background: "#fff",
+                  border: `0.5px solid ${BLUE_BDR_D}`,
+                  color: T2,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleTopicModalSubmit}
+                disabled={topicInput.trim().length < 2}
+                className="flex-1 h-12 rounded-[13px] text-[13px] font-bold flex items-center justify-center gap-2 transition-transform hover:scale-[1.01] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                style={{
+                  background: `linear-gradient(135deg, ${B1}, ${B3})`,
+                  color: "#fff",
+                  boxShadow: SH_BTN_D,
+                }}
+              >
+                Continue <ChevronRight className="w-[14px] h-[14px]" strokeWidth={2.5} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DesktopShell>
   );
 
