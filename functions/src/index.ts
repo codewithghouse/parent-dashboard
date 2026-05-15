@@ -1284,13 +1284,33 @@ exports.cascadeSchoolRename = functions.firestore
     const schoolId = context.params.schoolId;
     const db = admin.firestore();
 
+    // Update BOTH `schoolName` AND `branchName` on every denormalized doc.
+    // In this product each "school" doc IS a branch (single-branch-per-doc
+    // pattern), so the two fields are synonyms — but different UI surfaces
+    // read different field names ("Campus Branch" reads branchName, page
+    // headers read schoolName). Mirror both so every render path stays in
+    // sync. Time: O(N) where N = total denormalized docs across collections;
+    // chunked at 450 ops/batch internally.
     let total = 0;
     for (const coll of SCHOOL_CASCADE_COLLECTIONS) {
       try {
-        const n = await cascadeFieldToCollection(
-          db, coll, "schoolId", schoolId, "schoolName", afterName,
-        );
-        total += n;
+        const snap = await db.collection(coll)
+          .where("schoolId", "==", schoolId).get();
+        if (snap.empty) continue;
+        const CHUNK = 450;
+        for (let i = 0; i < snap.docs.length; i += CHUNK) {
+          const slice = snap.docs.slice(i, i + CHUNK);
+          const batch = db.batch();
+          slice.forEach(d => {
+            batch.update(d.ref, {
+              schoolName: afterName,
+              branchName: afterName,
+              _renameCascadedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          });
+          await batch.commit();
+          total += slice.length;
+        }
       } catch (err) {
         console.error(`[cascadeSchoolRename] ${coll} failed for schoolId=${schoolId}:`, err);
       }
@@ -1315,7 +1335,8 @@ exports.cascadeSchoolRename = functions.firestore
       const branchSnap = await db.collectionGroup("branches").get();
       const matchedRefs = new Map<string, FirebaseFirestore.DocumentReference>();
 
-      // (a) + (b)
+      // (a) + (b) — direct id / field match (works for multi-branch where
+      // principal.schoolId === branchId).
       branchSnap.docs.forEach(d => {
         const data = d.data() as { branchId?: string };
         if (d.id === schoolId || data.branchId === schoolId) {
@@ -1323,7 +1344,9 @@ exports.cascadeSchoolRename = functions.firestore
         }
       });
 
-      // (c) — principal bridge for single-tenant
+      // (c) — principal bridge. Finds principals whose schoolId === this
+      // renamed schools/{schoolId}, then maps their branchId values onto
+      // branch docs whose id or branchId field equals them.
       const principalSnap = await db.collection("principals")
         .where("schoolId", "==", schoolId).get();
       const bridgeBranchIds = new Set<string>();
@@ -1340,7 +1363,90 @@ exports.cascadeSchoolRename = functions.firestore
         });
       }
 
-      // Single commit covers all three match strategies (deduped by path).
+      // (d) — name-based match under the OWNER's subcollection. Single-tenant
+      // setups stamp `principal.schoolId = owner.uid` and `principal.branchId`
+      // as a slug ("umsh") that DOES NOT equal the owner's branch doc id
+      // (auto-id like "abc123"). For those, the only reliable link is the
+      // branch's previous human-readable `name`. Look under
+      // `schools/{schoolId}/branches/*` (since schoolId === owner.uid here)
+      // for any branch whose current name matches beforeName.
+      try {
+        const ownerBranches = await db.collection("schools").doc(schoolId)
+          .collection("branches").get();
+        ownerBranches.docs.forEach(d => {
+          const data = d.data() as { name?: string };
+          // Case-insensitive match on whitespace-trimmed names.
+          const nm = String(data?.name || "").trim().toLowerCase();
+          if (nm && nm === beforeName.trim().toLowerCase()) {
+            matchedRefs.set(d.ref.path, d.ref);
+          }
+        });
+      } catch (err) {
+        console.warn(`[cascadeSchoolRename] (d) owner-subcollection lookup skipped:`, err);
+      }
+
+      // (f) — aggressive collectionGroup name-match. Iterate the already-
+      // fetched branchSnap (no extra read) and match by `name`. Scope to
+      // safety: only match if at least ONE principal exists whose schoolId
+      // matches this rename event — i.e., there's a real principal claim
+      // on this school. Without that scope, two unrelated owners could
+      // share a branch name and we'd update the wrong one. Time: O(B) over
+      // already-fetched branches, where B = total branches across all
+      // owners (typically <100).
+      if (matchedRefs.size === 0 && principalSnap.docs.length > 0) {
+        const ownerUidsClaimingSchool = new Set<string>();
+        principalSnap.docs.forEach(d => {
+          const data = d.data() as { schoolId?: string };
+          if (data.schoolId) ownerUidsClaimingSchool.add(data.schoolId);
+        });
+        const before = beforeName.trim().toLowerCase();
+        branchSnap.docs.forEach(d => {
+          const data = d.data() as { name?: string };
+          const nm = String(data?.name || "").trim().toLowerCase();
+          if (nm !== before) return;
+          // Path is `schools/{ownerUid}/branches/{branchId}` — extract
+          // ownerUid from the doc ref.
+          const parts = d.ref.path.split("/");
+          if (parts.length >= 4 && parts[0] === "schools" && parts[2] === "branches") {
+            const ownerUidOfBranch = parts[1];
+            if (ownerUidsClaimingSchool.has(ownerUidOfBranch)) {
+              matchedRefs.set(d.ref.path, d.ref);
+            }
+          }
+        });
+      }
+
+      // (e) — last-resort: if everything else missed, but a principal
+      // bridge exists, update EVERY branch under that owner's school whose
+      // current name equals beforeName. This catches the rare case where the
+      // schoolId on the principal record doesn't point at the owner's uid
+      // directly but at some other indirection — still safe because we
+      // scope by name.
+      if (matchedRefs.size === 0 && principalSnap.docs.length > 0) {
+        const ownerUids = new Set<string>();
+        principalSnap.docs.forEach(d => {
+          const data = d.data() as { ownerUid?: string; schoolId?: string };
+          if (data.ownerUid) ownerUids.add(data.ownerUid);
+          if (data.schoolId) ownerUids.add(data.schoolId);
+        });
+        for (const ownerUid of ownerUids) {
+          try {
+            const ownerBranches = await db.collection("schools").doc(ownerUid)
+              .collection("branches").get();
+            ownerBranches.docs.forEach(d => {
+              const data = d.data() as { name?: string };
+              const nm = String(data?.name || "").trim().toLowerCase();
+              if (nm && nm === beforeName.trim().toLowerCase()) {
+                matchedRefs.set(d.ref.path, d.ref);
+              }
+            });
+          } catch (err) {
+            console.warn(`[cascadeSchoolRename] (e) lookup under ${ownerUid} skipped:`, err);
+          }
+        }
+      }
+
+      // Single commit covers all match strategies (deduped by path).
       if (matchedRefs.size > 0) {
         const batch = db.batch();
         matchedRefs.forEach(ref => {
@@ -1351,6 +1457,16 @@ exports.cascadeSchoolRename = functions.firestore
         });
         await batch.commit();
         total += matchedRefs.size;
+        console.log(
+          `[cascadeSchoolRename] matched ${matchedRefs.size} branch doc(s):`,
+          Array.from(matchedRefs.keys()).join(", "),
+        );
+      } else {
+        console.log(
+          `[cascadeSchoolRename] NO branch doc matched for schools/${schoolId}. ` +
+          `Checked: direct id/field, principal bridge (${bridgeBranchIds.size} ids), ` +
+          `name match ("${beforeName}").`,
+        );
       }
     } catch (err) {
       console.error(`[cascadeSchoolRename] branches subcollection update failed:`, err);

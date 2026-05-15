@@ -194,6 +194,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => { unsubscribe(); if (unsubStudentRef.current) { unsubStudentRef.current(); unsubStudentRef.current = null; } };
   }, []);
 
+  // ── Live school-name subscription ────────────────────────────────────
+  // ParentTopbar reads `studentData.schoolName`. Subscribe to
+  // schools/{schoolId} as the source of truth so renames from any other
+  // dashboard / tab propagate to the parent's header within ~1s.
+  useEffect(() => {
+    const schoolId = studentData?.schoolId;
+    if (!schoolId) return;
+    const unsub = onSnapshot(
+      doc(db, "schools", schoolId),
+      (snap) => {
+        if (!snap.exists()) return;
+        const liveName = String((snap.data() as { name?: string })?.name || "").trim();
+        if (!liveName) return;
+        setStudentData((prev: any) => {
+          if (!prev) return prev;
+          if (prev.schoolName === liveName && prev.branchName === liveName) return prev;
+          return { ...prev, schoolName: liveName, branchName: liveName };
+        });
+      },
+      (err) => console.warn("[AuthContext] live school-name listener failed:", err),
+    );
+    return () => unsub();
+  }, [studentData?.schoolId]);
+
   const loginWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     // Force the Google account chooser EVERY time. Without this, Google
