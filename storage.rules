@@ -131,6 +131,13 @@ service firebase.storage {
       allow delete: if sameSchool(schoolId) && hasStaffRole();
     }
 
+    // ─── Important Questions (mirrors syllabi shape) ─────────────────────
+    match /important_questions/{schoolId}/{branchId}/{classId}/{titleSlug}/{fileName} {
+      allow read:   if sameSchool(schoolId);
+      allow write:  if sameSchool(schoolId) && hasStaffRole() && isAllowedSyllabusType();
+      allow delete: if sameSchool(schoolId) && hasStaffRole();
+    }
+
     // ═════════════════════════════════════════════════════════════════════
     // ── Alumni PDFs ─────────────────────────────────────────────────────
     //   Path: alumni/{schoolId}/{branchId}/{fileName}

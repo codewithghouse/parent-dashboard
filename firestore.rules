@@ -865,6 +865,17 @@ service cloud.firestore {
                        && (resource.data.uploadedBy == uid() || hasAdminRole());
     }
 
+    // ── Important Questions ────────────────────────────────────────────
+    match /important_questions/{id} {
+      allow get:  if signedIn() && inSameSchool();
+      allow list: if signedIn();  // TEMPORARY PHASE-1
+      allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
+      allow update: if signedIn() && inSameSchool() && schoolIdImmutable()
+                       && (resource.data.uploadedBy == uid() || hasAdminRole());
+      allow delete: if signedIn() && inSameSchool()
+                       && (resource.data.uploadedBy == uid() || hasAdminRole());
+    }
+
     // ── Owner → Principal notifications ────────────────────────────────
     match /owner_to_principal_notes/{id} {
       allow get:  if signedIn() && inSameSchool();
