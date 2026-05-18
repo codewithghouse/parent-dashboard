@@ -24,6 +24,13 @@ import {
   arrayUnion,
   increment,
 } from "firebase/firestore";
+import {
+  getStorage,
+  ref as storageRef,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject,
+} from "firebase/storage";
 import { db } from "./firebase";
 
 export type TicketCategory = "bug" | "feature" | "billing" | "account" | "other";
@@ -40,6 +47,14 @@ export interface TicketReply {
   message: string;
   createdAt: number;   // client ms epoch (Firestore doesn't allow
                        // serverTimestamp inside arrays)
+}
+
+export interface TicketAttachment {
+  name: string;
+  url: string;          // tokenised download URL from getDownloadURL
+  storagePath: string;  // for delete capability
+  contentType: string;
+  size: number;
 }
 
 export interface SupportTicket {
@@ -65,6 +80,7 @@ export interface SupportTicket {
   lastReplyAt: Timestamp | null;
   replyCount: number;
   replies: TicketReply[];
+  attachments: TicketAttachment[];
 }
 
 const COLLECTION = "support_tickets";
@@ -86,6 +102,59 @@ export interface CreateTicketInput {
   description: string;
   category: TicketCategory;
   priority: TicketPriority;
+  attachments?: TicketAttachment[];
+}
+
+export const MAX_ATTACHMENTS = 5;
+export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10 MB per file
+export const ACCEPTED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+];
+
+/**
+ * Upload one image to `support_uploads/{uid}/{batchId}/{filename}` and return
+ * the persisted attachment metadata.  Caller MUST pass a stable `batchId` so
+ * all files for a single ticket land under the same folder (enables cascade
+ * delete + traces back to the ticket).
+ */
+export async function uploadTicketAttachment(
+  uid: string,
+  batchId: string,
+  file: File
+): Promise<TicketAttachment> {
+  if (!uid) throw new Error("Missing authenticated user.");
+  if (!batchId) throw new Error("Missing upload batch id.");
+  if (file.size > MAX_ATTACHMENT_BYTES) {
+    throw new Error(`${file.name} is larger than 10 MB.`);
+  }
+  if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+    throw new Error(`${file.name}: only image files allowed.`);
+  }
+  const safeName = file.name.replace(/[^\w.\-]+/g, "_").slice(0, 120);
+  const fileName = `${Date.now()}_${safeName}`;
+  const path = `support_uploads/${uid}/${batchId}/${fileName}`;
+  const ref = storageRef(getStorage(), path);
+  await uploadBytes(ref, file, { contentType: file.type });
+  const url = await getDownloadURL(ref);
+  return {
+    name: safeName,
+    url,
+    storagePath: path,
+    contentType: file.type,
+    size: file.size,
+  };
+}
+
+/** Best-effort cleanup if user removes a staged attachment before submit. */
+export async function deleteTicketAttachment(storagePath: string): Promise<void> {
+  try {
+    await deleteObject(storageRef(getStorage(), storagePath));
+  } catch (err) {
+    console.warn("[supportTickets] deleteTicketAttachment:", err);
+  }
 }
 
 /** Persists a new ticket. Throws on validation failure or Firestore error. */
@@ -102,6 +171,7 @@ export async function createTicket(input: CreateTicketInput): Promise<string> {
   }
   if (!input.schoolId) throw new Error("Missing school context.");
   if (!input.createdBy.uid) throw new Error("Missing authenticated user.");
+  const attachments = (input.attachments || []).slice(0, MAX_ATTACHMENTS);
 
   const payload = {
     schoolId: input.schoolId,
@@ -125,6 +195,7 @@ export async function createTicket(input: CreateTicketInput): Promise<string> {
     lastReplyAt: null,
     replyCount: 0,
     replies: [] as TicketReply[],
+    attachments,
   };
 
   const ref = await addDoc(collection(db, COLLECTION), payload);

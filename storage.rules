@@ -233,6 +233,30 @@ service firebase.storage {
 
 
     // ═════════════════════════════════════════════════════════════════════
+    // ── Support ticket attachments (Help & Support page) ────────────────
+    //   Path: support_uploads/{uploaderUid}/{batchId}/{fileName}
+    //   Layout chosen so the uploader's UID is the FIRST segment after the
+    //   collection — makes the write rule trivial (segment must match
+    //   request.auth.uid). batchId is a client-generated uuid so multiple
+    //   files in one ticket land under the same folder, enabling tidy
+    //   delete-by-prefix.
+    //
+    //   Read: any signed-in user. Tokenised download URLs ARE the real
+    //         access boundary here — the rule is defense in depth.
+    //   Write: uploader = same UID, image-only, 10 MB cap per file.
+    //   Delete: uploader OR support agent (mirrors Firestore ticket delete).
+    // ═════════════════════════════════════════════════════════════════════
+    match /support_uploads/{uploaderUid}/{batchId}/{fileName} {
+      allow read:   if signedIn();
+      allow write:  if signedIn()
+                    && uid() == uploaderUid
+                    && request.resource.size < 10 * 1024 * 1024
+                    && isImage();
+      allow delete: if signedIn() && uid() == uploaderUid;
+    }
+
+
+    // ═════════════════════════════════════════════════════════════════════
     // ── CATCH-ALL — deny unknown paths ──────────────────────────────────
     // ═════════════════════════════════════════════════════════════════════
     match /{allPaths=**} {

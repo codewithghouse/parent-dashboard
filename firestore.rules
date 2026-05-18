@@ -1220,7 +1220,13 @@ service cloud.firestore {
              ['bug','feature','billing','account','other']
         && request.resource.data.priority in
              ['low','medium','high','urgent']
-        && request.resource.data.replyCount == 0;
+        && request.resource.data.replyCount == 0
+        // Attachments: at most 5 image uploads per ticket, each ≤ 10 MB.
+        // The actual file bytes are gated by Storage rules; here we just
+        // enforce the array shape + array size on the doc itself.
+        && (!('attachments' in request.resource.data)
+            || (request.resource.data.attachments is list
+                && request.resource.data.attachments.size() <= 5));
 
       // Update:
       //   - Ticket creator: append reply + flip status from resolved→open

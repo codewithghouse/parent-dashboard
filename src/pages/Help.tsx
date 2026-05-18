@@ -9,6 +9,9 @@ import {
   MessageSquare,
   Tag,
   Flag,
+  Paperclip,
+  X,
+  Image as ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../lib/AuthContext";
@@ -16,13 +19,19 @@ import {
   TICKET_CATEGORY_LABELS,
   TICKET_PRIORITY_LABELS,
   TICKET_STATUS_LABELS,
+  MAX_ATTACHMENTS,
+  MAX_ATTACHMENT_BYTES,
+  ACCEPTED_IMAGE_TYPES,
   addReply,
   createTicket,
+  deleteTicketAttachment,
   fmtRelative,
   reopenTicket,
   statusTone,
   subscribeUserTickets,
+  uploadTicketAttachment,
   type SupportTicket,
+  type TicketAttachment,
   type TicketCategory,
   type TicketPriority,
   type TicketStatus,
@@ -34,6 +43,32 @@ const REPLY_MAX = 5000;
 
 type StatusFilter = "all" | TicketStatus;
 
+interface StagedAttachment {
+  localId: string;     // client-generated id for keying/removal
+  file: File;
+  previewUrl: string;  // local object URL for thumbnail
+  uploading: boolean;
+  uploaded?: TicketAttachment;
+  error?: string;
+}
+
+function newBatchId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `b-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function localId(): string {
+  return `l-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function humanSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
 export default function Help() {
   const { user, studentData } = useAuth();
 
@@ -43,6 +78,105 @@ export default function Help() {
   const [priority, setPriority] = useState<TicketPriority>("medium");
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [attachments, setAttachments] = useState<StagedAttachment[]>([]);
+  const [batchId, setBatchId] = useState<string>(() => newBatchId());
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Cleanup ObjectURLs on unmount to avoid memory leaks.
+  useEffect(() => {
+    return () => {
+      attachments.forEach((a) => URL.revokeObjectURL(a.previewUrl));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function resetForm() {
+    setSubject("");
+    setDescription("");
+    setCategory("bug");
+    setPriority("medium");
+    attachments.forEach((a) => URL.revokeObjectURL(a.previewUrl));
+    setAttachments([]);
+    setBatchId(newBatchId());
+  }
+
+  async function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    if (!user?.uid) {
+      toast.error("Please sign in again to attach images.");
+      return;
+    }
+    const remainingSlots = MAX_ATTACHMENTS - attachments.length;
+    if (remainingSlots <= 0) {
+      toast.error(`Up to ${MAX_ATTACHMENTS} images per ticket.`);
+      return;
+    }
+    const incoming = Array.from(files).slice(0, remainingSlots);
+
+    const staged: StagedAttachment[] = incoming.map((file) => ({
+      localId: localId(),
+      file,
+      previewUrl: URL.createObjectURL(file),
+      uploading: true,
+    }));
+    setAttachments((prev) => [...prev, ...staged]);
+
+    // Upload each staged file in parallel.
+    await Promise.all(
+      staged.map(async (s) => {
+        // Pre-flight client-side checks (rule will also catch).
+        if (s.file.size > MAX_ATTACHMENT_BYTES) {
+          setAttachments((prev) =>
+            prev.map((a) =>
+              a.localId === s.localId
+                ? { ...a, uploading: false, error: "Larger than 10 MB" }
+                : a
+            )
+          );
+          return;
+        }
+        if (!ACCEPTED_IMAGE_TYPES.includes(s.file.type)) {
+          setAttachments((prev) =>
+            prev.map((a) =>
+              a.localId === s.localId
+                ? { ...a, uploading: false, error: "Only image files allowed" }
+                : a
+            )
+          );
+          return;
+        }
+        try {
+          const uploaded = await uploadTicketAttachment(user.uid!, batchId, s.file);
+          setAttachments((prev) =>
+            prev.map((a) =>
+              a.localId === s.localId ? { ...a, uploading: false, uploaded } : a
+            )
+          );
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Upload failed.";
+          setAttachments((prev) =>
+            prev.map((a) =>
+              a.localId === s.localId ? { ...a, uploading: false, error: msg } : a
+            )
+          );
+        }
+      })
+    );
+
+    // Reset the input so the same filename can be re-selected after a remove.
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  async function removeAttachment(localIdToRemove: string) {
+    const target = attachments.find((a) => a.localId === localIdToRemove);
+    setAttachments((prev) => prev.filter((a) => a.localId !== localIdToRemove));
+    if (target) {
+      URL.revokeObjectURL(target.previewUrl);
+      if (target.uploaded?.storagePath) {
+        deleteTicketAttachment(target.uploaded.storagePath);
+      }
+    }
+  }
 
   // ── Tickets list state ────────────────────────────────────────────
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
@@ -102,6 +236,20 @@ export default function Help() {
       toast.error("Your school context is still loading — try again in a moment.");
       return;
     }
+    // Block submission while any attachment is still uploading.
+    if (attachments.some((a) => a.uploading)) {
+      toast.error("Wait for images to finish uploading.");
+      return;
+    }
+    const erroredAttachment = attachments.find((a) => a.error);
+    if (erroredAttachment) {
+      toast.error(`Remove the failed attachment first (${erroredAttachment.file.name}).`);
+      return;
+    }
+    const successfulAttachments: TicketAttachment[] = attachments
+      .map((a) => a.uploaded)
+      .filter((x): x is TicketAttachment => Boolean(x));
+
     setSubmitting(true);
     try {
       await createTicket({
@@ -119,12 +267,10 @@ export default function Help() {
         description,
         category,
         priority,
+        attachments: successfulAttachments,
       });
       toast.success("Ticket raised — our support team will reply soon.");
-      setSubject("");
-      setDescription("");
-      setCategory("bug");
-      setPriority("medium");
+      resetForm();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to raise ticket.";
       toast.error(msg);
@@ -228,15 +374,57 @@ export default function Help() {
             />
           </FormField>
 
+          <FormField
+            label="Screenshots"
+            icon={<Paperclip className="w-3.5 h-3.5" />}
+            hint={`${attachments.length}/${MAX_ATTACHMENTS} · 10 MB each · jpg/png/webp/gif`}
+          >
+            <div className="space-y-3">
+              {attachments.length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                  {attachments.map((a) => (
+                    <AttachmentThumb
+                      key={a.localId}
+                      item={a}
+                      onRemove={() => removeAttachment(a.localId)}
+                    />
+                  ))}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={attachments.length >= MAX_ATTACHMENTS}
+                className="w-full h-20 rounded-lg flex flex-col items-center justify-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  background: "#F8FAFC",
+                  border: "1px dashed #CBD5E1",
+                  color: "#475569",
+                }}
+              >
+                <ImageIcon className="w-5 h-5" />
+                <span className="text-xs">
+                  {attachments.length >= MAX_ATTACHMENTS
+                    ? `Limit reached (${MAX_ATTACHMENTS} files)`
+                    : "Click to attach screenshots"}
+                </span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ACCEPTED_IMAGE_TYPES.join(",")}
+                multiple
+                className="hidden"
+                onChange={(e) => handleFiles(e.target.files)}
+              />
+            </div>
+          </FormField>
+
           <div className="flex justify-end gap-2 pt-1">
             <button
               type="button"
-              onClick={() => {
-                setSubject("");
-                setDescription("");
-                setCategory("bug");
-                setPriority("medium");
-              }}
+              onClick={resetForm}
               disabled={submitting}
               className="h-10 px-4 rounded-lg text-sm disabled:opacity-50"
               style={{ background: "#F1F5F9", color: "#475569", border: "1px solid #E2E8F0" }}
@@ -245,7 +433,12 @@ export default function Help() {
             </button>
             <button
               type="submit"
-              disabled={submitting || !subject.trim() || !description.trim()}
+              disabled={
+                submitting ||
+                !subject.trim() ||
+                !description.trim() ||
+                attachments.some((a) => a.uploading)
+              }
               className="h-10 px-5 rounded-lg text-sm text-white flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
               style={{ background: "#0B1F3A" }}
             >
@@ -346,6 +539,63 @@ export default function Help() {
 }
 
 /* ─── components ─── */
+
+function AttachmentThumb({
+  item,
+  onRemove,
+}: {
+  item: StagedAttachment;
+  onRemove: () => void;
+}) {
+  return (
+    <div
+      className="relative rounded-lg overflow-hidden"
+      style={{
+        background: "#FFFFFF",
+        border: `1px solid ${item.error ? "#FCA5A5" : "#E2E8F0"}`,
+        aspectRatio: "4 / 3",
+      }}
+    >
+      <img
+        src={item.previewUrl}
+        alt={item.file.name}
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+      {item.uploading && (
+        <div
+          className="absolute inset-0 flex items-center justify-center"
+          style={{ background: "rgba(15,23,42,0.55)" }}
+        >
+          <Loader2 className="w-5 h-5 text-white animate-spin" />
+        </div>
+      )}
+      {item.error && (
+        <div
+          className="absolute inset-0 flex flex-col items-center justify-center text-center px-2"
+          style={{ background: "rgba(220,38,38,0.85)", color: "#FFFFFF" }}
+        >
+          <AlertCircle className="w-4 h-4 mb-1" />
+          <span className="text-[10px] leading-tight">{item.error}</span>
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={onRemove}
+        className="absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center transition-transform hover:scale-110"
+        style={{ background: "#FFFFFF", color: "#0B1F3A", boxShadow: "0 1px 4px rgba(0,0,0,0.25)" }}
+        aria-label="Remove attachment"
+      >
+        <X className="w-3.5 h-3.5" />
+      </button>
+      <div
+        className="absolute bottom-0 left-0 right-0 px-2 py-1 text-[10px] truncate"
+        style={{ background: "rgba(15,23,42,0.7)", color: "#FFFFFF" }}
+      >
+        {item.file.name} · {humanSize(item.file.size)}
+      </div>
+    </div>
+  );
+}
 
 function FormField({
   label,
@@ -521,6 +771,7 @@ function TicketThread({
           when={fmtRelative(ticket.createdAt)}
           message={ticket.description}
           isCurrentUser={ticket.createdBy.uid === currentUid}
+          attachments={ticket.attachments}
         />
       </div>
 
@@ -604,12 +855,14 @@ function ThreadBubble({
   when,
   message,
   isCurrentUser,
+  attachments,
 }: {
   authorRole: SupportTicket["createdBy"]["role"] | "support";
   authorName: string;
   when: string;
   message: string;
   isCurrentUser: boolean;
+  attachments?: TicketAttachment[];
 }) {
   const isSupport = authorRole === "support";
   return (
@@ -650,6 +903,37 @@ function ThreadBubble({
         >
           {message}
         </div>
+        {attachments && attachments.length > 0 && (
+          <div
+            className={`mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2 ${
+              isCurrentUser ? "justify-items-end" : ""
+            }`}
+          >
+            {attachments.map((att, idx) => (
+              <a
+                key={`${att.storagePath}-${idx}`}
+                href={att.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block rounded-lg overflow-hidden transition-transform hover:scale-[1.02]"
+                style={{
+                  background: "#FFFFFF",
+                  border: "1px solid #E2E8F0",
+                  aspectRatio: "4 / 3",
+                  maxWidth: 160,
+                }}
+                title={`${att.name} · ${humanSize(att.size)}`}
+              >
+                <img
+                  src={att.url}
+                  alt={att.name}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </a>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
