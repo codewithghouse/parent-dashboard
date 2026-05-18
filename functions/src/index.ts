@@ -384,7 +384,6 @@ export const parentAIProxy = functions
 // ─────────────────────────────────────────────────────────────────────────────
 export const syncUserClaims = functions
   .runWith({
-    serviceAccount: "edullent-2a399@appspot.gserviceaccount.com",
     timeoutSeconds: 30,
     memory: "256MB",
   })
