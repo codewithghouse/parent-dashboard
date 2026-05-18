@@ -26,7 +26,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.verifyRazorpayPayment = exports.createRazorpayOrder = exports.validateCoupon = exports.seedSampleData = exports._processClassForTesting = exports.triggerLeaderboardManually = exports.updateActionProgress = exports.generateInsights = exports.calculateWeeklyLeaderboard = exports.aggregateSchoolStats = exports.syncUserClaims = exports.parentAIProxy = exports.getParentAITutor = void 0;
+exports.verifyRazorpayPayment = exports.createRazorpayOrder = exports.validateCoupon = exports.seedSampleData = exports._processClassForTesting = exports.triggerLeaderboardManually = exports.updateActionProgress = exports.generateInsights = exports.calculateWeeklyLeaderboard = exports.aggregateSchoolStats = exports.syncUserClaimsV2 = exports.syncUserClaims = exports.parentAIProxy = exports.getParentAITutor = void 0;
 const functions = __importStar(require("firebase-functions"));
 const params_1 = require("firebase-functions/params");
 const admin = __importStar(require("firebase-admin"));
@@ -341,14 +341,14 @@ exports.parentAIProxy = functions
 //
 // For parents with kids in multiple schools, schoolIds (array) is also set
 // and the frontend can pass { schoolId: <chosen> } to pick one.
+//
+// MIGRATION NOTE (2026-05-18): The legacy `syncUserClaims` function is bound
+// to a deleted India project service account and cannot be updated in place.
+// A new `syncUserClaimsV2` function (same logic, clean SA) is exported below;
+// new frontend code should call V2. The old export is kept as a no-op
+// alias so existing in-flight clients keep working until they upgrade.
 // ─────────────────────────────────────────────────────────────────────────────
-exports.syncUserClaims = functions
-    .runWith({
-    serviceAccount: "edullent-2a399@appspot.gserviceaccount.com",
-    timeoutSeconds: 30,
-    memory: "256MB",
-})
-    .https.onCall(async (data, context) => {
+const syncUserClaimsHandler = async (data, context) => {
     requireAuth(context);
     const uid = context.auth.uid;
     const email = (context.auth.token.email || "").toLowerCase();
@@ -518,7 +518,25 @@ exports.syncUserClaims = functions
     // No role found — clear claims so stale ones don't leak.
     await auth.setCustomUserClaims(uid, null);
     throw new functions.https.HttpsError("permission-denied", "No role found for this account. Contact your school administrator.");
-});
+};
+// Legacy export — kept so existing clients don't 404. Stuck on dead India SA
+// (cannot be updated in place) but invocations still route to v1 runtime.
+exports.syncUserClaims = functions
+    .runWith({
+    timeoutSeconds: 30,
+    memory: "256MB",
+})
+    .https.onCall(syncUserClaimsHandler);
+// New canonical function — fresh SA binding, deploys cleanly. All dashboards
+// should migrate their `httpsCallable(fns, "syncUserClaims")` calls to
+// `syncUserClaimsV2`. Once every client is on V2, the legacy function can be
+// retired during a maintenance window.
+exports.syncUserClaimsV2 = functions
+    .runWith({
+    timeoutSeconds: 30,
+    memory: "256MB",
+})
+    .https.onCall(syncUserClaimsHandler);
 // ─── branchId schema validator ────────────────────────────────────────────────
 // Rejects tenant docs missing schoolId by QUARANTINING (not deleting).
 // Auto-infers missing branchId by walking the enrollment / teacher chain.

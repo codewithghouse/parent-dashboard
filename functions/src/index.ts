@@ -381,13 +381,17 @@ export const parentAIProxy = functions
 //
 // For parents with kids in multiple schools, schoolIds (array) is also set
 // and the frontend can pass { schoolId: <chosen> } to pick one.
+//
+// MIGRATION NOTE (2026-05-18): The legacy `syncUserClaims` function is bound
+// to a deleted India project service account and cannot be updated in place.
+// A new `syncUserClaimsV2` function (same logic, clean SA) is exported below;
+// new frontend code should call V2. The old export is kept as a no-op
+// alias so existing in-flight clients keep working until they upgrade.
 // ─────────────────────────────────────────────────────────────────────────────
-export const syncUserClaims = functions
-  .runWith({
-    timeoutSeconds: 30,
-    memory: "256MB",
-  })
-  .https.onCall(async (data, context) => {
+const syncUserClaimsHandler = async (
+  data: any,
+  context: functions.https.CallableContext
+) => {
     requireAuth(context);
     const uid = context.auth!.uid;
     const email = (context.auth!.token.email || "").toLowerCase();
@@ -568,7 +572,27 @@ export const syncUserClaims = functions
       "permission-denied",
       "No role found for this account. Contact your school administrator.",
     );
-  });
+};
+
+// Legacy export — kept so existing clients don't 404. Stuck on dead India SA
+// (cannot be updated in place) but invocations still route to v1 runtime.
+export const syncUserClaims = functions
+  .runWith({
+    timeoutSeconds: 30,
+    memory: "256MB",
+  })
+  .https.onCall(syncUserClaimsHandler);
+
+// New canonical function — fresh SA binding, deploys cleanly. All dashboards
+// should migrate their `httpsCallable(fns, "syncUserClaims")` calls to
+// `syncUserClaimsV2`. Once every client is on V2, the legacy function can be
+// retired during a maintenance window.
+export const syncUserClaimsV2 = functions
+  .runWith({
+    timeoutSeconds: 30,
+    memory: "256MB",
+  })
+  .https.onCall(syncUserClaimsHandler);
 
 
 // ─── branchId schema validator ────────────────────────────────────────────────

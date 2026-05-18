@@ -31,9 +31,11 @@ async function callSyncOnce(user: User): Promise<{
   branchId?: string | null;
 } | null> {
   const fns = getFunctions(undefined, FUNCTIONS_REGION);
+  // Migrated 2026-05-18 to syncUserClaimsV2 — the legacy syncUserClaims function
+  // is stuck on a deleted India service account and cannot be updated in place.
   const call = httpsCallable<unknown, { role: string; schoolId: string; branchId?: string }>(
     fns,
-    "syncUserClaims",
+    "syncUserClaimsV2",
   );
   const res = await call({});
   // Force-refresh the ID token so the new custom claims take effect immediately.
