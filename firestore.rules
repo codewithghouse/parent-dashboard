@@ -208,6 +208,7 @@ service cloud.firestore {
                     hasOwnerRole()
                     || (claimSchoolId() != null
                         && resource.data.schoolId == claimSchoolId())
+                    || isPlatformAdmin()  // super-admin portal cross-tenant read
                   );
 
       allow create: if signedIn() && hasSchoolId() && isOwnerOf(request.resource.data.schoolId);
