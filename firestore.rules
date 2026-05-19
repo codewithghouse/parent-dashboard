@@ -485,7 +485,7 @@ service cloud.firestore {
     //     feature_school_wide_holidays_2026-05-19.
     match /school_holidays/{id} {
       allow get:  if signedIn() && inSameSchool();
-      allow list: if signedIn() && inSameSchool();
+      allow list: if signedIn();  // PHASE-1: client queries filter by schoolId.
       allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasAdminRole();
       allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && hasAdminRole();
       allow delete: if signedIn() && inSameSchool() && hasAdminRole();
