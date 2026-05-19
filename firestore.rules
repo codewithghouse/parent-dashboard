@@ -1212,8 +1212,12 @@ service cloud.firestore {
     // Tenant scoping: ticket has schoolId for traceability, but support
     // agents read cross-tenant (intentional — they help every school).
     //
-    // Reply array is appended-only by either side. User can append their
-    // reply + reopen a resolved ticket. Support can change status / append.
+    // Reply array is appended-only.
+    //   - Creator may append replies ONLY while ticket is open / in_progress.
+    //   - Once status is resolved or closed, the ticket becomes read-only on
+    //     the user side. Only Edullent support agents can mutate (status flip,
+    //     append reply, reopen). This is enforced server-side here AND mirrored
+    //     in each dashboard's Help.tsx UI (reply box + reopen button hidden).
     match /support_tickets/{ticketId} {
 
       // Read: ticket creator (own uid match) OR support agent.
@@ -1256,28 +1260,25 @@ service cloud.firestore {
                 && request.resource.data.attachments.size() <= 5));
 
       // Update:
-      //   - Ticket creator: append reply + flip status from resolved→open
-      //     (re-open). Cannot change schoolId / createdBy / subject / etc.
-      //   - Support agent: append reply + change status + resolvedAt.
-      //     Cannot change schoolId or createdBy.uid (forensics).
+      //   - Support agent: anything except schoolId / createdBy.uid (forensics).
+      //   - Ticket creator: append-style mutation ONLY while open/in_progress.
+      //     Status, subject, category, schoolId, createdBy.uid all immutable
+      //     from the creator side. Once support flips to resolved/closed,
+      //     the creator path returns false (no replies, no reopen).
       allow update: if signedIn() && (
         // Support agent path
         (isSupportAgent()
           && request.resource.data.schoolId == resource.data.schoolId
           && request.resource.data.createdBy.uid == resource.data.createdBy.uid)
         ||
-        // Creator path — only append-style mutations
+        // Creator path — append-only while ticket is still active.
         (resource.data.createdBy.uid == uid()
+          && resource.data.status in ['open','in_progress']
+          && request.resource.data.status == resource.data.status
           && request.resource.data.schoolId == resource.data.schoolId
           && request.resource.data.createdBy.uid == resource.data.createdBy.uid
           && request.resource.data.subject == resource.data.subject
           && request.resource.data.category == resource.data.category
-          // Status: keep same OR reopen from resolved/closed
-          && (
-            request.resource.data.status == resource.data.status
-            || (resource.data.status in ['resolved','closed']
-                && request.resource.data.status == 'open')
-          )
           // Reply count can only grow
           && request.resource.data.replyCount >= resource.data.replyCount)
       );
