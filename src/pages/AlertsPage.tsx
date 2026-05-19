@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   AlertCircle, Clock, Trophy, Calendar, User,
   Loader2, BellRing, CheckCircle, BookOpen, ShieldAlert, Sparkles,
-  MessageSquare
+  MessageSquare, X as XIcon
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
@@ -43,6 +44,32 @@ const AlertsPage = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  // ── Notification panel (header bell) ───────────────────────────────
+  // Bell click opens a portal-anchored dropdown showing top 5 recent
+  // alerts. Click an item → close panel + scroll to the alert card in
+  // the list below.
+  const [notifPanelOpen, setNotifPanelOpen] = useState(false);
+  const bellRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (!notifPanelOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setNotifPanelOpen(false);
+    };
+    const onClickOutside = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (bellRef.current?.contains(t)) return;
+      const panelEl = document.querySelector('[data-alerts-notif-panel="true"]');
+      if (panelEl?.contains(t)) return;
+      setNotifPanelOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onClickOutside);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onClickOutside);
+    };
+  }, [notifPanelOpen]);
 
   // Reset to page 0 whenever the user switches filter tabs — otherwise tab
   // switch could leave you stranded on a page index that no longer exists.
@@ -684,6 +711,7 @@ const AlertsPage = () => {
             return (
               <div
                 key={alert.id}
+                data-alert-id={alert.id}
                 role="button"
                 tabIndex={0}
                 aria-label={`${alert.title} — ${primary?.label || "view"}`}
@@ -971,11 +999,17 @@ const AlertsPage = () => {
               <CheckCircle className="w-4 h-4" style={{ color: B1 }} strokeWidth={2.3} />
               Mark All Read
             </button>
-            <div className="w-10 h-10 rounded-full flex items-center justify-center relative"
+            <button
+              ref={bellRef}
+              type="button"
+              onClick={() => setNotifPanelOpen(o => !o)}
+              aria-label="Open notifications"
+              aria-expanded={notifPanelOpen}
+              className="w-10 h-10 rounded-full flex items-center justify-center relative active:scale-95 transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
               style={{ background: "#fff", border: `0.5px solid ${BLUE_BDR}`, boxShadow: SH_D }}>
               <BellRing className="w-4 h-4" style={{ color: "rgba(0,85,255,0.60)" }} strokeWidth={1.8} />
               {unreadCountD > 0 && <span className="absolute top-[1px] right-[1px] w-2 h-2 rounded-full" style={{ background: RED_D, border: "1.5px solid white" }} />}
-            </div>
+            </button>
             <div className="w-10 h-10 rounded-full flex items-center justify-center text-[14px] font-bold text-white"
               style={{ background: `linear-gradient(140deg, ${B1}, ${B2})`, boxShadow: "0 3px 12px rgba(0,85,255,0.36), 0 0 0 2px rgba(255,255,255,0.8)" }}>
               {(studentData?.name?.[0] || "S").toUpperCase()}
@@ -1082,6 +1116,7 @@ const AlertsPage = () => {
 
                   return (
                     <div key={alert.id}
+                      data-alert-id={alert.id}
                       onMouseEnter={handle3DEnter}
                       onMouseMove={handle3DMove}
                       onMouseLeave={handle3DLeave}
@@ -1315,6 +1350,249 @@ const AlertsPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Notification panel — portaled to escape page transforms */}
+      {notifPanelOpen && bellRef.current && createPortal(
+        (() => {
+          const rect = bellRef.current.getBoundingClientRect();
+          const panelW = 340;
+          const panelTop = rect.bottom + 8;
+          const panelRight = Math.max(12, window.innerWidth - rect.right);
+          const topAlerts = allAlerts.slice(0, 6);
+          const handleItemClick = (id: string) => {
+            setNotifPanelOpen(false);
+            requestAnimationFrame(() => {
+              const el = document.querySelector(`[data-alert-id="${CSS.escape(id)}"]`);
+              if (el) (el as HTMLElement).scrollIntoView({ behavior: "smooth", block: "center" });
+            });
+          };
+          return (
+            <div
+              data-alerts-notif-panel="true"
+              role="dialog"
+              aria-label="Recent notifications"
+              style={{
+                position: "fixed",
+                top: panelTop,
+                right: panelRight,
+                width: panelW,
+                maxWidth: "calc(100vw - 24px)",
+                maxHeight: "min(70vh, 520px)",
+                background: "#fff",
+                borderRadius: 18,
+                border: "0.5px solid rgba(0,85,255,0.12)",
+                boxShadow: "0 24px 60px rgba(15,23,42,0.18), 0 4px 12px rgba(15,23,42,0.06)",
+                zIndex: 80,
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+                fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+              }}
+            >
+              {/* Header */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "12px 14px 10px",
+                  borderBottom: "0.5px solid rgba(0,85,255,0.08)",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: T4, textTransform: "uppercase", letterSpacing: "0.16em" }}>
+                    Notifications
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: T1, marginTop: 2, letterSpacing: "-0.3px" }}>
+                    {unreadCountD > 0 ? `${unreadCountD} unread` : "All caught up"}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setNotifPanelOpen(false)}
+                  aria-label="Close notifications"
+                  className="active:scale-95 transition-transform"
+                  style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: 10,
+                    background: BG_D,
+                    border: "0.5px solid rgba(0,85,255,0.10)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                  }}
+                >
+                  <XIcon className="w-[14px] h-[14px]" style={{ color: T3 }} strokeWidth={2.4} />
+                </button>
+              </div>
+
+              {/* List */}
+              <div style={{ flex: 1, overflowY: "auto" }}>
+                {topAlerts.length === 0 ? (
+                  <div style={{ padding: "26px 14px", textAlign: "center" }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: T1, marginBottom: 4 }}>
+                      You're all caught up
+                    </div>
+                    <div style={{ fontSize: 11, color: T3 }}>
+                      No new alerts right now.
+                    </div>
+                  </div>
+                ) : (
+                  topAlerts.map((a) => {
+                    const isUnread = isRecentD(a.createdAt);
+                    const isHigh = a.priority === "High Priority";
+                    const isGood = a.priority === "Good News";
+                    const dotColor = isHigh ? RED_D : isGood ? GREEN_D : ORANGE_D;
+                    return (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => handleItemClick(a.id)}
+                        className="active:scale-[0.99] transition-transform"
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 10,
+                          padding: "10px 14px",
+                          width: "100%",
+                          textAlign: "left",
+                          background: isUnread ? "rgba(0,85,255,0.04)" : "transparent",
+                          border: "none",
+                          borderBottom: "0.5px solid rgba(0,85,255,0.06)",
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLButtonElement).style.background =
+                            "rgba(0,85,255,0.06)";
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLButtonElement).style.background = isUnread
+                            ? "rgba(0,85,255,0.04)"
+                            : "transparent";
+                        }}
+                      >
+                        <span
+                          aria-hidden
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: "50%",
+                            background: dotColor,
+                            marginTop: 6,
+                            flexShrink: 0,
+                            boxShadow: isUnread ? `0 0 0 2.5px ${dotColor}33` : "none",
+                          }}
+                        />
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div
+                            style={{
+                              fontSize: 12.5,
+                              fontWeight: 700,
+                              color: T1,
+                              letterSpacing: "-0.2px",
+                              lineHeight: 1.35,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              display: "-webkit-box",
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: "vertical",
+                            }}
+                          >
+                            {a.title}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 10.5,
+                              color: T3,
+                              marginTop: 3,
+                              lineHeight: 1.45,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              display: "-webkit-box",
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: "vertical",
+                            }}
+                          >
+                            {a.description}
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                              marginTop: 6,
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 9,
+                                fontWeight: 700,
+                                color: dotColor,
+                                textTransform: "uppercase",
+                                letterSpacing: "0.06em",
+                              }}
+                            >
+                              {a.priority}
+                            </span>
+                            <span style={{ fontSize: 10, color: T4 }}>·</span>
+                            <span style={{ fontSize: 10, color: T4 }}>
+                              {a.category}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Footer */}
+              {topAlerts.length > 0 && (
+                <div
+                  style={{
+                    padding: "10px 14px",
+                    borderTop: "0.5px solid rgba(0,85,255,0.08)",
+                    background: BG_D,
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      markAllRead();
+                      setNotifPanelOpen(false);
+                    }}
+                    className="active:scale-[0.98] transition-transform"
+                    style={{
+                      width: "100%",
+                      height: 36,
+                      borderRadius: 11,
+                      background: "#fff",
+                      border: `0.5px solid ${BLUE_BDR}`,
+                      color: B1,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      letterSpacing: "-0.1px",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 6,
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    <CheckCircle className="w-[14px] h-[14px]" strokeWidth={2.4} />
+                    Mark all read
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })(),
+        document.body
+      )}
     </div>
   );
 };

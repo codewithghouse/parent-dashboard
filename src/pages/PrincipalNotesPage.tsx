@@ -134,7 +134,7 @@ const PrincipalNotesPage = () => {
   // / current-time. A pending serverTimestamp must render blank, not fabricate.
   const fmtTime = (ts: any) => {
     const ms = toMs(ts);
-    return ms ? new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+    return ms ? new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true }) : "";
   };
 
   const fmtDate = (ts: any) => {
@@ -249,7 +249,7 @@ const PrincipalNotesPage = () => {
                         borderRadius: "8px 8px 0 8px",
                         boxShadow: "0 1px 1px rgba(11,20,26,0.08)",
                       }}>
-                      <div className="text-[14px] leading-[1.4] whitespace-pre-wrap break-words pr-[58px]" style={{ color: WA_T1 }}>{n.message}</div>
+                      <div className="text-[14px] leading-[1.4] whitespace-pre-wrap break-words pr-[78px]" style={{ color: WA_T1 }}>{n.message}</div>
                       <div className="absolute right-[8px] bottom-[4px] flex items-center gap-[3px]">
                         <span className="text-[10px]" style={{ color: WA_T3 }}>{fmtTime(n.timestamp)}</span>
                         <CheckCheck className="w-[14px] h-[14px]" style={{ color: WA_TICK_READ }} />
@@ -264,7 +264,7 @@ const PrincipalNotesPage = () => {
                         borderRadius: "8px 8px 8px 0",
                         boxShadow: "0 1px 1px rgba(11,20,26,0.08)",
                       }}>
-                      <div className="text-[14px] leading-[1.4] whitespace-pre-wrap break-words pr-[44px]" style={{ color: WA_T1 }}>{n.message}</div>
+                      <div className="text-[14px] leading-[1.4] whitespace-pre-wrap break-words pr-[62px]" style={{ color: WA_T1 }}>{n.message}</div>
                       <div className="absolute right-[8px] bottom-[4px]">
                         <span className="text-[10px]" style={{ color: WA_T3 }}>{fmtTime(n.timestamp)}</span>
                       </div>
@@ -449,7 +449,7 @@ const PrincipalNotesPage = () => {
                           borderRadius: "8px 8px 8px 0",
                           boxShadow: "0 1px 1px rgba(11,20,26,0.08)",
                         }}>
-                        <p className={`text-[14.2px] whitespace-pre-wrap leading-[1.4] ${isParent ? "pr-[58px]" : "pr-[44px]"}`}
+                        <p className={`text-[14.2px] whitespace-pre-wrap leading-[1.4] ${isParent ? "pr-[78px]" : "pr-[62px]"}`}
                           style={{ color: WA_T1 }}>{n.message}</p>
                         <div className="absolute right-[8px] bottom-[4px] flex items-center gap-[3px]">
                           <span className="text-[11px]" style={{ color: WA_T3 }}>{fmtTime(n.timestamp)}</span>

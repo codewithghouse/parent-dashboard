@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import type { ComponentType, ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, type NavigateFunction } from "react-router-dom";
 import {
   CheckCircle, XCircle, Clock, ChevronLeft, ChevronRight, Loader2,
@@ -369,7 +370,7 @@ interface CalendarCardProps {
   isMobile: boolean;
   navigate: NavigateFunction;
   isInGrid?: boolean;   // skip outer mx-5 mt-3 when used inside a grid
-  onCellClick?: (dateKey: string) => void;
+  onCellClick?: (dateKey: string, status: string) => void;
 }
 
 const CalendarCard = ({
@@ -566,8 +567,9 @@ const CalendarCard = ({
               }
             })();
             const dateKey = istKey(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day));
-            const hasRecord = status === "present" || status === "absent" || status === "late";
-            const clickable = !!onCellClick && hasRecord;
+            const clickable = !!onCellClick && (
+              status === "present" || status === "absent" || status === "late" || status === "unmarked"
+            );
             return (
               <div
                 key={day}
@@ -575,10 +577,10 @@ const CalendarCard = ({
                 tabIndex={clickable ? 0 : undefined}
                 aria-label={clickable ? `Open detail for ${dateKey}` : undefined}
                 onClick={clickable
-                  ? (e) => { e.stopPropagation(); onCellClick?.(dateKey); }
+                  ? (e) => { e.stopPropagation(); onCellClick?.(dateKey, status); }
                   : undefined}
                 onKeyDown={clickable
-                  ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onCellClick?.(dateKey); } }
+                  ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onCellClick?.(dateKey, status); } }
                   : undefined}
                 className={[
                   isMobile ? "aspect-square rounded-[12px] flex items-center justify-center text-[13px]" : "aspect-square rounded-[14px] flex items-center justify-center text-[15px]",
@@ -608,15 +610,35 @@ const DayDetailModal = ({
   }, [onClose]);
 
   const statusTone =
-    day.status === "present" ? { color: T.GREEN_D, bg: T.GREEN_S, bdr: T.GREEN_B, label: "Present", Icon: CheckCircle } :
-    day.status === "late" ? { color: "#AA5500", bg: "rgba(255,136,0,0.10)", bdr: "rgba(255,136,0,0.25)", label: "Late", Icon: Clock } :
-    { color: "#AA2233", bg: "rgba(255,51,85,0.08)", bdr: "rgba(255,51,85,0.22)", label: "Absent", Icon: XCircle };
+    day.status === "present" ? {
+      color: T.GREEN_D, bg: T.GREEN_S, bdr: T.GREEN_B,
+      label: "Present", message: "Teacher marked you as Present",
+      Icon: CheckCircle,
+    } :
+    day.status === "late" ? {
+      color: "#AA5500", bg: "rgba(255,136,0,0.10)", bdr: "rgba(255,136,0,0.25)",
+      label: "Late", message: "Teacher marked you as Late",
+      Icon: Clock,
+    } :
+    day.status === "unmarked" ? {
+      color: "#64748b", bg: "rgba(100,116,139,0.10)", bdr: "rgba(100,116,139,0.22)",
+      label: "Not Marked", message: "Teacher has not marked attendance",
+      Icon: AlertCircle,
+    } :
+    {
+      color: "#AA2233", bg: "rgba(255,51,85,0.08)", bdr: "rgba(255,51,85,0.22)",
+      label: "Absent", message: "Teacher marked you as Absent",
+      Icon: XCircle,
+    };
   const StatusIcon = statusTone.Icon;
 
   // Parse YYYY-MM-DD into a friendly long-form label.
   const dateLong = formatDateLong(day.dateKey);
 
-  return (
+  // Portal to document.body — escapes any parent with CSS `transform`/`filter`/
+  // `perspective`, which would otherwise turn this `position: fixed` overlay
+  // into a container-relative one (and float it to the bottom of a card).
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -640,7 +662,7 @@ const DayDetailModal = ({
         style={{
           background: "#fff",
           borderRadius: 22,
-          width: 440,
+          width: 360,
           maxWidth: "100%",
           padding: 0,
           overflow: "hidden",
@@ -678,7 +700,7 @@ const DayDetailModal = ({
           >
             <StatusIcon className="w-5 h-5" style={{ color: statusTone.color }} strokeWidth={2.2} />
             <span className="text-[15px] font-bold" style={{ color: statusTone.color, letterSpacing: "-0.2px" }}>
-              Marked as {statusTone.label}
+              {statusTone.message}
             </span>
           </div>
 
@@ -736,7 +758,7 @@ const DayDetailModal = ({
             </div>
           )}
 
-          {!day.className && !day.markedBy && !(day.note && day.note.trim()) && (
+          {day.status !== "unmarked" && !day.className && !day.markedBy && !(day.note && day.note.trim()) && (
             <div
               className="text-[12px] text-center py-2"
               style={{ color: T.T4 }}
@@ -746,7 +768,8 @@ const DayDetailModal = ({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
@@ -1841,7 +1864,19 @@ const AttendancePage = () => {
   }, [stats]);
 
   // ── D. Calendar cell click → DayDetail ──────────────────────────────
-  const handleDayClick = (dateKey: string) => {
+  const handleDayClick = (dateKey: string, status: string) => {
+    // Past weekday with no record — surface "not marked" to the parent so they
+    // know it's a teacher oversight, not a silent gap.
+    if (status === "unmarked") {
+      setSelectedDay({
+        dateKey,
+        status: "unmarked",
+        note: null,
+        className: null,
+        markedBy: null,
+      });
+      return;
+    }
     const log = attendanceLogs.find((l) => l.date === dateKey);
     if (!log) return;
     const className = log.classId
