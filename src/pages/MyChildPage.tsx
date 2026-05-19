@@ -10,6 +10,8 @@ import { subscribePerStudent } from "../lib/perStudentQuery";
 import { subscribeEnrollments } from "../lib/enrollmentQuery";
 import { scopedQuery } from "../lib/scopedQuery";
 import { SubjectMasteryRadar } from "../components/SubjectMasteryRadar";
+import { dedupAttendanceByDay } from "../lib/attendanceDedup";
+import { subscribeSchoolHolidays, buildHolidayMap, type SchoolHoliday } from "../lib/schoolHolidays";
 
 // ── Tokens ───────────────────────────────────────────────────────────────────
 const T = {
@@ -166,6 +168,7 @@ const MyChildPage = () => {
   const [parentNotes, setParentNotes] = useState<any[]>([]);
   const [interventions, setInterventions] = useState<any[]>([]);
   const [enrollments, setEnrollments] = useState<any[]>([]);
+  const [schoolHolidays, setSchoolHolidays] = useState<SchoolHoliday[]>([]);
   const [calMonth, setCalMonth] = useState(new Date());
 
   const sid = studentData?.id || studentData?.studentId || "";
@@ -260,6 +263,14 @@ const MyChildPage = () => {
       (err) => { console.error("[MyChild] enrollments:", err); ready.en = true; checkReady(); },
     ));
 
+    // School-wide holidays (principal-declared). Excluded from attendance %
+    // and rendered as purple chips on the calendar.
+    unsubs.push(subscribeSchoolHolidays(
+      studentData?.schoolId || "",
+      (rows) => setSchoolHolidays(rows),
+      (err) => console.error("[MyChild] school_holidays:", err),
+    ));
+
     return () => { unsubs.forEach(u => u()); };
   }, [studentData?.id, studentData?.schoolId, studentData?.email, studentData?.studentEmail]);
 
@@ -308,12 +319,18 @@ const MyChildPage = () => {
   // Merged student (live master overrides cached studentData)
   const student = useMemo(() => ({ ...studentData, ...(masterProfile || {}) }), [studentData, masterProfile]);
 
+  // ── School-wide holidays lookup (principal-declared) ────────────────────
+  const holidayMap = useMemo(() => buildHolidayMap(schoolHolidays), [schoolHolidays]);
+
   // ── Metrics ────────────────────────────────────────────────────────────────
   const m = useMemo(() => {
-    // Holiday days are excluded from attendance % across all dashboards —
-    // teacher explicitly declared the day off for the whole class, so it
-    // doesn't count for or against the student.
-    const attCountable = attendance.filter(r => r.status !== "holiday");
+    // Dedup first so holiday wins over any same-day present/absent from
+    // subject teachers (multi-class loophole). THEN exclude holiday AND
+    // any school-wide declared holiday dates from %.
+    const attDeduped = dedupAttendanceByDay(attendance as any[]);
+    const attCountable = attDeduped
+      .filter(r => r.status !== "holiday")
+      .filter(r => !holidayMap.has(typeof r.date === "string" ? r.date : ""));
     const tot = attCountable.length;
     const pres = attCountable.filter(r => r.status === "present").length;
     const late = attCountable.filter(r => r.status === "late").length;
@@ -391,7 +408,7 @@ const MyChildPage = () => {
     }).length;
 
     return { tot, pres, late, abs, attRate, avg, subScores, trend, monthly, subCount, asgCount, completion, days, recentIncidents, submittedAsgIds };
-  }, [attendance, testScores, submissions, assignments, incidents]);
+  }, [attendance, testScores, submissions, assignments, incidents, holidayMap]);
 
   // No-data guard: a brand-new student should show "NO DATA", not "CRITICAL".
   const hasAnyData = testScores.length > 0 || attendance.length > 0 || incidents.length > 0;
@@ -425,14 +442,20 @@ const MyChildPage = () => {
   const sortedInterventions = useMemo(() => [...interventions].sort(cmpDescTime), [interventions]);
 
   // Calendar lookup map — replaces O(days × attendance) per-cell .find() with O(1) get.
+  // Priority: school-wide holiday > per-student record (already dedup'd so
+  // class teacher's holiday wins over subject teacher's mark). Result: any
+  // date declared by principal renders as "holiday" everywhere.
   const attendanceMap = useMemo(() => {
     const map = new Map<string, string>();
-    attendance.forEach((a: any) => {
+    const deduped = dedupAttendanceByDay(attendance as any[]);
+    deduped.forEach((a: any) => {
       const key = typeof a.date === "string" ? a.date : istKey(toDate(a.date));
       if (key) map.set(key, String(a.status || ""));
     });
+    // School-wide holidays trump everything
+    holidayMap.forEach((_v, key) => map.set(key, "holiday"));
     return map;
-  }, [attendance]);
+  }, [attendance, holidayMap]);
 
   // Assignment ordering: unsubmitted first (urgent to parent), then by due date
   // ascending so most-imminent appears at top.
@@ -804,6 +827,7 @@ const MyChildPage = () => {
                 d.status === "present" ? T.grn :
                 d.status === "late" ? T.amb :
                 d.status === "absent" ? T.red :
+                d.status === "holiday" ? T.pur :
                 isUnmarked ? T.s3 :
                 "transparent";
               const fontColor = d.status
@@ -830,6 +854,7 @@ const MyChildPage = () => {
               { c: T.grn, l: "Present" },
               { c: T.amb, l: "Late" },
               { c: T.red, l: "Absent" },
+              { c: T.pur, l: "Holiday" },
               { c: T.s2, l: "Weekend" },
               { c: T.s3, l: "Not marked" },
             ].map(x => (

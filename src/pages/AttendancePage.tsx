@@ -17,6 +17,7 @@ import { where } from "firebase/firestore";
 import { subscribePerStudent } from "@/lib/perStudentQuery";
 import { subscribeEnrollments } from "@/lib/enrollmentQuery";
 import { dedupAndSortAttendance } from "@/lib/attendanceDedup";
+import { subscribeSchoolHolidays, buildHolidayMap, type SchoolHoliday } from "@/lib/schoolHolidays";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { computeAttendanceCorrelation } from "@/ai/system/attendance-correlation";
 
@@ -541,7 +542,11 @@ const CalendarCard = ({
               selectedDate.getMonth() === todayDate.getMonth() &&
               day === todayDate.getDate();
             const cellStyle: React.CSSProperties = (() => {
-              if (isToday) {
+              // "Today" gradient hides status colour. We carve out holiday
+              // because a holiday declaration is more important than the
+              // today-indicator (parent already knows it's today from the
+              // calendar header).
+              if (isToday && status !== "holiday") {
                 return {
                   background: `linear-gradient(135deg, ${T.B1}, ${T.B2})`,
                   color: "#fff", fontWeight: 700,
@@ -1647,11 +1652,36 @@ const AttendancePage = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [attendanceLogs, setAttendanceLogs] = useState<RawAttendance[]>([]);
   const [enrollments, setEnrollments] = useState<RawEnrollment[]>([]);
+  const [schoolHolidays, setSchoolHolidays] = useState<SchoolHoliday[]>([]);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<AttendanceStats>({
-    present: 0, absent: 0, late: 0, percentage: null,
-  });
-  const [monthStats, setMonthStats] = useState<MonthStats>({ present: 0, absent: 0, late: 0 });
+  // School-wide holidays lookup. Excluded from both stats + monthStats below.
+  const holidayMap = useMemo(() => buildHolidayMap(schoolHolidays), [schoolHolidays]);
+
+  // Stats derived from attendanceLogs + holidayMap (was useState, now useMemo
+  // so principal-declared school holidays correctly drop out of % once they
+  // arrive over the school_holidays subscription).
+  const stats = useMemo<AttendanceStats>(() => {
+    const countable = attendanceLogs.filter(l => !(l.date && holidayMap.has(l.date)));
+    const pCount = countable.filter((l) => l.status === "present").length;
+    const aCount = countable.filter((l) => l.status === "absent").length;
+    const lCount = countable.filter((l) => l.status === "late").length;
+    const total = pCount + aCount + lCount;
+    return {
+      present: pCount, absent: aCount, late: lCount,
+      percentage: total === 0 ? null : Math.round(((pCount + lCount) / total) * 100),
+    };
+  }, [attendanceLogs, holidayMap]);
+
+  const monthStats = useMemo<MonthStats>(() => {
+    const now = new Date();
+    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const thisMonth = attendanceLogs.filter(l => l.date?.startsWith(ym) && !holidayMap.has(l.date || ""));
+    return {
+      present: thisMonth.filter((l) => l.status === "present").length,
+      absent:  thisMonth.filter((l) => l.status === "absent").length,
+      late:    thisMonth.filter((l) => l.status === "late").length,
+    };
+  }, [attendanceLogs, holidayMap]);
   const [listenerError, setListenerError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedDay, setSelectedDay] = useState<SelectedDay | null>(null);
@@ -1684,26 +1714,7 @@ const AttendancePage = () => {
         // `feedback_attendance_one_per_day_loophole` for the canonical fix.
         const uniqueLogs = dedupAndSortAttendance(raw);
         setAttendanceLogs(uniqueLogs);
-
-        const pCount = uniqueLogs.filter((l) => l.status === "present").length;
-        const aCount = uniqueLogs.filter((l) => l.status === "absent").length;
-        const lCount = uniqueLogs.filter((l) => l.status === "late").length;
-        const total = pCount + aCount + lCount;
-        setStats({
-          present: pCount,
-          absent: aCount,
-          late: lCount,
-          percentage: total === 0 ? null : Math.round(((pCount + lCount) / total) * 100),
-        });
-
-        const now = new Date();
-        const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-        const thisMonth = uniqueLogs.filter((l) => l.date?.startsWith(ym));
-        setMonthStats({
-          present: thisMonth.filter((l) => l.status === "present").length,
-          absent:  thisMonth.filter((l) => l.status === "absent").length,
-          late:    thisMonth.filter((l) => l.status === "late").length,
-        });
+        // stats + monthStats are now derived useMemos above — no setState here.
         setLoading(false);
       },
       onError: (err) => {
@@ -1733,10 +1744,19 @@ const AttendancePage = () => {
       },
     );
 
+    // School-wide holidays (principal-declared) — excluded from % + rendered
+    // as purple cells on the calendar.
+    const unsubHolidays = subscribeSchoolHolidays(
+      studentData?.schoolId || "",
+      (rows) => { if (!cancelled) setSchoolHolidays(rows); },
+      (err) => console.error("[Attendance] school_holidays:", err),
+    );
+
     return () => {
       cancelled = true;
       u();
       unsubEnroll();
+      unsubHolidays();
     };
   }, [studentData, refreshKey, settings.academicYearStartMonth]);
 
@@ -1747,8 +1767,11 @@ const AttendancePage = () => {
     attendanceLogs.forEach((l) => {
       if (l.date && l.status) m.set(l.date, l.status);
     });
+    // School-wide holidays trump any per-student attendance status. Same
+    // date renders as purple "holiday" everywhere it's surfaced.
+    holidayMap.forEach((_v, key) => m.set(key, "holiday"));
     return m;
-  }, [attendanceLogs]);
+  }, [attendanceLogs, holidayMap]);
 
   // Single week-bar computation used by both branches.
   const weekBars = useMemo<WeekBar[]>(() => {

@@ -9,6 +9,7 @@ import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, getDocs, Timestamp } from "firebase/firestore";
 import { subscribeEnrollments } from "@/lib/enrollmentQuery";
 import { fetchPerStudent, subscribePerStudent } from "@/lib/perStudentQuery";
+import { subscribeSchoolHolidays, buildHolidayMap, type SchoolHoliday } from "@/lib/schoolHolidays";
 import { buildAlerts } from "@/lib/alertBuilder";
 import { useSchoolSettings, resolveAcademicYear } from "@/hooks/useSchoolSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -278,6 +279,7 @@ const DashboardPage = () => {
   // means Dashboard and AlertsPage can never drift apart again.
   const [risksRaw, setRisksRaw] = useState<any[]>([]);
   const [attendanceRaw, setAttendanceRaw] = useState<any[]>([]);
+  const [schoolHolidays, setSchoolHolidays] = useState<SchoolHoliday[]>([]);
   const [scoresRaw, setScoresRaw] = useState<any[]>([]);
   const [notesRaw, setNotesRaw] = useState<any[]>([]);
   const [assignmentsRaw, setAssignmentsRaw] = useState<any[]>([]);
@@ -335,27 +337,17 @@ const DashboardPage = () => {
 
     // 1. Attendance — DUAL-KEY (id + email merge) per dual_query_pattern memory.
     // Single-query missed any attendance doc written with only studentEmail.
+    //
+    // % calc lives in a separate useMemo below — it depends on BOTH the
+    // attendance records (stashed in state) AND school_holidays (separate
+    // subscription). Doing the math here would freeze holidayMap at
+    // subscription time, missing later principal-declared holidays.
     const u1 = subscribePerStudent({
       collection: "attendance",
       student: studentData,
       onChange: (docs) => {
         const records = docs.map(d => ({ id: d.id, ...d.data() as any }));
-        setAttendanceRaw(records); // for buildAlerts
-        if (records.length === 0) {
-          setLiveStats(prev => ({ ...prev, attendance: null, hasAttendanceData: false }));
-          return;
-        }
-        // Exclude holiday days from both numerator and denominator — they
-        // don't count for or against the student per the holiday-status
-        // policy shipped 2026-05-19.
-        const countable = records.filter((r: any) => r.status !== "holiday");
-        if (countable.length === 0) {
-          setLiveStats(prev => ({ ...prev, attendance: null, hasAttendanceData: false }));
-          return;
-        }
-        const present = countable.filter((r: any) => r.status === "present" || r.status === "late").length;
-        const pct = Math.round((present / countable.length) * 100);
-        setLiveStats(prev => ({ ...prev, attendance: pct, hasAttendanceData: true }));
+        setAttendanceRaw(records); // useMemo below picks this up
       },
       onError: onListenerError("attendance"),
     });
@@ -579,6 +571,38 @@ const DashboardPage = () => {
     // with the email-side query, silently dropping any per-student doc whose
     // studentId field doesn't match the parent's auth doc id.
   }, [studentData?.id, studentData?.schoolId, studentData?.email, studentData?.studentEmail, refreshKey]);
+
+  // School-wide holidays — separate subscription so principal-declared dates
+  // immediately propagate to the attendance % below.
+  useEffect(() => {
+    if (!studentData?.schoolId) return;
+    const unsub = subscribeSchoolHolidays(
+      studentData.schoolId,
+      (rows) => setSchoolHolidays(rows),
+      (err) => console.error("[Dashboard] school_holidays:", err),
+    );
+    return () => unsub();
+  }, [studentData?.schoolId]);
+
+  // Live attendance % — derived from attendanceRaw + school_holidays.
+  // Re-computes whenever either changes (vs. baked-in at subscription time).
+  useEffect(() => {
+    if (attendanceRaw.length === 0) {
+      setLiveStats(prev => ({ ...prev, attendance: null, hasAttendanceData: false }));
+      return;
+    }
+    const holidayKeys = new Set(schoolHolidays.map(h => h.date));
+    const countable = attendanceRaw.filter((r: any) =>
+      r.status !== "holiday" && !holidayKeys.has(String(r.date || "")),
+    );
+    if (countable.length === 0) {
+      setLiveStats(prev => ({ ...prev, attendance: null, hasAttendanceData: false }));
+      return;
+    }
+    const present = countable.filter((r: any) => r.status === "present" || r.status === "late").length;
+    const pct = Math.round((present / countable.length) * 100);
+    setLiveStats(prev => ({ ...prev, attendance: pct, hasAttendanceData: true }));
+  }, [attendanceRaw, schoolHolidays]);
 
   // P0-3: assignments + tests are one-shot getDocs (live-onSnapshot would
   // require nested listener management). To keep the UI honest about freshness,

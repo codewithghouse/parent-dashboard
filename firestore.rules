@@ -477,6 +477,19 @@ service cloud.firestore {
       allow update:    if signedIn() && inSameSchool() && schoolIdImmutable() && hasStaffRole();
       allow delete:    if signedIn() && inSameSchool() && hasAdminRole();
     }
+    // ── school_holidays — principal-declared school-wide off-days ───────
+    //     Doc id pattern: `${schoolId}_${YYYY-MM-DD}`. One doc per school per
+    //     date. Read by everyone in the school (parent/teacher/principal/
+    //     owner) so attendance % readers can exclude these dates. Write
+    //     gated to admin role (owner / principal). Memory:
+    //     feature_school_wide_holidays_2026-05-19.
+    match /school_holidays/{id} {
+      allow get:  if signedIn() && inSameSchool();
+      allow list: if signedIn() && inSameSchool();
+      allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasAdminRole();
+      allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && hasAdminRole();
+      allow delete: if signedIn() && inSameSchool() && hasAdminRole();
+    }
     match /results/{id} {
       allow get:  if signedIn() && inSameSchool();
       allow list: if signedIn();  // TEMPORARY PHASE-1: relaxed while client queries migrate. Re-tighten to inSameSchool() once all pages filter by schoolId.

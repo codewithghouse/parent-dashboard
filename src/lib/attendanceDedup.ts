@@ -73,8 +73,18 @@ export function dedupAttendanceByDay<T extends AttendanceLike>(logs: T[]): T[] {
       byDay.set(l.date, l);
       return;
     }
-    // Latest createdAt wins. Falls back to keeping the existing record
-    // when neither has a timestamp.
+    // Holiday wins over present/absent/late regardless of createdAt — closes
+    // the multi-teacher loophole: class teacher declares holiday at 9 AM,
+    // subject teacher takes period roll call at 10 AM and marks "present" →
+    // without this carve-out the latest-createdAt rule flips the deduped
+    // record to present and the holiday declaration is silently lost.
+    // Memory ref: feature_attendance_holiday_status.
+    const existingIsHoliday = (existing.status || "").toLowerCase() === "holiday";
+    const incomingIsHoliday = (l.status || "").toLowerCase() === "holiday";
+    if (existingIsHoliday && !incomingIsHoliday) return;          // keep holiday
+    if (incomingIsHoliday && !existingIsHoliday) { byDay.set(l.date, l); return; }
+    // Both same priority (both holiday OR neither holiday) → latest createdAt
+    // wins. Falls back to keeping the existing record when neither has a ts.
     const existingMs = tsMs(existing.createdAt);
     const newMs = tsMs(l.createdAt);
     if (newMs > existingMs) byDay.set(l.date, l);
