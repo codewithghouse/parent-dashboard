@@ -310,9 +310,13 @@ const MyChildPage = () => {
 
   // ── Metrics ────────────────────────────────────────────────────────────────
   const m = useMemo(() => {
-    const tot = attendance.length;
-    const pres = attendance.filter(r => r.status === "present").length;
-    const late = attendance.filter(r => r.status === "late").length;
+    // Holiday days are excluded from attendance % across all dashboards —
+    // teacher explicitly declared the day off for the whole class, so it
+    // doesn't count for or against the student.
+    const attCountable = attendance.filter(r => r.status !== "holiday");
+    const tot = attCountable.length;
+    const pres = attCountable.filter(r => r.status === "present").length;
+    const late = attCountable.filter(r => r.status === "late").length;
     const abs = tot - pres - late;
     const attRate = tot > 0 ? ((pres + late) / tot) * 100 : 0;
 
@@ -349,7 +353,7 @@ const MyChildPage = () => {
     const today0 = new Date();
     const monthly = Array.from({ length: 6 }, (_, i) => {
       const d = new Date(today0.getFullYear(), today0.getMonth() - (5 - i), 1);
-      const mAtt = attendance.filter(r => { const dt = toDate(r.date); return dt && dt.getMonth() === d.getMonth() && dt.getFullYear() === d.getFullYear(); });
+      const mAtt = attendance.filter(r => { const dt = toDate(r.date); return dt && dt.getMonth() === d.getMonth() && dt.getFullYear() === d.getFullYear() && r.status !== "holiday"; });
       const mSc = testScores.filter(t => { const dt = scoreDateOf(t); return dt && dt.getMonth() === d.getMonth() && dt.getFullYear() === d.getFullYear(); });
       const mP = mAtt.filter(r => r.status === "present" || r.status === "late").length;
       const attP = mAtt.length > 0 ? (mP / mAtt.length) * 100 : 0;

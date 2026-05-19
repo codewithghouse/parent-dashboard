@@ -74,7 +74,7 @@ interface SelectedDay {
   markedBy: string | null;
 }
 
-type DayStatus = "present" | "absent" | "late" | "weekend" | "unmarked" | "empty";
+type DayStatus = "present" | "absent" | "late" | "holiday" | "weekend" | "unmarked" | "empty";
 
 interface AttendanceStats {
   present: number;
@@ -383,14 +383,15 @@ const CalendarCard = ({
 
   const getDayStatus = (day: number): DayStatus => {
     const d = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day);
-    if (d.getDay() === 0 || d.getDay() === 6) return "weekend";
     const key = istKey(d);
     const status = attendanceMap.get(key);
+    // Holiday is the only status that wins over weekend — teacher may
+    // declare a Saturday-class day a holiday and that mark should display.
+    if (status === "holiday") return "holiday";
+    if (d.getDay() === 0 || d.getDay() === 6) return "weekend";
     if (status === "absent") return "absent";
     if (status === "late") return "late";
     if (status === "present") return "present";
-    // No record — past weekday is "unmarked" (NOT "forgotten" — could be
-    // a holiday / off-day / network issue, not necessarily teacher fault).
     return d.getTime() < todayMidnightMs ? "unmarked" : "empty";
   };
 
@@ -551,6 +552,7 @@ const CalendarCard = ({
                 case "present":  return { background: "rgba(0,200,83,0.10)", color: T.GREEN_D, border: "0.5px solid rgba(0,200,83,0.18)", fontWeight: 600 };
                 case "absent":   return { background: "rgba(255,51,85,0.10)", color: T.RED, border: "0.5px solid rgba(255,51,85,0.18)", fontWeight: 600 };
                 case "late":     return { background: "rgba(255,136,0,0.10)", color: T.ORANGE, border: "0.5px solid rgba(255,136,0,0.18)", fontWeight: 600 };
+                case "holiday":  return { background: "rgba(123,63,244,0.10)", color: "#5B22C2", border: "0.5px solid rgba(123,63,244,0.22)", fontWeight: 600 };
                 case "weekend":  return { color: T.T4, fontWeight: 500 };
                 // NOT-MARKED: visible grey box so parent can clearly tell
                 // "teacher didn't take attendance this day" apart from
@@ -568,7 +570,7 @@ const CalendarCard = ({
             })();
             const dateKey = istKey(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day));
             const clickable = !!onCellClick && (
-              status === "present" || status === "absent" || status === "late" || status === "unmarked"
+              status === "present" || status === "absent" || status === "late" || status === "holiday" || status === "unmarked"
             );
             return (
               <div
@@ -619,6 +621,11 @@ const DayDetailModal = ({
       color: "#AA5500", bg: "rgba(255,136,0,0.10)", bdr: "rgba(255,136,0,0.25)",
       label: "Late", message: "Teacher marked you as Late",
       Icon: Clock,
+    } :
+    day.status === "holiday" ? {
+      color: "#5B22C2", bg: "rgba(123,63,244,0.10)", bdr: "rgba(123,63,244,0.22)",
+      label: "Holiday", message: "Declared as Holiday — excluded from attendance %",
+      Icon: Trophy,
     } :
     day.status === "unmarked" ? {
       color: "#64748b", bg: "rgba(100,116,139,0.10)", bdr: "rgba(100,116,139,0.22)",

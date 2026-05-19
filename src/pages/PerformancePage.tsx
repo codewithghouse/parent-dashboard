@@ -2805,10 +2805,12 @@ const PerformancePage = () => {
       const t = d.getTime();
       return !isNaN(t) && t >= thirtyAgo && t <= todayMs;
     });
-    const attendancePresent = recentAtt.filter((a) => a.status === "present").length;
-    const attendanceLate = recentAtt.filter((a) => a.status === "late").length;
-    const attendanceAbsent = recentAtt.filter((a) => a.status === "absent").length;
-    const attendanceTotal = recentAtt.length;
+    // Holiday days are excluded from attendance % (whole-class off-day).
+    const recentCountable = recentAtt.filter((a) => a.status !== "holiday");
+    const attendancePresent = recentCountable.filter((a) => a.status === "present").length;
+    const attendanceLate = recentCountable.filter((a) => a.status === "late").length;
+    const attendanceAbsent = recentCountable.filter((a) => a.status === "absent").length;
+    const attendanceTotal = recentCountable.length;
     const attendanceRate =
       attendanceTotal > 0
         ? Math.round(((attendancePresent + attendanceLate) / attendanceTotal) * 100)

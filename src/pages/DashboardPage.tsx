@@ -345,8 +345,16 @@ const DashboardPage = () => {
           setLiveStats(prev => ({ ...prev, attendance: null, hasAttendanceData: false }));
           return;
         }
-        const present = records.filter((r: any) => r.status === "present" || r.status === "late").length;
-        const pct = Math.round((present / records.length) * 100);
+        // Exclude holiday days from both numerator and denominator — they
+        // don't count for or against the student per the holiday-status
+        // policy shipped 2026-05-19.
+        const countable = records.filter((r: any) => r.status !== "holiday");
+        if (countable.length === 0) {
+          setLiveStats(prev => ({ ...prev, attendance: null, hasAttendanceData: false }));
+          return;
+        }
+        const present = countable.filter((r: any) => r.status === "present" || r.status === "late").length;
+        const pct = Math.round((present / countable.length) * 100);
         setLiveStats(prev => ({ ...prev, attendance: pct, hasAttendanceData: true }));
       },
       onError: onListenerError("attendance"),
@@ -646,10 +654,12 @@ const DashboardPage = () => {
       const attDocs = attDocsRaw
         .map(d => d.data())
         .filter((d: any) => !d.date || d.date >= weekStartStr);
-      const attPresent = attDocs.filter((d: any) => d.status === "present").length;
-      const attLate = attDocs.filter((d: any) => d.status === "late").length;
-      const attAbsent = attDocs.filter((d: any) => d.status === "absent").length;
-      const attTotal = attDocs.length;
+      // Exclude holiday days (whole-class declared off-days) from the % calc.
+      const attCountable = attDocs.filter((d: any) => d.status !== "holiday");
+      const attPresent = attCountable.filter((d: any) => d.status === "present").length;
+      const attLate = attCountable.filter((d: any) => d.status === "late").length;
+      const attAbsent = attCountable.filter((d: any) => d.status === "absent").length;
+      const attTotal = attCountable.length;
       // Don't fake 100% when there are zero attendance records this week —
       // 0 conveys "no data" without misleading the parent.
       const attPct = attTotal === 0 ? 0 : Math.round(((attPresent + attLate) / attTotal) * 100);
