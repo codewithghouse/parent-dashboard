@@ -470,10 +470,29 @@ service cloud.firestore {
     // ═══════════════════════════════════════════════════════════════════════
 
     // ── Academic core ────────────────────────────────────────────────────
+    // S2 class-teacher gate on `create` (added 2026-05-20). Daily attendance
+    // is class-teacher only — subject teachers in the same school can read
+    // (for displaying records on incidents/notes/grade screens) but cannot
+    // write roll-call. Update + delete unchanged. Graceful legacy fallback:
+    // classes without a `classTeacherEmail` field (pre-migration) allow any
+    // staff to write so production isn't broken before the principal runs the
+    // Backfill Class Teachers helper.
     match /attendance/{id} {
       allow get:  if signedIn() && inSameSchool();
       allow list: if signedIn();  // TEMPORARY PHASE-1: relaxed while client queries migrate. Re-tighten to inSameSchool() once all pages filter by schoolId.
-      allow create:    if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
+      allow create:    if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole() && (
+                          hasAdminRole()
+                          || (
+                            'classId' in request.resource.data
+                            && request.resource.data.classId is string
+                            && exists(/databases/$(database)/documents/classes/$(request.resource.data.classId))
+                            && (
+                              !('classTeacherEmail' in get(/databases/$(database)/documents/classes/$(request.resource.data.classId)).data)
+                              || get(/databases/$(database)/documents/classes/$(request.resource.data.classId)).data.classTeacherEmail == ''
+                              || get(/databases/$(database)/documents/classes/$(request.resource.data.classId)).data.classTeacherEmail == email()
+                            )
+                          )
+                        );
       allow update:    if signedIn() && inSameSchool() && schoolIdImmutable() && hasStaffRole();
       allow delete:    if signedIn() && inSameSchool() && hasAdminRole();
     }
