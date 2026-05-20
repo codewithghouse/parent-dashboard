@@ -1280,10 +1280,10 @@ service cloud.firestore {
 
       // Update:
       //   - Support agent: anything except schoolId / createdBy.uid (forensics).
-      //   - Ticket creator: append-style mutation ONLY while open/in_progress.
+      //   - Ticket creator: append-style mutation while open/in_progress,
+      //     PLUS the specific resolved|closed → open transition (reopen).
       //     Status, subject, category, schoolId, createdBy.uid all immutable
-      //     from the creator side. Once support flips to resolved/closed,
-      //     the creator path returns false (no replies, no reopen).
+      //     from the creator side except for that single status transition.
       allow update: if signedIn() && (
         // Support agent path
         (isSupportAgent()
@@ -1300,6 +1300,19 @@ service cloud.firestore {
           && request.resource.data.category == resource.data.category
           // Reply count can only grow
           && request.resource.data.replyCount >= resource.data.replyCount)
+        ||
+        // Creator REOPEN path — resolved/closed → open only. No other field
+        // changes allowed; replyCount stays equal; subject/category/schoolId
+        // immutable. The Help UI exposes this via reopenTicket().
+        (resource.data.createdBy.uid == uid()
+          && resource.data.status in ['resolved','closed']
+          && request.resource.data.status == 'open'
+          && request.resource.data.schoolId == resource.data.schoolId
+          && request.resource.data.createdBy.uid == resource.data.createdBy.uid
+          && request.resource.data.subject == resource.data.subject
+          && request.resource.data.category == resource.data.category
+          && request.resource.data.priority == resource.data.priority
+          && request.resource.data.replyCount == resource.data.replyCount)
       );
 
       // Delete: support agent only — preserves user history by default.
