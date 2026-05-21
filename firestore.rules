@@ -509,6 +509,65 @@ service cloud.firestore {
       allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && hasAdminRole();
       allow delete: if signedIn() && inSameSchool() && hasAdminRole();
     }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ── PRE-PRIMARY MODULE (Playgroup / Nursery / LKG / UKG) ─────────────
+    //     Added 2026-05-21. All collections share the same multi-tenant
+    //     contract as the rest of the codebase: `schoolId` on every doc,
+    //     immutable on update, read scoped to inSameSchool(). PHASE-1 list
+    //     rule mirrored from /attendance et al.
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // pp_daily_activities — per-class-per-day slot timeline + parent report
+    // status. Doc id pattern: `${date}_${classId}`. Written by class teacher
+    // (and Didi/assistant for selected fields, gated app-side).
+    match /pp_daily_activities/{id} {
+      allow get:  if signedIn() && inSameSchool();
+      allow list: if signedIn();  // PHASE-1
+      allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
+      allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && hasStaffRole();
+      allow delete: if signedIn() && inSameSchool() && hasAdminRole();
+    }
+
+    // pp_pickups — per-class-per-day pickup verification queue (safety-
+    // critical). Records actual pickup person + verification timestamp +
+    // optional selfie URL. Mismatch records escalate via onPickupMismatch
+    // Cloud Function into pp_incidents below.
+    match /pp_pickups/{id} {
+      allow get:  if signedIn() && inSameSchool();
+      allow list: if signedIn();  // PHASE-1
+      allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
+      allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && hasStaffRole();
+      allow delete: if signedIn() && inSameSchool() && hasAdminRole();
+    }
+
+    // pp_class_levels — per-school configurable class level labels
+    // (Playgroup, Nursery, LKG, UKG + custom like "Pre-Nursery",
+    // "Junior KG", "Toddler Group"). Seeded on first visit to the
+    // principal-dashboard Pre-Teachers page using deterministic doc IDs
+    // (`${schoolId}_${levelKey}`) so concurrent first-load triggers are
+    // idempotent. Admin-only writes (owner / principal). Soft-delete only
+    // — clients set `active: false` via update; hard deletes denied so we
+    // never orphan historical class refs.
+    match /pp_class_levels/{id} {
+      allow get:  if signedIn() && inSameSchool();
+      allow list: if signedIn();  // PHASE-1
+      allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasAdminRole();
+      allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && hasAdminRole();
+      allow delete: if false;
+    }
+
+    // pp_incidents — append-only incident log written by Cloud Functions
+    // (e.g., onPickupMismatch) via Admin SDK. Client writes denied.
+    // Admin reads + can flip `handled: true` after responding.
+    match /pp_incidents/{id} {
+      allow get:  if signedIn() && inSameSchool() && hasAdminRole();
+      allow list: if signedIn() && inSameSchool() && hasAdminRole();
+      allow create: if false;  // server-only via Admin SDK
+      allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && hasAdminRole();
+      allow delete: if false;
+    }
+
     match /results/{id} {
       allow get:  if signedIn() && inSameSchool();
       allow list: if signedIn();  // TEMPORARY PHASE-1: relaxed while client queries migrate. Re-tighten to inSameSchool() once all pages filter by schoolId.
