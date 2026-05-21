@@ -568,6 +568,48 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // pp_diaper_logs — per-class-per-day diaper / washroom log. Doc id
+    // pattern: `${date}_${classId}`. Entries array appended to as teacher
+    // taps quick-action buttons through the day. Parents read their own
+    // child's entries via the same doc (filtered client-side).
+    match /pp_diaper_logs/{id} {
+      allow get:  if signedIn() && inSameSchool();
+      allow list: if signedIn();  // PHASE-1
+      allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
+      allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && hasStaffRole();
+      allow delete: if signedIn() && inSameSchool() && hasAdminRole();
+    }
+
+    // pp_meals_naps — per-class-per-day meals + naps log. Doc id pattern:
+    // `${date}_${classId}`. Two parallel arrays (meals[], naps[]).
+    match /pp_meals_naps/{id} {
+      allow get:  if signedIn() && inSameSchool();
+      allow list: if signedIn();  // PHASE-1
+      allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
+      allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && hasStaffRole();
+      allow delete: if signedIn() && inSameSchool() && hasAdminRole();
+    }
+
+    // pp_behavior_notes — per-student behavior observations with visibility
+    // tiers. Doc per entry. Tier filtering is client-side in PHASE-1.
+    match /pp_behavior_notes/{id} {
+      allow get:  if signedIn() && inSameSchool();
+      allow list: if signedIn();  // PHASE-1
+      allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
+      allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && hasStaffRole();
+      allow delete: if signedIn() && inSameSchool() && hasAdminRole();
+    }
+
+    // pp_milestones — per-student NEP 2020 5-domain observations. Doc per
+    // entry. Append-only in practice.
+    match /pp_milestones/{id} {
+      allow get:  if signedIn() && inSameSchool();
+      allow list: if signedIn();  // PHASE-1
+      allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
+      allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && hasStaffRole();
+      allow delete: if signedIn() && inSameSchool() && hasAdminRole();
+    }
+
     match /results/{id} {
       allow get:  if signedIn() && inSameSchool();
       allow list: if signedIn();  // TEMPORARY PHASE-1: relaxed while client queries migrate. Re-tighten to inSameSchool() once all pages filter by schoolId.

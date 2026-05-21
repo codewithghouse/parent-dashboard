@@ -1035,14 +1035,37 @@ exports.cascadeTeacherRename = functions.firestore
     console.log(`[cascadeTeacherRename] ${teacherId}: "${beforeName}" → "${afterName}" — ${total} docs across ${TEACHER_CASCADE_COLLECTIONS.length} collections`);
     return null;
 });
+// Expanded 2026-05-20 — every collection that stamps className denorm needs
+// to be in this list. Cross-checked by grep on `collection(db, "X")` ∩
+// `className:` writes across all 6 dashboards. Empty `where("classId","==",X)`
+// queries return zero docs and are cheap (~1ms each).
 const CLASS_CASCADE_COLLECTIONS = [
     "enrollments",
     "students",
     "teaching_assignments",
     "attendance",
     "test_scores",
+    "gradebook_scores",
+    "gradebook_columns",
+    "results",
     "assignments",
     "submissions",
+    "tests",
+    "incidents",
+    "improvement_areas",
+    "student_ratings",
+    "paper_corrections",
+    "syllabi",
+    "important_questions",
+    "principal_reports",
+    "reports",
+    "lessonPlans",
+    "lessonSummaries",
+    "examPapers",
+    "risks",
+    "interventions",
+    "meetings",
+    "communications",
 ];
 exports.cascadeClassRename = functions.firestore
     .document("classes/{classId}")
