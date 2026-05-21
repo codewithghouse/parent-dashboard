@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Printer, MessageSquare, AlertCircle, Loader2, ChevronLeft, ChevronRight, CheckCircle2, FileText, BookOpen, Calendar as CalIcon, TrendingUp, BarChart3, Activity, AlertTriangle, Clock } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, LabelList } from "recharts";
 import { doc, onSnapshot, where } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../lib/AuthContext";
@@ -504,10 +504,23 @@ const MyChildPage = () => {
   const scoreHistory = [...testScores]
     .sort((a, b) => (scoreDateOf(b)?.getTime() || 0) - (scoreDateOf(a)?.getTime() || 0))
     .slice(0, 6);
-  const barChartData = [...scoreHistory].reverse().map(t => ({
-    name: String(t.subject || t.subjectName || "TEST").slice(0, 8),
-    score: pctOf(t),
-  }));
+  // Chart skips ungraded entries (pctOf returns 0) — an invisible/zero-height
+  // bar is misleading next to a "—" row in the table below.
+  const barChartData = [...scoreHistory]
+    .reverse()
+    .map(t => {
+      const d = scoreDateOf(t);
+      return {
+        name: String(t.subject || t.subjectName || "TEST").slice(0, 8),
+        score: pctOf(t),
+        dateLabel: d ? d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : "",
+      };
+    })
+    .filter(d => d.score > 0);
+  // Zoom Y-axis into the data range so the 90% vs 99% gap is actually visible.
+  // For all-low scorers we still anchor at 0 so the floor reads honestly.
+  const barMin = barChartData.length > 0 ? Math.min(...barChartData.map(d => d.score)) : 0;
+  const barYMin = barMin >= 90 ? 75 : barMin >= 75 ? 50 : barMin >= 50 ? 25 : 0;
 
   // Predicted next score — deterministic forecast based on recent trend.
   const forecast = m.avg > 0
@@ -957,14 +970,67 @@ const MyChildPage = () => {
 
         <Card title={`Score History · ${testScores.length} records`} action={<DetailLink to="/tests" />}>
           {barChartData.length > 0 && (
-            <div style={{ height: 150, marginBottom: 12 }}>
+            <div style={{ height: 190, marginBottom: 12 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barChartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={T.s2} />
-                  <XAxis dataKey="name" tick={{ fill: T.ink3, fontSize: 9 }} axisLine={{ stroke: T.s2 }} />
-                  <YAxis tick={{ fill: T.ink3, fontSize: 9 }} axisLine={{ stroke: T.s2 }} domain={[0, 100]} />
-                  <Tooltip contentStyle={{ background: T.white, border: `1px solid ${T.bdr}`, borderRadius: 8, fontSize: 11 }} />
-                  <Bar dataKey="score" fill={T.blue} radius={[4, 4, 0, 0]} />
+                <BarChart data={barChartData} margin={{ top: 24, right: 12, left: -16, bottom: 4 }} barCategoryGap="22%">
+                  <defs>
+                    <linearGradient id="scoreBarHigh" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={T.grn} stopOpacity={0.95} />
+                      <stop offset="100%" stopColor="#86EFAC" stopOpacity={0.7} />
+                    </linearGradient>
+                    <linearGradient id="scoreBarGood" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={T.blue} stopOpacity={0.95} />
+                      <stop offset="100%" stopColor="#A5B4FC" stopOpacity={0.7} />
+                    </linearGradient>
+                    <linearGradient id="scoreBarAmber" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={T.amb} stopOpacity={0.95} />
+                      <stop offset="100%" stopColor="#FCD34D" stopOpacity={0.7} />
+                    </linearGradient>
+                    <linearGradient id="scoreBarRed" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={T.red} stopOpacity={0.95} />
+                      <stop offset="100%" stopColor="#FCA5A5" stopOpacity={0.7} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={T.s2} />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fill: T.ink2, fontSize: 10, fontWeight: 600 }}
+                    axisLine={{ stroke: T.s2 }}
+                    tickLine={false}
+                    tickMargin={6}
+                  />
+                  <YAxis
+                    tick={{ fill: T.ink3, fontSize: 9 }}
+                    axisLine={{ stroke: T.s2 }}
+                    tickLine={false}
+                    domain={[barYMin, 100]}
+                    width={32}
+                  />
+                  <Tooltip
+                    cursor={{ fill: "rgba(59,91,219,0.05)" }}
+                    contentStyle={{ background: T.white, border: `1px solid ${T.bdr}`, borderRadius: 10, fontSize: 11, padding: "8px 12px", boxShadow: "0 4px 16px rgba(15,23,42,0.08)" }}
+                    formatter={(val: unknown) => (typeof val === "number" ? [`${val}%`, "Score"] : ["—", "Score"])}
+                    labelFormatter={(label: string, items: any) => {
+                      const dt = items?.[0]?.payload?.dateLabel || "";
+                      return dt ? `${label} · ${dt}` : label;
+                    }}
+                  />
+                  <Bar dataKey="score" radius={[10, 10, 4, 4]} maxBarSize={56}>
+                    {barChartData.map((d, i) => {
+                      const fill =
+                        d.score >= 85 ? "url(#scoreBarHigh)" :
+                        d.score >= 70 ? "url(#scoreBarGood)" :
+                        d.score >= 50 ? "url(#scoreBarAmber)" :
+                                        "url(#scoreBarRed)";
+                      return <Cell key={i} fill={fill} />;
+                    })}
+                    <LabelList
+                      dataKey="score"
+                      position="top"
+                      formatter={(v: unknown) => (typeof v === "number" ? `${v}%` : "")}
+                      style={{ fontSize: 11, fontWeight: 700, fill: T.ink, letterSpacing: "-0.2px" }}
+                    />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>

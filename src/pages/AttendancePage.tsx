@@ -9,7 +9,8 @@ import {
   Trophy, Activity, X as XIcon, BookOpen, User,
 } from "lucide-react";
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, LabelList,
 } from "recharts";
 import { useAuth } from "@/lib/AuthContext";
 import { useSchoolSettings } from "@/hooks/useSchoolSettings";
@@ -1375,8 +1376,26 @@ interface MonthlyTrendProps {
 }
 
 const MonthlyTrendCard = ({ points, best, worst, isMobile, navigate }: MonthlyTrendProps) => {
+  // Drop months without data — a half-empty 6-bucket strip with a flat line
+  // at the very end is worse than a fuller 2-3 month view of what's real.
   const meaningful = points.filter((p) => p.percentage != null);
   if (meaningful.length < 2) return null;
+
+  // ≤ 2 months → bar comparison reads better than a flat 2-point line.
+  // 3+ months → area chart shows the trend.
+  const useBars = meaningful.length <= 2;
+
+  // Zoom Y-axis into the data range so small movements stay visible.
+  // For high-attendance students (≥90%) a 0-100 scale flattens everything.
+  const pcts = meaningful.map((p) => p.percentage as number);
+  const minPct = Math.min(...pcts);
+  const yMin = minPct >= 90 ? 70 : minPct >= 75 ? 50 : minPct >= 50 ? 25 : 0;
+
+  const subtitle =
+    meaningful.length === points.length
+      ? "Monthly attendance rate across recent months"
+      : `Across ${meaningful.length} month${meaningful.length === 1 ? "" : "s"} of recorded attendance`;
+
   return (
     <div
       role="button"
@@ -1397,10 +1416,10 @@ const MonthlyTrendCard = ({ points, best, worst, isMobile, navigate }: MonthlyTr
             className={isMobile ? "text-[16px] font-bold" : "text-[17px] font-bold"}
             style={{ color: T.T1, letterSpacing: "-0.3px" }}
           >
-            6-Month Trend
+            {useBars ? "Monthly Attendance" : "6-Month Trend"}
           </div>
           <div className={isMobile ? "text-[11px] mt-0.5" : "text-[12px] mt-0.5"} style={{ color: T.T3 }}>
-            Monthly attendance rate across recent months
+            {subtitle}
           </div>
         </div>
         {best && worst && best.monthKey !== worst.monthKey && (
@@ -1422,56 +1441,135 @@ const MonthlyTrendCard = ({ points, best, worst, isMobile, navigate }: MonthlyTr
           </div>
         )}
       </div>
-      <div className={isMobile ? "h-[160px] w-full" : "h-[220px] w-full"}>
+      <div className={isMobile ? "h-[180px] w-full" : "h-[240px] w-full"}>
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={points} margin={{ top: 6, right: 6, left: isMobile ? -18 : -10, bottom: 0 }}>
-            <defs>
-              <linearGradient id="attTrendArea" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={T.B1} stopOpacity={0.22} />
-                <stop offset="100%" stopColor={T.B1} stopOpacity={0} />
-              </linearGradient>
-              <linearGradient id="attTrendLine" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor={T.B1} />
-                <stop offset="100%" stopColor="#66BBFF" />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="0" vertical={false} stroke="rgba(0,85,255,0.07)" />
-            <XAxis
-              dataKey="monthLabel"
-              axisLine={false}
-              tickLine={false}
-              tick={{ fontSize: isMobile ? 10 : 12, fill: T.T4, fontWeight: 600 }}
-            />
-            <YAxis
-              axisLine={false}
-              tickLine={false}
-              tick={{ fontSize: isMobile ? 10 : 12, fill: T.T4, fontWeight: 600 }}
-              domain={[0, 100]}
-              width={isMobile ? 30 : 36}
-            />
-            <Tooltip
-              contentStyle={{
-                borderRadius: 12,
-                border: "0.5px solid rgba(0,85,255,0.15)",
-                boxShadow: "0 4px 20px rgba(0,85,255,0.12)",
-                fontSize: isMobile ? 11 : 12,
-                padding: "8px 12px",
-              }}
-              formatter={(val: unknown) =>
-                typeof val === "number" ? [`${val}%`, "Attendance"] : ["—", "Attendance"]
-              }
-            />
-            <Area
-              type="monotone"
-              dataKey="percentage"
-              stroke="url(#attTrendLine)"
-              strokeWidth={isMobile ? 2.5 : 3}
-              fill="url(#attTrendArea)"
-              dot={{ r: isMobile ? 4 : 5, strokeWidth: 2, stroke: "#fff", fill: T.B1 }}
-              activeDot={{ r: isMobile ? 6 : 7, strokeWidth: 2 }}
-              connectNulls={false}
-            />
-          </AreaChart>
+          {useBars ? (
+            <BarChart
+              data={meaningful}
+              margin={{ top: 24, right: 16, left: isMobile ? -18 : -10, bottom: 0 }}
+              barCategoryGap="30%"
+            >
+              <defs>
+                <linearGradient id="attTrendBar" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={T.B1} stopOpacity={0.95} />
+                  <stop offset="100%" stopColor="#66BBFF" stopOpacity={0.75} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="0" vertical={false} stroke="rgba(0,85,255,0.07)" />
+              <XAxis
+                dataKey="monthLabel"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: isMobile ? 11 : 13, fill: T.T2, fontWeight: 700 }}
+                tickMargin={8}
+              />
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: isMobile ? 10 : 12, fill: T.T4, fontWeight: 600 }}
+                domain={[yMin, 100]}
+                width={isMobile ? 30 : 36}
+                tickFormatter={(v) => `${v}`}
+              />
+              <Tooltip
+                cursor={{ fill: "rgba(0,85,255,0.04)" }}
+                contentStyle={{
+                  borderRadius: 12,
+                  border: "0.5px solid rgba(0,85,255,0.15)",
+                  boxShadow: "0 4px 20px rgba(0,85,255,0.12)",
+                  fontSize: isMobile ? 11 : 12,
+                  padding: "8px 12px",
+                }}
+                formatter={(val: unknown) =>
+                  typeof val === "number" ? [`${val}%`, "Attendance"] : ["—", "Attendance"]
+                }
+              />
+              <Bar
+                dataKey="percentage"
+                fill="url(#attTrendBar)"
+                radius={[12, 12, 4, 4]}
+                maxBarSize={isMobile ? 70 : 110}
+              >
+                <LabelList
+                  dataKey="percentage"
+                  position="top"
+                  formatter={(v: unknown) => (typeof v === "number" ? `${v}%` : "")}
+                  style={{
+                    fontSize: isMobile ? 12 : 14,
+                    fontWeight: 700,
+                    fill: T.T1,
+                    letterSpacing: "-0.2px",
+                  }}
+                />
+              </Bar>
+            </BarChart>
+          ) : (
+            <AreaChart
+              data={meaningful}
+              margin={{ top: 24, right: 16, left: isMobile ? -18 : -10, bottom: 0 }}
+            >
+              <defs>
+                <linearGradient id="attTrendArea" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={T.B1} stopOpacity={0.28} />
+                  <stop offset="100%" stopColor={T.B1} stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="attTrendLine" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor={T.B1} />
+                  <stop offset="100%" stopColor="#66BBFF" />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="0" vertical={false} stroke="rgba(0,85,255,0.07)" />
+              <XAxis
+                dataKey="monthLabel"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: isMobile ? 11 : 13, fill: T.T2, fontWeight: 700 }}
+                tickMargin={8}
+              />
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: isMobile ? 10 : 12, fill: T.T4, fontWeight: 600 }}
+                domain={[yMin, 100]}
+                width={isMobile ? 30 : 36}
+              />
+              <Tooltip
+                contentStyle={{
+                  borderRadius: 12,
+                  border: "0.5px solid rgba(0,85,255,0.15)",
+                  boxShadow: "0 4px 20px rgba(0,85,255,0.12)",
+                  fontSize: isMobile ? 11 : 12,
+                  padding: "8px 12px",
+                }}
+                formatter={(val: unknown) =>
+                  typeof val === "number" ? [`${val}%`, "Attendance"] : ["—", "Attendance"]
+                }
+              />
+              <Area
+                type="monotone"
+                dataKey="percentage"
+                stroke="url(#attTrendLine)"
+                strokeWidth={isMobile ? 3 : 3.5}
+                fill="url(#attTrendArea)"
+                dot={{ r: isMobile ? 5 : 6, strokeWidth: 2.5, stroke: "#fff", fill: T.B1 }}
+                activeDot={{ r: isMobile ? 7 : 8, strokeWidth: 2 }}
+                connectNulls
+              >
+                <LabelList
+                  dataKey="percentage"
+                  position="top"
+                  offset={12}
+                  formatter={(v: unknown) => (typeof v === "number" ? `${v}%` : "")}
+                  style={{
+                    fontSize: isMobile ? 11 : 12,
+                    fontWeight: 700,
+                    fill: T.T1,
+                    letterSpacing: "-0.2px",
+                  }}
+                />
+              </Area>
+            </AreaChart>
+          )}
         </ResponsiveContainer>
       </div>
     </div>
