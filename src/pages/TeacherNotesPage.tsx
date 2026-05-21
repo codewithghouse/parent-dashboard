@@ -47,7 +47,15 @@ const TeacherNotesPage = () => {
   const [hoverRating, setHoverRating]               = useState(0);
   const [reviewText, setReviewText]                 = useState("");
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Common emoji list for the picker panel
+  const EMOJIS = ["😊","😂","❤️","👍","🙏","😍","🎉","🔥","✅","👏","😭","🤔","💯","🙌","😅","🥰","😁","👋","💪","🎓","📚","✏️","⭐","🌟","💡","📝","🤝","😇","🙂","👌"];
+  const insertEmoji = (emoji: string) => {
+    setMessageContent(prev => prev + emoji);
+    setShowEmojiPicker(false);
+  };
 
   // Fetch all parent_notes for this student.
   // Dual-query pattern (studentId + studentEmail) — teacher writes don't always
@@ -598,18 +606,43 @@ const TeacherNotesPage = () => {
             </div>
 
             {/* Input bar — WhatsApp style */}
-            <div className="px-2 py-[7px] flex items-end gap-[6px] shrink-0"
+            <div className="px-2 py-[7px] flex items-end gap-[6px] shrink-0 relative"
               style={{ background: WA_HEADER_BG }}>
+              {/* Emoji picker panel — mobile */}
+              {showEmojiPicker && (
+                <div
+                  className="absolute bottom-[62px] left-2 z-30 rounded-[18px] p-3 grid gap-1"
+                  style={{
+                    background: "#fff",
+                    boxShadow: "0 8px 32px rgba(11,20,26,0.18), 0 2px 8px rgba(11,20,26,0.10)",
+                    gridTemplateColumns: "repeat(6, 1fr)",
+                    width: 230,
+                  }}
+                >
+                  {EMOJIS.map(e => (
+                    <button
+                      key={e}
+                      onClick={() => insertEmoji(e)}
+                      className="w-9 h-9 flex items-center justify-center rounded-[10px] text-[20px] active:scale-90 transition-transform hover:bg-gray-100"
+                    >{e}</button>
+                  ))}
+                </div>
+              )}
               <div className="flex-1 flex items-center gap-1 px-3 py-[8px] rounded-[24px]"
                 style={{ background: "#fff" }}>
-                <button className="w-7 h-7 flex items-center justify-center active:scale-90 shrink-0">
-                  <Smile className="w-[22px] h-[22px]" style={{ color: T3 }} strokeWidth={1.8} />
+                <button
+                  className="w-7 h-7 flex items-center justify-center active:scale-90 shrink-0"
+                  onClick={() => setShowEmojiPicker(v => !v)}
+                  aria-label="Emoji picker"
+                >
+                  <Smile className="w-[22px] h-[22px]" style={{ color: showEmojiPicker ? B1 : T3 }} strokeWidth={1.8} />
                 </button>
                 <input
                   type="text"
                   value={messageContent}
                   onChange={e => setMessageContent(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                  onFocus={() => setShowEmojiPicker(false)}
                   placeholder="Message"
                   className="flex-1 min-w-0 px-2 text-[15px] outline-none bg-transparent"
                   style={{ color: T1, fontFamily: FONT }}
@@ -1128,9 +1161,33 @@ const TeacherNotesPage = () => {
                   </div>
 
                   {/* Input bar (WA gray with white pill input + green send) */}
-                  <div className="flex items-end gap-2 px-4 py-[10px] shrink-0" style={{ background: WA_HEADER_BG }}>
-                    <button className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-[rgba(11,20,26,0.06)]">
-                      <Smile className="w-[22px] h-[22px]" style={{ color: WA_T2 }} strokeWidth={1.8} />
+                  <div className="flex items-end gap-2 px-4 py-[10px] shrink-0 relative" style={{ background: WA_HEADER_BG }}>
+                    {/* Emoji picker panel — desktop */}
+                    {showEmojiPicker && (
+                      <div
+                        className="absolute bottom-[62px] left-4 z-30 rounded-[18px] p-3 grid gap-1"
+                        style={{
+                          background: "#fff",
+                          boxShadow: "0 8px 32px rgba(11,20,26,0.16), 0 2px 8px rgba(11,20,26,0.10)",
+                          gridTemplateColumns: "repeat(6, 1fr)",
+                          width: 260,
+                        }}
+                      >
+                        {EMOJIS.map(e => (
+                          <button
+                            key={e}
+                            onClick={() => insertEmoji(e)}
+                            className="w-9 h-9 flex items-center justify-center rounded-[10px] text-[20px] transition-colors hover:bg-gray-100"
+                          >{e}</button>
+                        ))}
+                      </div>
+                    )}
+                    <button
+                      className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-[rgba(11,20,26,0.06)]"
+                      onClick={() => setShowEmojiPicker(v => !v)}
+                      aria-label="Emoji picker"
+                    >
+                      <Smile className="w-[22px] h-[22px]" style={{ color: showEmojiPicker ? WA_GREEN : WA_T2 }} strokeWidth={1.8} />
                     </button>
                     <button className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-[rgba(11,20,26,0.06)]">
                       <Paperclip className="w-[20px] h-[20px]" style={{ color: WA_T2 }} strokeWidth={2} />
