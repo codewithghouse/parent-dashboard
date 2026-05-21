@@ -875,15 +875,15 @@ const TestsPage = () => {
             <GraduationCap style={{ width: 110, height: 110, color: B1, opacity: 0.18, strokeWidth: 1.6 }} />
           </div>
 
-          <div className="flex items-center justify-between gap-6 flex-wrap relative z-10">
-            <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between gap-6 relative z-10">
+            <div className="flex items-center gap-4 min-w-0 flex-1">
               <div className="w-[44px] h-[44px] rounded-[14px] flex items-center justify-center shrink-0"
                 style={{ background: "rgba(0,85,255,0.14)", border: "0.5px solid rgba(0,85,255,0.28)" }}>
                 <Calendar className="w-[22px] h-[22px]" style={{ color: B1 }} strokeWidth={2.2} />
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <div className="text-[10px] font-bold uppercase tracking-[0.10em]" style={{ color: T4 }}>Coming Up Next</div>
-                <div className="text-[28px] font-bold mt-1 leading-[1.1]" style={{ color: T1, letterSpacing: "-0.8px" }}>
+                <div className="text-[28px] font-bold mt-1 leading-[1.1] truncate" style={{ color: T1, letterSpacing: "-0.8px" }}>
                   {nextTestTitle}
                 </div>
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
@@ -912,8 +912,8 @@ const TestsPage = () => {
               const days = getDayDiff(nextTest.testDate || nextTest.date);
               const isText = days === 0 || days === 1;
               return (
-                <div className="px-6 py-4 rounded-[18px] text-center min-w-[120px] relative"
-                  style={{ background: "rgba(0,85,255,0.08)", border: "0.5px solid rgba(0,85,255,0.20)" }}>
+                <div className="px-6 py-4 rounded-[18px] text-center shrink-0"
+                  style={{ background: "rgba(0,85,255,0.08)", border: "0.5px solid rgba(0,85,255,0.20)", minWidth: 120 }}>
                   <div className={`font-bold leading-none ${isText ? "text-[26px]" : "text-[44px]"}`} style={{ color: B1, letterSpacing: "-1.4px" }}>
                     {isText ? (days === 0 ? "Today" : "Tomorrow") : days}
                   </div>
