@@ -610,6 +610,27 @@ service cloud.firestore {
       allow delete: if signedIn() && inSameSchool() && hasAdminRole();
     }
 
+    // pp_announcements — school/stage/class-scoped notices. Audience
+    // filtering (school/stage/class) is enforced client-side against the
+    // active child's classId.
+    match /pp_announcements/{id} {
+      allow get:  if signedIn() && inSameSchool();
+      allow list: if signedIn();  // PHASE-1
+      allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
+      allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && hasStaffRole();
+      allow delete: if signedIn() && inSameSchool() && hasAdminRole();
+    }
+
+    // pp_events — school calendar entries (holidays, PTM, celebrations,
+    // exams, trips, general). Written by staff, read by parents.
+    match /pp_events/{id} {
+      allow get:  if signedIn() && inSameSchool();
+      allow list: if signedIn();  // PHASE-1
+      allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
+      allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && hasStaffRole();
+      allow delete: if signedIn() && inSameSchool() && hasAdminRole();
+    }
+
     match /results/{id} {
       allow get:  if signedIn() && inSameSchool();
       allow list: if signedIn();  // TEMPORARY PHASE-1: relaxed while client queries migrate. Re-tighten to inSameSchool() once all pages filter by schoolId.
