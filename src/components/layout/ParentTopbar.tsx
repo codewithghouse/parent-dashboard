@@ -2,12 +2,51 @@ import { Bell, Menu } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../lib/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useEffect, useRef, useState } from "react";
 
 interface ParentTopbarProps {
   onMenuClick: () => void;
 }
 
 const IND = "#30306E";
+
+/** Renders text on a single line; if it overflows the available width, scrolls
+ *  it horizontally (marquee) instead of truncating with an ellipsis. */
+const MarqueeText = ({ text, className, style }: { text: string; className?: string; style?: React.CSSProperties }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const measureRef = useRef<HTMLSpanElement>(null);
+  const [overflowing, setOverflowing] = useState(false);
+
+  useEffect(() => {
+    const measure = () => {
+      const c = containerRef.current;
+      const m = measureRef.current;
+      if (!c || !m) return;
+      setOverflowing(m.scrollWidth > c.clientWidth + 1);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (containerRef.current) ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, [text]);
+
+  if (!overflowing) {
+    return (
+      <div ref={containerRef} className={`min-w-0 ${className ?? ""}`} style={style}>
+        <span ref={measureRef} className="whitespace-nowrap truncate block">{text}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={containerRef} className={`marquee ${className ?? ""}`} style={style}>
+      <div className="marquee__track">
+        <span ref={measureRef}>{text}</span>
+        <span aria-hidden="true">{text}</span>
+      </div>
+    </div>
+  );
+};
 
 export const ParentTopbar = ({ onMenuClick }: ParentTopbarProps) => {
   const { studentData } = useAuth();
@@ -53,17 +92,16 @@ export const ParentTopbar = ({ onMenuClick }: ParentTopbarProps) => {
             <Menu className="w-[18px] h-[18px]" style={{ color: "rgba(48,48,110,0.55)" }} />
           </button>
 
-          <div className="flex items-center gap-[7px] pl-1 min-w-0">
+          <div className="flex items-center gap-[7px] pl-1 min-w-0 flex-1">
             <span
               className="w-[7px] h-[7px] rounded-full flex-shrink-0 animate-pulse"
               style={{ background: "#12C04E", boxShadow: "0 0 0 2.5px rgba(18,192,78,0.2)" }}
             />
-            <span
-              className="text-[15px] font-bold truncate"
+            <MarqueeText
+              text={studentData?.schoolName || "Edullent"}
+              className="text-[15px] font-bold"
               style={{ color: IND, letterSpacing: "-0.2px" }}
-            >
-              {studentData?.schoolName || "Edullent"}
-            </span>
+            />
           </div>
         </div>
 
@@ -106,12 +144,13 @@ export const ParentTopbar = ({ onMenuClick }: ParentTopbarProps) => {
           <Menu className="w-5 h-5 text-slate-600" />
         </button>
 
-        <div className="flex flex-col leading-tight min-w-0">
-          <span className="text-sm font-black text-slate-800 truncate max-w-[140px] md:max-w-none uppercase tracking-tight">
-            {studentData?.schoolName || "EDULLENT"}
-          </span>
+        <div className="flex flex-col leading-tight min-w-0 max-w-[260px] md:max-w-[420px]">
+          <MarqueeText
+            text={studentData?.schoolName || "EDULLENT"}
+            className="text-sm font-black text-slate-800 uppercase tracking-tight"
+          />
           <div className="flex items-center gap-2 mt-0.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">
               {studentData?.branch || "Portal Active"}
             </span>

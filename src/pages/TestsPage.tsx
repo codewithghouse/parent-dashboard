@@ -785,29 +785,66 @@ const TestsPage = () => {
             style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
             <div className="flex items-center justify-between mb-3">
               <div className="text-[14px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>Monthly Activity</div>
-              <div className="text-[11px] font-bold" style={{ color: B1 }}>{academicYear} Term</div>
+              <div className="text-[10px] font-bold px-[8px] py-[3px] rounded-full"
+                style={{ color: B1, background: "rgba(0,85,255,0.08)", border: "0.5px solid rgba(0,85,255,0.18)" }}>
+                {academicYear}
+              </div>
             </div>
-            <div className="flex items-end gap-[7px] h-12 mb-[7px]">
-              {monthlyActivity.map((m, i) => {
-                const h = 6 + (m.count / maxMonthly) * 36;
-                const opacity = m.isCurrent ? 1 : m.count === 0 ? 0.22 : 0.55;
-                return (
-                  <div key={i} className="flex flex-col items-center gap-1 flex-1">
-                    <div
-                      className="w-full rounded-t-[5px] min-h-[4px]"
-                      style={{
-                        height: h,
-                        background: `linear-gradient(180deg, ${B1}, ${B4})`,
-                        opacity,
-                        boxShadow: m.isCurrent ? "0 0 0 3px rgba(0,85,255,0.18)" : "none",
-                      }}
-                    />
-                    <span className="text-[9px] font-bold uppercase tracking-[0.04em]" style={{ color: m.isCurrent ? B1 : T4 }}>
-                      {m.label}
-                    </span>
-                  </div>
-                );
-              })}
+
+            {/* Chart area: gridlines + bars */}
+            <div className="relative h-[64px] mb-[6px]">
+              <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+                {[0, 1, 2].map(i => (
+                  <div key={i} className="w-full" style={{ borderTop: "0.5px dashed rgba(0,85,255,0.08)" }} />
+                ))}
+              </div>
+              <div className="absolute inset-0 flex items-end gap-[7px]">
+                {monthlyActivity.map((m, i) => {
+                  const pct = maxMonthly > 0 ? m.count / maxMonthly : 0;
+                  const h = m.count === 0 ? 3 : 10 + pct * 44;
+                  const isCurr = m.isCurrent;
+                  const hasData = m.count > 0;
+                  return (
+                    <div key={i} className="flex-1 flex flex-col items-center justify-end h-full relative">
+                      {hasData && (
+                        <span
+                          className="absolute text-[9px] font-bold"
+                          style={{ bottom: h + 2, color: isCurr ? B1 : T3, letterSpacing: "-0.2px" }}
+                        >
+                          {m.count}
+                        </span>
+                      )}
+                      <div
+                        className="w-full transition-all duration-300"
+                        style={{
+                          height: h,
+                          borderRadius: hasData ? "6px 6px 2px 2px" : "2px",
+                          background: isCurr
+                            ? `linear-gradient(180deg, ${B1} 0%, ${B4} 100%)`
+                            : !hasData
+                              ? "rgba(0,85,255,0.10)"
+                              : "linear-gradient(180deg, rgba(0,85,255,0.42) 0%, rgba(0,85,255,0.22) 100%)",
+                          boxShadow: isCurr
+                            ? "0 4px 12px rgba(0,85,255,0.30), inset 0 1px 0 rgba(255,255,255,0.22)"
+                            : "none",
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Month labels */}
+            <div className="flex items-center gap-[7px]">
+              {monthlyActivity.map((m, i) => (
+                <div key={i} className="flex-1 flex items-center justify-center gap-[2px]">
+                  {m.isCurrent && <div className="w-[3px] h-[3px] rounded-full" style={{ background: B1 }} />}
+                  <span className="text-[9px] font-bold uppercase tracking-[0.04em]" style={{ color: m.isCurrent ? B1 : T4 }}>
+                    {m.label}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -871,8 +908,8 @@ const TestsPage = () => {
             boxShadow: SH,
             border: "0.5px solid rgba(0,85,255,0.20)",
           }}>
-          <div className="absolute pointer-events-none" style={{ bottom: 16, right: 20 }}>
-            <GraduationCap style={{ width: 110, height: 110, color: B1, opacity: 0.18, strokeWidth: 1.6 }} />
+          <div className="absolute pointer-events-none" style={{ bottom: 16, right: 170 }}>
+            <GraduationCap style={{ width: 96, height: 96, color: B1, opacity: 0.14, strokeWidth: 1.6 }} />
           </div>
 
           <div className="flex items-center justify-between gap-6 relative z-10">
@@ -912,8 +949,8 @@ const TestsPage = () => {
               const days = getDayDiff(nextTest.testDate || nextTest.date);
               const isText = days === 0 || days === 1;
               return (
-                <div className="px-6 py-4 rounded-[18px] text-center shrink-0"
-                  style={{ background: "rgba(0,85,255,0.08)", border: "0.5px solid rgba(0,85,255,0.20)", minWidth: 120 }}>
+                <div className="px-6 py-4 rounded-[18px] text-center shrink-0 relative z-10"
+                  style={{ background: "rgba(255,255,255,0.85)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", border: "0.5px solid rgba(0,85,255,0.28)", minWidth: 120, boxShadow: "0 2px 8px rgba(0,85,255,0.06)" }}>
                   <div className={`font-bold leading-none ${isText ? "text-[26px]" : "text-[44px]"}`} style={{ color: B1, letterSpacing: "-1.4px" }}>
                     {isText ? (days === 0 ? "Today" : "Tomorrow") : days}
                   </div>
@@ -1187,32 +1224,79 @@ const TestsPage = () => {
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/performance"); } }}
               className="bg-white rounded-[22px] px-5 py-5 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0055FF]/40"
               style={{ boxShadow: SH, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="text-[15px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>Monthly Activity</div>
-                <div className="text-[11px] font-bold" style={{ color: B1 }}>{academicYear}</div>
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <div className="text-[15px] font-bold" style={{ color: T1, letterSpacing: "-0.2px" }}>Monthly Activity</div>
+                  <div className="text-[10px] font-medium mt-[2px]" style={{ color: T4 }}>Tests completed by month</div>
+                </div>
+                <div className="text-[10px] font-bold px-[10px] py-[4px] rounded-full"
+                  style={{ color: B1, background: "rgba(0,85,255,0.08)", border: "0.5px solid rgba(0,85,255,0.18)" }}>
+                  {academicYear}
+                </div>
               </div>
-              <div className="flex items-end gap-[8px] h-[100px] mb-2">
-                {monthlyActivity.map((m, i) => {
-                  const h = 8 + (m.count / maxMonthly) * 86;
-                  const opacity = m.isCurrent ? 1 : m.count === 0 ? 0.22 : 0.55;
-                  return (
-                    <div key={i} className="flex flex-col items-center gap-1 flex-1">
-                      <div
-                        className="w-full rounded-t-[6px] min-h-[5px]"
-                        style={{
-                          height: h,
-                          background: `linear-gradient(180deg, ${B1}, ${B4})`,
-                          opacity,
-                          boxShadow: m.isCurrent ? "0 0 0 3px rgba(0,85,255,0.18)" : "none",
-                        }}
-                      />
-                      <span className="text-[10px] font-bold uppercase tracking-[0.04em]" style={{ color: m.isCurrent ? B1 : T4 }}>
-                        {m.label}
-                      </span>
-                    </div>
-                  );
-                })}
+
+              {/* Chart area: gridlines + bars */}
+              <div className="relative h-[120px] mb-3">
+                {/* Subtle horizontal gridlines */}
+                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+                  {[0, 1, 2, 3].map(i => (
+                    <div key={i} className="w-full" style={{ borderTop: "0.5px dashed rgba(0,85,255,0.08)" }} />
+                  ))}
+                </div>
+
+                {/* Bars */}
+                <div className="absolute inset-0 flex items-end gap-[10px]">
+                  {monthlyActivity.map((m, i) => {
+                    const pct = maxMonthly > 0 ? m.count / maxMonthly : 0;
+                    const h = m.count === 0 ? 4 : 14 + pct * 88;
+                    const isCurr = m.isCurrent;
+                    const hasData = m.count > 0;
+                    return (
+                      <div key={i} className="flex-1 flex flex-col items-center justify-end h-full relative">
+                        {hasData && (
+                          <span
+                            className="absolute text-[10px] font-bold"
+                            style={{ bottom: h + 4, color: isCurr ? B1 : T3, letterSpacing: "-0.2px" }}
+                          >
+                            {m.count}
+                          </span>
+                        )}
+                        <div
+                          className="w-full transition-all duration-300"
+                          style={{
+                            height: h,
+                            borderRadius: hasData ? "8px 8px 3px 3px" : "3px",
+                            background: isCurr
+                              ? `linear-gradient(180deg, ${B1} 0%, ${B4} 100%)`
+                              : !hasData
+                                ? "rgba(0,85,255,0.10)"
+                                : "linear-gradient(180deg, rgba(0,85,255,0.42) 0%, rgba(0,85,255,0.22) 100%)",
+                            boxShadow: isCurr
+                              ? "0 6px 16px rgba(0,85,255,0.32), inset 0 1px 0 rgba(255,255,255,0.22)"
+                              : "none",
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
+
+              {/* Month labels */}
+              <div className="flex items-center gap-[10px] mb-1">
+                {monthlyActivity.map((m, i) => (
+                  <div key={i} className="flex-1 flex items-center justify-center gap-[3px]">
+                    {m.isCurrent && <div className="w-[4px] h-[4px] rounded-full" style={{ background: B1 }} />}
+                    <span
+                      className="text-[10px] font-bold uppercase tracking-[0.05em]"
+                      style={{ color: m.isCurrent ? B1 : T4 }}
+                    >
+                      {m.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
               <div className="flex items-center justify-between pt-3 mt-2" style={{ borderTop: "0.5px solid rgba(0,85,255,0.08)" }}>
                 <span className="text-[11px] font-medium" style={{ color: T4 }}>Tests this month</span>
                 <span className="text-[13px] font-bold" style={{ color: B1 }}>{monthlyActivity[monthlyActivity.length - 1].count}</span>

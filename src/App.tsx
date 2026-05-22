@@ -126,7 +126,7 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <OfflineBanner />
           <AppRoutes />
           {/* PWA: install banner + update prompt (outside routes so always visible) */}

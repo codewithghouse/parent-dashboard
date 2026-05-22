@@ -13,7 +13,7 @@
  *   - Push notifications ready
  */
 
-const CACHE_VERSION  = 'v17';
+const CACHE_VERSION  = 'v19';
 const STATIC_CACHE   = `edullent-static-${CACHE_VERSION}`;
 const API_CACHE      = `edullent-api-${CACHE_VERSION}`;
 const STORAGE_CACHE  = `edullent-storage-${CACHE_VERSION}`;
@@ -130,6 +130,13 @@ async function cacheFirst(request, cacheName) {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   const req = event.request;
+
+  // Dev escape hatch: never intercept anything when serving from localhost.
+  // Vite's dev server returns transient errors during HMR/restarts that we
+  // were caching as 503 and replaying forever, which made dynamic imports
+  // (`PrincipalNotesPage.tsx` etc.) appear permanently broken. Letting the
+  // browser go straight to the network in dev avoids that completely.
+  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') return;
 
   // Skip non-GET and chrome-extension requests
   if (req.method !== 'GET') return;

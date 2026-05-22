@@ -499,7 +499,7 @@ const AIPracticePage = () => {
                 { icon: "⭐", val: bestScore > 0 ? `${bestScore}%` : "—", label: "Best", tint: "rgba(255,204,34,0.12)", bdr: "rgba(255,204,34,0.28)", color: GOLD, decorBg: "rgba(255,204,34,0.09)" },
               ].map(({ icon, val, label, tint, bdr, color, decorBg }) => (
                 <div key={label} className="rounded-[16px] py-[13px] px-[10px] flex flex-col items-center gap-[5px] relative overflow-hidden"
-                  style={{ background: tint, border: `0.5px solid ${bdr}` }}>
+                  style={{ background: `linear-gradient(180deg, #ffffff 0%, rgba(255,255,255,0.85) 100%), ${tint}`, backgroundBlendMode: "normal", border: `0.5px solid ${bdr}` }}>
                   {/* Decorative background glow — clipped by overflow-hidden */}
                   <div
                     className="absolute -bottom-3 -right-3 w-[55px] h-[55px] rounded-full pointer-events-none"
@@ -1050,19 +1050,20 @@ const AIPracticePage = () => {
             boxShadow: SH_LG_D,
             border: "0.5px solid rgba(0,85,255,0.20)",
           }}>
-          {/* Decorative background sparkle — overflow:hidden wrapper clips SVG strokes */}
+          {/* Decorative background sparkle — placed bottom-left so it doesn't bleed
+              into the translucent stat chips that sit in the right column. */}
           <div
             className="absolute pointer-events-none"
             style={{
-              top: 14,
-              right: 16,
-              width: 96,
-              height: 96,
+              bottom: -10,
+              left: -8,
+              width: 110,
+              height: 110,
               overflow: "hidden",
-              borderRadius: 10,
+              borderRadius: 12,
             }}
           >
-            <Sparkles style={{ width: 96, height: 96, color: B1, opacity: 0.12, strokeWidth: 1.4 }} />
+            <Sparkles style={{ width: 110, height: 110, color: B1, opacity: 0.08, strokeWidth: 1.4 }} />
           </div>
           <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
             <div>
@@ -1116,7 +1117,7 @@ const AIPracticePage = () => {
                 <div
                   key={label}
                   className="rounded-[18px] py-5 px-3 flex flex-col items-center gap-1 relative overflow-hidden"
-                  style={{ background: tint, border: `0.5px solid ${bdr}` }}
+                  style={{ background: `linear-gradient(180deg, #ffffff 0%, rgba(255,255,255,0.85) 100%), ${tint}`, border: `0.5px solid ${bdr}` }}
                 >
                   {/* Decorative background circle — clipped inside card */}
                   <div

@@ -2,9 +2,9 @@ import { useState, useEffect } from "react";
 import {
   Trophy, AlertTriangle, Star, StarHalf, Clock, Users,
   BookOpen, HandHeart, Lightbulb, Loader2, CheckCircle,
-  ShieldCheck, Hourglass, Activity
+  ShieldCheck, Hourglass, Activity, ArrowRight, TrendingUp, TrendingDown, Minus
 } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceArea, ReferenceLine, LabelList } from "recharts";
 import { useAuth } from "@/lib/AuthContext";
 import { collection, onSnapshot, query, where, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -700,36 +700,126 @@ export default function BehaviourPage() {
                 style={{ boxShadow: SH_LG, border: "0.5px solid rgba(0,85,255,0.10)" }}>
                 <div className="flex items-center justify-between mb-1">
                   <div className="text-[17px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Behavior Trend</div>
-                  <div className="px-[11px] py-1 rounded-full text-[11px] font-bold"
+                  <div className="flex items-center gap-[5px] px-[11px] py-1 rounded-full text-[11px] font-bold"
                     style={{ background: "rgba(0,85,255,0.10)", color: B1, border: "0.5px solid rgba(0,85,255,0.18)" }}>
+                    <Star className="w-[11px] h-[11px] fill-current" />
                     {rating} {trendUp ? "↑" : "↓"}
                   </div>
                 </div>
-                <div className="text-[12px] mb-4 font-normal" style={{ color: T3 }}>Rating progression across months</div>
-                <div style={{ height: 160 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={trendData} margin={{ top: 6, right: 6, left: -22, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="behMobileLine" x1="0%" y1="0%" x2="100%" y2="0%">
-                          <stop offset="0%" stopColor={B1} />
-                          <stop offset="100%" stopColor="#66BBFF" />
-                        </linearGradient>
-                        <linearGradient id="behMobileArea" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor={B1} stopOpacity={0.14} />
-                          <stop offset="100%" stopColor={B1} stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="0" vertical={false} stroke="rgba(0,85,255,0.06)" />
-                      <XAxis dataKey="m" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: T4, fontWeight: 600 }} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: T4, fontWeight: 600 }} domain={[1, 5]} width={28} />
-                      <Tooltip
-                        contentStyle={{ borderRadius: 12, border: "0.5px solid rgba(0,85,255,0.15)", boxShadow: "0 4px 20px rgba(0,85,255,0.12)", fontSize: 11, padding: "6px 10px", background: "#fff" }}
-                        formatter={(val: any) => [`${val.toFixed?.(1) ?? val}`, "Rating"]}
-                      />
-                      <Area type="monotone" dataKey="score" stroke="url(#behMobileLine)" strokeWidth={2.5} fill="url(#behMobileArea)" dot={{ r: 4, strokeWidth: 2, stroke: "#fff", fill: B1 }} activeDot={{ r: 6, strokeWidth: 2 }} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
+                <div className="text-[12px] mb-3 font-normal" style={{ color: T3 }}>Rating progression across months</div>
+
+                {trendData.length >= 3 ? (
+                  <>
+                    {/* Compact legend */}
+                    <div className="flex items-center gap-3 mb-2 flex-wrap">
+                      <div className="flex items-center gap-[5px]">
+                        <span className="block w-[8px] h-[2.5px] rounded-full" style={{ background: B1 }} />
+                        <span className="text-[9px] font-semibold uppercase tracking-[0.06em]" style={{ color: T3 }}>Rating</span>
+                      </div>
+                      <div className="flex items-center gap-[5px]">
+                        <span className="block w-[8px] h-[2.5px] rounded-full" style={{ background: "rgba(0,200,83,0.55)" }} />
+                        <span className="text-[9px] font-semibold uppercase tracking-[0.06em]" style={{ color: T3 }}>Excellent</span>
+                      </div>
+                      <div className="flex items-center gap-[5px]">
+                        <span className="block w-[8px] h-[1.5px] rounded-full" style={{ background: "rgba(255,170,0,0.65)" }} />
+                        <span className="text-[9px] font-semibold uppercase tracking-[0.06em]" style={{ color: T3 }}>Target 4.0</span>
+                      </div>
+                    </div>
+
+                    <div style={{ height: 180 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={trendData} margin={{ top: 18, right: 8, left: -18, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="behMobileLine" x1="0%" y1="0%" x2="100%" y2="0%">
+                              <stop offset="0%" stopColor={B1} />
+                              <stop offset="100%" stopColor="#66BBFF" />
+                            </linearGradient>
+                            <linearGradient id="behMobileArea" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor={B1} stopOpacity={0.22} />
+                              <stop offset="100%" stopColor={B1} stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 4" vertical={false} stroke="rgba(0,85,255,0.08)" />
+                          <ReferenceArea y1={4.5} y2={5} fill="rgba(0,200,83,0.06)" stroke="none" />
+                          <ReferenceLine y={4} stroke="rgba(255,170,0,0.55)" strokeDasharray="4 4" strokeWidth={1.1} />
+                          <XAxis dataKey="m" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: T4, fontWeight: 600 }} dy={4} />
+                          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: T4, fontWeight: 600 }} domain={[1, 5]} ticks={[1, 2, 3, 4, 5]} width={28} />
+                          <Tooltip
+                            cursor={{ stroke: "rgba(0,85,255,0.25)", strokeWidth: 1, strokeDasharray: "3 3" }}
+                            contentStyle={{ borderRadius: 12, border: "0.5px solid rgba(0,85,255,0.15)", boxShadow: "0 6px 22px rgba(0,85,255,0.14)", fontSize: 11, padding: "8px 10px", background: "#fff" }}
+                            labelStyle={{ fontWeight: 700, color: T1, marginBottom: 2, fontSize: 11 }}
+                            itemStyle={{ color: B1, fontWeight: 600 }}
+                            formatter={(val: any) => [`${val?.toFixed?.(1) ?? val} / 5`, "Rating"]}
+                          />
+                          <Area type="monotone" dataKey="score" stroke="url(#behMobileLine)" strokeWidth={2.5} fill="url(#behMobileArea)"
+                            dot={{ r: 4, strokeWidth: 2, stroke: "#fff", fill: B1 }} activeDot={{ r: 6, strokeWidth: 2, stroke: "#fff", fill: B1 }}>
+                            <LabelList dataKey="score" position="top" offset={8}
+                              formatter={(v: any) => (typeof v === "number" ? v.toFixed(1) : "")}
+                              style={{ fontSize: 9, fontWeight: 700, fill: B1, fontFamily: "DM Sans" }} />
+                          </Area>
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </>
+                ) : (() => {
+                  // Two-point comparison card (flat line would look empty)
+                  const a: any = trendData[0], b: any = trendData[1];
+                  const va = typeof a?.score === "number" ? a.score : 0;
+                  const vb = typeof b?.score === "number" ? b.score : 0;
+                  const delta = +(vb - va).toFixed(1);
+                  const dir = delta > 0 ? "up" : delta < 0 ? "down" : "flat";
+                  const dirColor = dir === "up" ? GREEN : dir === "down" ? RED : T4;
+                  const dirLabel = dir === "up" ? "Improved" : dir === "down" ? "Declined" : "Stable";
+                  const DirIcon = dir === "up" ? TrendingUp : dir === "down" ? TrendingDown : Minus;
+                  const tier = (n: number) =>
+                    n >= 4.5 ? { label: "Excellent", color: GREEN,  bg: "rgba(0,200,83,0.10)",  bdr: "rgba(0,200,83,0.25)" } :
+                    n >= 3.5 ? { label: "Good",      color: B1,     bg: "rgba(0,85,255,0.10)",  bdr: "rgba(0,85,255,0.22)" } :
+                    n >= 2.5 ? { label: "Average",   color: GOLD,   bg: "rgba(255,170,0,0.12)", bdr: "rgba(255,170,0,0.28)" } :
+                               { label: "Low",       color: RED,    bg: "rgba(255,51,85,0.10)", bdr: "rgba(255,51,85,0.25)" };
+                  const ta = tier(va), tb = tier(vb);
+                  return (
+                    <div className="flex flex-col">
+                      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 py-2">
+                        <div className="rounded-[14px] py-3 px-2 text-center"
+                          style={{ background: ta.bg, border: `0.5px solid ${ta.bdr}` }}>
+                          <div className="text-[9px] font-bold uppercase tracking-[0.10em] mb-[4px]" style={{ color: T4 }}>{a.m}</div>
+                          <div className="text-[28px] font-bold leading-none mb-[6px]" style={{ color: T1, letterSpacing: "-0.9px" }}>{va.toFixed(1)}</div>
+                          <div className="inline-flex items-center gap-[3px] px-[7px] py-[2px] rounded-full text-[8px] font-bold uppercase tracking-[0.06em]"
+                            style={{ background: "#fff", color: ta.color, border: `0.5px solid ${ta.bdr}` }}>
+                            <Star className="w-[8px] h-[8px] fill-current" />
+                            {ta.label}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col items-center gap-[5px] px-1">
+                          <div className="flex items-center justify-center w-9 h-9 rounded-full"
+                            style={{ background: "rgba(0,85,255,0.06)", border: "0.5px solid rgba(0,85,255,0.18)" }}>
+                            <ArrowRight className="w-[15px] h-[15px]" style={{ color: B1 }} strokeWidth={2.4} />
+                          </div>
+                          <div className="flex items-center gap-[3px] px-[7px] py-[2px] rounded-full text-[9px] font-bold"
+                            style={{ background: `${dirColor}1a`, color: dirColor, border: `0.5px solid ${dirColor}44` }}>
+                            <DirIcon className="w-[10px] h-[10px]" strokeWidth={2.4} />
+                            {delta > 0 ? `+${delta}` : delta === 0 ? "0.0" : delta}
+                          </div>
+                        </div>
+
+                        <div className="rounded-[14px] py-3 px-2 text-center"
+                          style={{ background: tb.bg, border: `0.5px solid ${tb.bdr}` }}>
+                          <div className="text-[9px] font-bold uppercase tracking-[0.10em] mb-[4px]" style={{ color: T4 }}>{b.m} <span style={{ color: B1 }}>· Now</span></div>
+                          <div className="text-[28px] font-bold leading-none mb-[6px]" style={{ color: T1, letterSpacing: "-0.9px" }}>{vb.toFixed(1)}</div>
+                          <div className="inline-flex items-center gap-[3px] px-[7px] py-[2px] rounded-full text-[8px] font-bold uppercase tracking-[0.06em]"
+                            style={{ background: "#fff", color: tb.color, border: `0.5px solid ${tb.bdr}` }}>
+                            <Star className="w-[8px] h-[8px] fill-current" />
+                            {tb.label}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-[10px] text-center pt-2 mt-1" style={{ color: T4, borderTop: "0.5px solid rgba(0,85,255,0.08)" }}>
+                        {dirLabel.toLowerCase() === "stable" ? "Held steady" : dirLabel} this month · full trend line appears after 3 months
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
@@ -1203,44 +1293,147 @@ export default function BehaviourPage() {
               {/* Trend Chart */}
               <div className="lg:col-span-2 bg-white rounded-[22px] p-6"
                 style={{ boxShadow: SH_LG_D, border: "0.5px solid rgba(0,85,255,0.10)" }}>
-                <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center justify-between mb-4">
                   <div>
                     <div className="text-[17px] font-bold" style={{ color: T1, letterSpacing: "-0.3px" }}>Behavior Trend</div>
                     <div className="text-[11px] font-normal mt-[2px]" style={{ color: T3 }}>Rating progression across months</div>
                   </div>
-                  <div className="px-[12px] py-[5px] rounded-full text-[12px] font-bold"
+                  <div className="flex items-center gap-[6px] px-[12px] py-[5px] rounded-full text-[12px] font-bold"
                     style={{ background: "rgba(0,85,255,0.10)", color: B1, border: `0.5px solid ${BLUE_BDR}` }}>
-                    {rating} / 5
+                    <Star className="w-[12px] h-[12px] fill-current" />
+                    {rating} <span style={{ color: "rgba(0,85,255,0.55)", fontWeight: 600 }}>/ 5</span>
                   </div>
                 </div>
-                {trendData.length > 1 ? (
+
+                {/* Legend row — only relevant when the full line chart is shown */}
+                {trendData.length >= 3 && (
+                  <div className="flex items-center gap-4 mb-3 flex-wrap">
+                    <div className="flex items-center gap-[6px]">
+                      <span className="block w-[10px] h-[3px] rounded-full" style={{ background: B1 }} />
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.06em]" style={{ color: T3 }}>Rating</span>
+                    </div>
+                    <div className="flex items-center gap-[6px]">
+                      <span className="block w-[10px] h-[3px] rounded-full" style={{ background: "rgba(0,200,83,0.55)" }} />
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.06em]" style={{ color: T3 }}>Excellent zone</span>
+                    </div>
+                    <div className="flex items-center gap-[6px]">
+                      <span className="block w-[10px] h-[1.5px] rounded-full" style={{ background: "rgba(255,170,0,0.65)", borderTop: "1px dashed rgba(255,170,0,0.65)" }} />
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.06em]" style={{ color: T3 }}>Target · 4.0</span>
+                    </div>
+                  </div>
+                )}
+
+                {trendData.length >= 3 ? (
                   <div className="h-[280px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <AreaChart data={trendData} margin={{ top: 24, right: 16, left: -16, bottom: 4 }}>
                         <defs>
                           <linearGradient id="behDeskArea" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor={B1} stopOpacity={0.22} />
+                            <stop offset="0%" stopColor={B1} stopOpacity={0.28} />
                             <stop offset="100%" stopColor={B1} stopOpacity={0} />
                           </linearGradient>
                           <linearGradient id="behDeskLine" x1="0%" y1="0%" x2="100%" y2="0%">
                             <stop offset="0%" stopColor={B1} />
                             <stop offset="100%" stopColor="#66BBFF" />
                           </linearGradient>
+                          <filter id="behDeskShadow" x="-20%" y="-20%" width="140%" height="140%">
+                            <feGaussianBlur in="SourceAlpha" stdDeviation="3" />
+                            <feOffset dx="0" dy="2" result="off" />
+                            <feComponentTransfer result="shadow"><feFuncA type="linear" slope="0.32" /></feComponentTransfer>
+                            <feMerge><feMergeNode in="shadow" /><feMergeNode in="SourceGraphic" /></feMerge>
+                          </filter>
                         </defs>
-                        <CartesianGrid strokeDasharray="0" vertical={false} stroke="rgba(0,85,255,0.07)" />
-                        <XAxis dataKey="m" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: T4 }} dy={8} />
-                        <YAxis domain={[1, 5]} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: T4 }} />
+                        <CartesianGrid strokeDasharray="3 4" vertical={false} stroke="rgba(0,85,255,0.08)" />
+                        <ReferenceArea y1={4.5} y2={5} fill="rgba(0,200,83,0.06)" stroke="none" />
+                        <ReferenceLine y={4} stroke="rgba(255,170,0,0.55)" strokeDasharray="4 4" strokeWidth={1.2} />
+                        <XAxis dataKey="m" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: T4, fontWeight: 600 }} dy={8} />
+                        <YAxis domain={[1, 5]} ticks={[1, 2, 3, 4, 5]} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: T4, fontWeight: 600 }} />
                         <Tooltip
-                          contentStyle={{ borderRadius: 12, border: `0.5px solid ${BLUE_BDR}`, boxShadow: "0 4px 20px rgba(0,85,255,0.12)", fontSize: 12, fontFamily: "DM Sans", background: "#fff" }}
-                          formatter={(val: any) => [`${val?.toFixed?.(1) ?? val}`, "Rating"]} />
-                        <Area type="monotone" dataKey="score" stroke="url(#behDeskLine)" strokeWidth={3} fill="url(#behDeskArea)"
-                          dot={{ r: 5, fill: B1, strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 7, strokeWidth: 2, stroke: "#fff" }} />
+                          cursor={{ stroke: "rgba(0,85,255,0.25)", strokeWidth: 1, strokeDasharray: "3 3" }}
+                          contentStyle={{ borderRadius: 12, border: `0.5px solid ${BLUE_BDR}`, boxShadow: "0 8px 28px rgba(0,85,255,0.16)", fontSize: 12, fontFamily: "DM Sans", background: "#fff", padding: "10px 12px" }}
+                          labelStyle={{ fontWeight: 700, color: T1, marginBottom: 4, fontSize: 12 }}
+                          itemStyle={{ color: B1, fontWeight: 600 }}
+                          formatter={(val: any) => [`${val?.toFixed?.(1) ?? val} / 5`, "Rating"]} />
+                        <Area type="monotone" dataKey="score" stroke="url(#behDeskLine)" strokeWidth={3} fill="url(#behDeskArea)" filter="url(#behDeskShadow)"
+                          dot={{ r: 5, fill: B1, strokeWidth: 2.5, stroke: "#fff" }} activeDot={{ r: 8, strokeWidth: 2.5, stroke: "#fff", fill: B1 }}>
+                          <LabelList dataKey="score" position="top" offset={12}
+                            formatter={(v: any) => (typeof v === "number" ? v.toFixed(1) : "")}
+                            style={{ fontSize: 11, fontWeight: 700, fill: B1, fontFamily: "DM Sans" }} />
+                        </Area>
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
-                ) : (
-                  <div className="h-[280px] flex items-center justify-center text-[13px]" style={{ color: T4 }}>
-                    Not enough data yet for a trend.
+                ) : trendData.length === 2 ? (() => {
+                  // ── Two-point comparison card (cleaner than a flat line) ──
+                  const a: any = trendData[0], b: any = trendData[1];
+                  const va = typeof a?.score === "number" ? a.score : 0;
+                  const vb = typeof b?.score === "number" ? b.score : 0;
+                  const delta = +(vb - va).toFixed(1);
+                  const dir = delta > 0 ? "up" : delta < 0 ? "down" : "flat";
+                  const dirColor = dir === "up" ? "#00C853" : dir === "down" ? "#FF3355" : T4;
+                  const dirLabel = dir === "up" ? "Improved" : dir === "down" ? "Declined" : "Stable";
+                  const DirIcon = dir === "up" ? TrendingUp : dir === "down" ? TrendingDown : Minus;
+                  const tier = (n: number) =>
+                    n >= 4.5 ? { label: "Excellent", color: "#00C853", bg: "rgba(0,200,83,0.10)", bdr: "rgba(0,200,83,0.25)" } :
+                    n >= 3.5 ? { label: "Good",      color: B1,        bg: "rgba(0,85,255,0.10)", bdr: "rgba(0,85,255,0.22)" } :
+                    n >= 2.5 ? { label: "Average",   color: "#FFAA00", bg: "rgba(255,170,0,0.12)", bdr: "rgba(255,170,0,0.28)" } :
+                               { label: "Low",       color: "#FF3355", bg: "rgba(255,51,85,0.10)", bdr: "rgba(255,51,85,0.25)" };
+                  const ta = tier(va), tb = tier(vb);
+                  return (
+                    <div className="h-[280px] flex flex-col">
+                      <div className="flex-1 grid grid-cols-[1fr_auto_1fr] items-center gap-4 py-4">
+                        {/* From month */}
+                        <div className="rounded-[18px] p-5 text-center relative overflow-hidden"
+                          style={{ background: ta.bg, border: `0.5px solid ${ta.bdr}` }}>
+                          <div className="text-[10px] font-bold uppercase tracking-[0.12em] mb-2" style={{ color: T4 }}>{a.m}</div>
+                          <div className="text-[44px] font-bold leading-none mb-2" style={{ color: T1, letterSpacing: "-1.4px" }}>{va.toFixed(1)}</div>
+                          <div className="inline-flex items-center gap-[5px] px-[10px] py-[3px] rounded-full text-[10px] font-bold uppercase tracking-[0.08em]"
+                            style={{ background: ta.bg, color: ta.color, border: `0.5px solid ${ta.bdr}` }}>
+                            <Star className="w-[10px] h-[10px] fill-current" />
+                            {ta.label}
+                          </div>
+                        </div>
+
+                        {/* Arrow + delta */}
+                        <div className="flex flex-col items-center gap-2 px-2">
+                          <div className="flex items-center justify-center w-12 h-12 rounded-full"
+                            style={{ background: "rgba(0,85,255,0.06)", border: "0.5px solid rgba(0,85,255,0.18)" }}>
+                            <ArrowRight className="w-5 h-5" style={{ color: B1 }} strokeWidth={2.4} />
+                          </div>
+                          <div className="flex items-center gap-[5px] px-[10px] py-[4px] rounded-full text-[11px] font-bold"
+                            style={{ background: `${dirColor}1a`, color: dirColor, border: `0.5px solid ${dirColor}44` }}>
+                            <DirIcon className="w-[12px] h-[12px]" strokeWidth={2.4} />
+                            {delta > 0 ? `+${delta}` : delta === 0 ? "0.0" : delta}
+                          </div>
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: T4 }}>{dirLabel}</div>
+                        </div>
+
+                        {/* To month */}
+                        <div className="rounded-[18px] p-5 text-center relative overflow-hidden"
+                          style={{ background: tb.bg, border: `0.5px solid ${tb.bdr}` }}>
+                          <div className="text-[10px] font-bold uppercase tracking-[0.12em] mb-2" style={{ color: T4 }}>{b.m} <span style={{ color: B1 }}>· Now</span></div>
+                          <div className="text-[44px] font-bold leading-none mb-2" style={{ color: T1, letterSpacing: "-1.4px" }}>{vb.toFixed(1)}</div>
+                          <div className="inline-flex items-center gap-[5px] px-[10px] py-[3px] rounded-full text-[10px] font-bold uppercase tracking-[0.08em]"
+                            style={{ background: tb.bg, color: tb.color, border: `0.5px solid ${tb.bdr}` }}>
+                            <Star className="w-[10px] h-[10px] fill-current" />
+                            {tb.label}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-[11px] text-center pt-3 mt-1" style={{ color: T4, borderTop: "0.5px solid rgba(0,85,255,0.08)" }}>
+                        Full trend line will appear after a third month of data
+                      </div>
+                    </div>
+                  );
+                })() : (
+                  <div className="h-[280px] flex flex-col items-center justify-center gap-2 rounded-[16px]"
+                    style={{ background: "rgba(0,85,255,0.03)", border: "0.5px dashed rgba(0,85,255,0.15)" }}>
+                    <div className="w-[42px] h-[42px] rounded-[12px] flex items-center justify-center"
+                      style={{ background: "rgba(0,85,255,0.08)", border: "0.5px solid rgba(0,85,255,0.18)" }}>
+                      <Star className="w-[18px] h-[18px]" style={{ color: B1 }} strokeWidth={2.2} />
+                    </div>
+                    <div className="text-[13px] font-semibold" style={{ color: T3 }}>Not enough data yet for a trend</div>
+                    <div className="text-[11px]" style={{ color: T4 }}>Two or more months are needed to plot progression</div>
                   </div>
                 )}
               </div>

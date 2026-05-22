@@ -645,3 +645,30 @@ img, video {
   100% { transform: translateY(0px); }
 }
 
+/* Marquee — scrolls long single-line text horizontally only when the inner
+   content overflows the .marquee container. Pauses on hover/tap. */
+.marquee {
+  overflow: hidden;
+  position: relative;
+  display: block;
+  width: 100%;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+          mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+}
+.marquee__track {
+  display: inline-flex;
+  white-space: nowrap;
+  gap: 2.5rem;
+  padding-left: 0;
+  animation: marquee-scroll 14s linear infinite;
+  will-change: transform;
+}
+.marquee:hover .marquee__track,
+.marquee:active .marquee__track {
+  animation-play-state: paused;
+}
+@keyframes marquee-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+

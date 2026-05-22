@@ -49,6 +49,8 @@ const TeacherNotesPage = () => {
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const emojiButtonRef = useRef<HTMLButtonElement>(null);
 
   // Common emoji list for the picker panel
   const EMOJIS = ["😊","😂","❤️","👍","🙏","😍","🎉","🔥","✅","👏","😭","🤔","💯","🙌","😅","🥰","😁","👋","💪","🎓","📚","✏️","⭐","🌟","💡","📝","🤝","😇","🙂","👌"];
@@ -56,6 +58,30 @@ const TeacherNotesPage = () => {
     setMessageContent(prev => prev + emoji);
     setShowEmojiPicker(false);
   };
+
+  // Close emoji picker on outside click / Escape — so clicking the chat area
+  // or pressing Esc dismisses the panel, not just clicking the smile button.
+  useEffect(() => {
+    if (!showEmojiPicker) return;
+    const handlePointer = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+      if (emojiPickerRef.current?.contains(target)) return;
+      if (emojiButtonRef.current?.contains(target)) return;
+      setShowEmojiPicker(false);
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowEmojiPicker(false);
+    };
+    document.addEventListener("mousedown", handlePointer);
+    document.addEventListener("touchstart", handlePointer);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handlePointer);
+      document.removeEventListener("touchstart", handlePointer);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [showEmojiPicker]);
 
   // Fetch all parent_notes for this student.
   // Dual-query pattern (studentId + studentEmail) — teacher writes don't always
@@ -337,6 +363,9 @@ const TeacherNotesPage = () => {
   const groupedMessages = useMemo(() => {
     const groups: { date: string; messages: any[] }[] = [];
     chatMessages.forEach(msg => {
+      // Skip messages with no real content — they would render as tiny
+      // timestamp-only bubbles (legacy/whitespace docs leaked through).
+      if (typeof msg?.content !== "string" || msg.content.trim() === "") return;
       // Bucket undated messages under "Sending…" so they're visibly distinct
       // from a real "Today" group and don't silently merge with it.
       const label = fmtDate(msg.createdAt) || "Sending…";
@@ -608,29 +637,40 @@ const TeacherNotesPage = () => {
             {/* Input bar — WhatsApp style */}
             <div className="px-2 py-[7px] flex items-end gap-[6px] shrink-0 relative"
               style={{ background: WA_HEADER_BG }}>
-              {/* Emoji picker panel — mobile */}
+              {/* Emoji picker panel — mobile (full-width drawer above input) */}
               {showEmojiPicker && (
                 <div
-                  className="absolute bottom-[62px] left-2 z-30 rounded-[18px] p-3 grid gap-1"
-                  style={{
-                    background: "#fff",
-                    boxShadow: "0 8px 32px rgba(11,20,26,0.18), 0 2px 8px rgba(11,20,26,0.10)",
-                    gridTemplateColumns: "repeat(6, 1fr)",
-                    width: 230,
-                  }}
+                  ref={emojiPickerRef}
+                  className="absolute left-0 right-0 bottom-[100%] z-30 px-2 pb-2 animate-in slide-in-from-bottom-2 fade-in duration-150"
                 >
-                  {EMOJIS.map(e => (
-                    <button
-                      key={e}
-                      onClick={() => insertEmoji(e)}
-                      className="w-9 h-9 flex items-center justify-center rounded-[10px] text-[20px] active:scale-90 transition-transform hover:bg-gray-100"
-                    >{e}</button>
-                  ))}
+                  <div
+                    className="rounded-t-[20px] rounded-b-[14px] px-3 pt-2 pb-3"
+                    style={{
+                      background: "#fff",
+                      boxShadow: "0 -8px 32px rgba(11,20,26,0.14), 0 -1px 4px rgba(11,20,26,0.06)",
+                      border: "0.5px solid rgba(11,20,26,0.08)",
+                    }}
+                  >
+                    {/* Drag handle */}
+                    <div className="flex justify-center mb-2">
+                      <div className="w-10 h-[4px] rounded-full" style={{ background: "rgba(11,20,26,0.18)" }} />
+                    </div>
+                    <div className="grid gap-1" style={{ gridTemplateColumns: "repeat(8, 1fr)" }}>
+                      {EMOJIS.map(e => (
+                        <button
+                          key={e}
+                          onClick={() => insertEmoji(e)}
+                          className="h-10 flex items-center justify-center rounded-[10px] text-[22px] active:scale-90 transition-transform hover:bg-gray-100"
+                        >{e}</button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
               <div className="flex-1 flex items-center gap-1 px-3 py-[8px] rounded-[24px]"
                 style={{ background: "#fff" }}>
                 <button
+                  ref={emojiButtonRef}
                   className="w-7 h-7 flex items-center justify-center active:scale-90 shrink-0"
                   onClick={() => setShowEmojiPicker(v => !v)}
                   aria-label="Emoji picker"
@@ -1165,6 +1205,7 @@ const TeacherNotesPage = () => {
                     {/* Emoji picker panel — desktop */}
                     {showEmojiPicker && (
                       <div
+                        ref={emojiPickerRef}
                         className="absolute bottom-[62px] left-4 z-30 rounded-[18px] p-3 grid gap-1"
                         style={{
                           background: "#fff",
@@ -1183,6 +1224,7 @@ const TeacherNotesPage = () => {
                       </div>
                     )}
                     <button
+                      ref={emojiButtonRef}
                       className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-[rgba(11,20,26,0.06)]"
                       onClick={() => setShowEmojiPicker(v => !v)}
                       aria-label="Emoji picker"
