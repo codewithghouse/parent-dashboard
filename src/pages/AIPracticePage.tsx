@@ -462,8 +462,20 @@ const AIPracticePage = () => {
             boxShadow: SH,
             border: "0.5px solid rgba(0,85,255,0.20)",
           }}>
-          <div className="absolute pointer-events-none" style={{ top: 12, right: 12 }}>
-            <Sparkles style={{ width: 70, height: 70, color: B1, opacity: 0.16, strokeWidth: 1.6 }} />
+          {/* Decorative background sparkle — wrapped in a fixed-size clip container
+              so SVG stroke painting cannot escape the parent card's overflow:hidden. */}
+          <div
+            className="absolute pointer-events-none"
+            style={{
+              top: 6,
+              right: 6,
+              width: 62,
+              height: 62,
+              overflow: "hidden",
+              borderRadius: 8,
+            }}
+          >
+            <Sparkles style={{ width: 62, height: 62, color: B1, opacity: 0.13, strokeWidth: 1.4 }} />
           </div>
 
           <div className="relative z-10">
@@ -482,17 +494,22 @@ const AIPracticePage = () => {
             {/* Stat chips */}
             <div className="grid grid-cols-3 gap-2">
               {[
-                { icon: "🔥", val: `${streak}d`, label: "Streak", tint: "rgba(255,136,0,0.10)", bdr: "rgba(255,136,0,0.22)", color: ORANGE },
-                { icon: <BarChart3 className="w-[18px] h-[18px]" style={{ color: B1 }} strokeWidth={2.2} />, val: `${attempts.length}`, label: "Exams", tint: "rgba(0,85,255,0.08)", bdr: "rgba(0,85,255,0.20)", color: B1 },
-                { icon: "⭐", val: bestScore > 0 ? `${bestScore}%` : "—", label: "Best", tint: "rgba(255,204,34,0.12)", bdr: "rgba(255,204,34,0.28)", color: GOLD },
-              ].map(({ icon, val, label, tint, bdr, color }) => (
-                <div key={label} className="rounded-[16px] py-[13px] px-[10px] flex flex-col items-center gap-[5px]"
-                  style={{ background: tint, border: `0.5px solid ${bdr}` }}>
-                  <div className="h-[22px] flex items-center justify-center text-[18px] leading-none mb-[2px]">
+                { icon: "🔥", val: `${streak}d`, label: "Streak", tint: "rgba(255,136,0,0.10)", bdr: "rgba(255,136,0,0.22)", color: ORANGE, decorBg: "rgba(255,136,0,0.07)" },
+                { icon: <BarChart3 className="w-[18px] h-[18px]" style={{ color: B1 }} strokeWidth={2.2} />, val: `${attempts.length}`, label: "Exams", tint: "rgba(0,85,255,0.08)", bdr: "rgba(0,85,255,0.20)", color: B1, decorBg: "rgba(0,85,255,0.06)" },
+                { icon: "⭐", val: bestScore > 0 ? `${bestScore}%` : "—", label: "Best", tint: "rgba(255,204,34,0.12)", bdr: "rgba(255,204,34,0.28)", color: GOLD, decorBg: "rgba(255,204,34,0.09)" },
+              ].map(({ icon, val, label, tint, bdr, color, decorBg }) => (
+                <div key={label} className="rounded-[16px] py-[13px] px-[10px] flex flex-col items-center gap-[5px] relative overflow-hidden"
+                  style={{ background: `linear-gradient(180deg, #ffffff 0%, rgba(255,255,255,0.85) 100%), ${tint}`, backgroundBlendMode: "normal", border: `0.5px solid ${bdr}` }}>
+                  {/* Decorative background glow — clipped by overflow-hidden */}
+                  <div
+                    className="absolute -bottom-3 -right-3 w-[55px] h-[55px] rounded-full pointer-events-none"
+                    style={{ background: `radial-gradient(circle, ${decorBg} 0%, transparent 70%)` }}
+                  />
+                  <div className="h-[22px] flex items-center justify-center text-[18px] leading-none mb-[2px] relative z-10">
                     {typeof icon === "string" ? icon : icon}
                   </div>
-                  <div className="text-[20px] font-bold leading-none" style={{ color: T1, letterSpacing: "-0.5px" }}>{val}</div>
-                  <div className="text-[8px] font-bold uppercase tracking-[0.10em]" style={{ color }}>{label}</div>
+                  <div className="text-[20px] font-bold leading-none relative z-10" style={{ color: T1, letterSpacing: "-0.5px" }}>{val}</div>
+                  <div className="text-[8px] font-bold uppercase tracking-[0.10em] relative z-10" style={{ color }}>{label}</div>
                 </div>
               ))}
             </div>
@@ -1033,8 +1050,20 @@ const AIPracticePage = () => {
             boxShadow: SH_LG_D,
             border: "0.5px solid rgba(0,85,255,0.20)",
           }}>
-          <div className="absolute pointer-events-none" style={{ top: 18, right: 22 }}>
-            <Sparkles style={{ width: 110, height: 110, color: B1, opacity: 0.14, strokeWidth: 1.6 }} />
+          {/* Decorative background sparkle — placed bottom-left so it doesn't bleed
+              into the translucent stat chips that sit in the right column. */}
+          <div
+            className="absolute pointer-events-none"
+            style={{
+              bottom: -10,
+              left: -8,
+              width: 110,
+              height: 110,
+              overflow: "hidden",
+              borderRadius: 12,
+            }}
+          >
+            <Sparkles style={{ width: 110, height: 110, color: B1, opacity: 0.08, strokeWidth: 1.4 }} />
           </div>
           <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
             <div>
@@ -1057,17 +1086,49 @@ const AIPracticePage = () => {
             </div>
             <div className="grid grid-cols-3 gap-3">
               {[
-                { icon: "🔥", val: `${streak}d`, label: "Streak", tint: "rgba(255,136,0,0.10)", bdr: "rgba(255,136,0,0.22)", color: ORANGE_D },
-                { icon: <BarChart3 className="w-[20px] h-[20px]" style={{ color: B1 }} strokeWidth={2.2} />, val: `${attempts.length}`, label: "Exams", tint: "rgba(0,85,255,0.08)", bdr: "rgba(0,85,255,0.20)", color: B1 },
-                { icon: "⭐", val: bestScore > 0 ? `${bestScore}%` : "—", label: "Best", tint: "rgba(255,204,34,0.12)", bdr: "rgba(255,204,34,0.30)", color: GOLD_D },
-              ].map(({ icon, val, label, tint, bdr, color }) => (
-                <div key={label} className="rounded-[18px] py-5 px-3 flex flex-col items-center gap-1"
-                  style={{ background: tint, border: `0.5px solid ${bdr}` }}>
-                  <div className="h-[26px] flex items-center justify-center text-[22px] leading-none mb-1">
+                {
+                  icon: "🔥",
+                  val: `${streak}d`,
+                  label: "Streak",
+                  tint: "rgba(255,136,0,0.10)",
+                  bdr: "rgba(255,136,0,0.22)",
+                  color: ORANGE_D,
+                  decorBg: "rgba(255,136,0,0.08)",
+                },
+                {
+                  icon: <BarChart3 className="w-[20px] h-[20px]" style={{ color: B1 }} strokeWidth={2.2} />,
+                  val: `${attempts.length}`,
+                  label: "Exams",
+                  tint: "rgba(0,85,255,0.08)",
+                  bdr: "rgba(0,85,255,0.20)",
+                  color: B1,
+                  decorBg: "rgba(0,85,255,0.06)",
+                },
+                {
+                  icon: "⭐",
+                  val: bestScore > 0 ? `${bestScore}%` : "—",
+                  label: "Best",
+                  tint: "rgba(255,204,34,0.12)",
+                  bdr: "rgba(255,204,34,0.30)",
+                  color: GOLD_D,
+                  decorBg: "rgba(255,204,34,0.10)",
+                },
+              ].map(({ icon, val, label, tint, bdr, color, decorBg }) => (
+                <div
+                  key={label}
+                  className="rounded-[18px] py-5 px-3 flex flex-col items-center gap-1 relative overflow-hidden"
+                  style={{ background: `linear-gradient(180deg, #ffffff 0%, rgba(255,255,255,0.85) 100%), ${tint}`, border: `0.5px solid ${bdr}` }}
+                >
+                  {/* Decorative background circle — clipped inside card */}
+                  <div
+                    className="absolute -bottom-4 -right-4 w-[70px] h-[70px] rounded-full pointer-events-none"
+                    style={{ background: `radial-gradient(circle, ${decorBg} 0%, transparent 70%)` }}
+                  />
+                  <div className="h-[26px] flex items-center justify-center text-[22px] leading-none mb-1 relative z-10">
                     {typeof icon === "string" ? icon : icon}
                   </div>
-                  <div className="text-[22px] font-bold leading-none" style={{ color: T1, letterSpacing: "-0.6px" }}>{val}</div>
-                  <div className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color }}>{label}</div>
+                  <div className="text-[22px] font-bold leading-none relative z-10" style={{ color: T1, letterSpacing: "-0.6px" }}>{val}</div>
+                  <div className="text-[9px] font-bold uppercase tracking-[0.10em] relative z-10" style={{ color }}>{label}</div>
                 </div>
               ))}
             </div>

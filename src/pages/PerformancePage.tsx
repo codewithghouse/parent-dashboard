@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart,
+  BarChart, Bar, Cell, LabelList,
 } from "recharts";
 import { SubjectPerformanceDetail } from "@/components/performance/SubjectPerformanceDetail";
 import { useAuth } from "@/lib/AuthContext";
@@ -746,6 +747,8 @@ const TrendChartCard = ({
   isMobile: boolean;
   navigate: NavigateFunction;
 }) => {
+  // Drop months without data — a leading Feb-empty gap before Mar's first
+  // point makes the area look broken and the curve start at thin air.
   const points = data.filter(p => p.score != null);
   if (points.length < 2) return null;
 
@@ -756,6 +759,74 @@ const TrendChartCard = ({
 
   const lineGradId = isMobile ? "perfLineBlueM" : "perfLineBlueD";
   const areaGradId = isMobile ? "perfAreaBlueM" : "perfAreaBlueD";
+
+  // ≤ 2 real months → bar comparison reads sharper than a 2-point curve.
+  // 3+ months → area chart shows progression.
+  const useBars = points.length <= 2;
+
+  // Smart Y-axis: zoom into the data range so 75% vs 93% movement is visible
+  // (full 0-100 flattens the curve to nearly horizontal at the top).
+  const scores = points.map(p => p.score as number);
+  const minScore = Math.min(...scores);
+  const yMin = minScore >= 90 ? 70 : minScore >= 75 ? 50 : minScore >= 50 ? 25 : 0;
+
+  // Per-month colour for the bar variant — keeps the visual decoded vs. a
+  // wall of identical blue bars. Matches the band semantics used elsewhere.
+  const barColor = (s: number) =>
+    s >= 85 ? "url(#perfBarHigh)" :
+    s >= 70 ? "url(#perfBarGood)" :
+    s >= 50 ? "url(#perfBarAmber)" :
+              "url(#perfBarRed)";
+
+  // Even 3-step Y-axis grid (yMin → mid → 100). Default recharts auto-ticks
+  // can land on awkward values like 65/85 when zoomed; explicit ticks read
+  // cleaner and keep the gridline rhythm consistent across all yMin values.
+  const yMid = Math.round((yMin + 100) / 2);
+  const yTicks = [yMin, yMid, 100];
+
+  // Custom pill-shaped label — renders score as a white rounded chip with a
+  // hairline border + drop shadow above each dot/bar. The chip lifts the
+  // value off the chart background so it stays legible against the area
+  // gradient AND avoids overlapping the Y-axis tick labels at the edges
+  // (we nudge first/last pills inward).
+  const PillLabel = (props: any) => {
+    const { x, y, value, index } = props;
+    if (typeof value !== "number" || typeof x !== "number" || typeof y !== "number") return null;
+    const w = isMobile ? 38 : 46;
+    const h = isMobile ? 20 : 24;
+    const last = points.length - 1;
+    const dx = index === 0 ? 8 : index === last ? -8 : 0;
+    const px = x + dx - w / 2;
+    const py = y - h - 10;
+    return (
+      <g style={{ pointerEvents: "none" }}>
+        <rect
+          x={px} y={py} width={w} height={h} rx={h / 2} ry={h / 2}
+          fill="#fff"
+          stroke="rgba(0,85,255,0.22)"
+          strokeWidth={0.75}
+          style={{ filter: "drop-shadow(0 2px 6px rgba(0,16,64,0.10))" }}
+        />
+        <text
+          x={px + w / 2}
+          y={py + h / 2}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontSize={isMobile ? 11 : 12.5}
+          fontWeight={700}
+          fill={T_PALETTE.T1}
+          style={{ letterSpacing: "-0.2px" }}
+        >
+          {value}%
+        </text>
+      </g>
+    );
+  };
+
+  const subtitle =
+    points.length === data.length
+      ? "Score progression across recent months"
+      : `Across ${points.length} month${points.length === 1 ? "" : "s"} of recorded tests`;
 
   return (
     <div
@@ -778,55 +849,139 @@ const TrendChartCard = ({
         Performance Trend
       </div>
       <div className={isMobile ? "text-[11px] mb-4" : "text-[12px] mt-1 mb-4"} style={{ color: T_PALETTE.T3 }}>
-        Score progression across recent months
+        {subtitle}
       </div>
-      <div className={isMobile ? "h-[150px] w-full" : "h-[240px] w-full"}>
+      <div className={isMobile ? "h-[180px] w-full" : "h-[260px] w-full"}>
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 6, right: 6, left: isMobile ? -18 : -10, bottom: 0 }}>
-            <defs>
-              <linearGradient id={areaGradId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={T_PALETTE.B1} stopOpacity={isMobile ? 0.20 : 0.22} />
-                <stop offset="100%" stopColor={T_PALETTE.B1} stopOpacity={0} />
-              </linearGradient>
-              <linearGradient id={lineGradId} x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor={T_PALETTE.B1} />
-                <stop offset="100%" stopColor="#66BBFF" />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="0" vertical={false} stroke="rgba(0,85,255,0.07)" />
-            <XAxis
-              dataKey="month"
-              axisLine={false}
-              tickLine={false}
-              tick={{ fontSize: isMobile ? 9 : 11, fill: T_PALETTE.T4, fontWeight: 600 }}
-            />
-            <YAxis
-              axisLine={false}
-              tickLine={false}
-              tick={{ fontSize: isMobile ? 9 : 11, fill: T_PALETTE.T4, fontWeight: 600 }}
-              domain={[0, 100]}
-              width={isMobile ? 30 : 36}
-            />
-            <Tooltip
-              contentStyle={{
-                borderRadius: 12,
-                border: "0.5px solid rgba(0,85,255,0.15)",
-                boxShadow: "0 4px 20px rgba(0,85,255,0.12)",
-                fontSize: isMobile ? 11 : 12,
-                padding: isMobile ? "6px 10px" : "8px 12px",
-              }}
-            />
-            <Area
-              type="monotone"
-              dataKey="score"
-              stroke={`url(#${lineGradId})`}
-              strokeWidth={isMobile ? 2.5 : 3}
-              fill={`url(#${areaGradId})`}
-              dot={{ r: isMobile ? 4 : 5, strokeWidth: 2, stroke: "#fff", fill: T_PALETTE.B1 }}
-              activeDot={{ r: isMobile ? 6 : 7, strokeWidth: 2 }}
-              connectNulls={false}
-            />
-          </AreaChart>
+          {useBars ? (
+            <BarChart
+              data={points}
+              margin={{ top: 36, right: 24, left: isMobile ? 4 : 12, bottom: 4 }}
+              barCategoryGap="30%"
+            >
+              <defs>
+                <linearGradient id="perfBarHigh" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#16a34a" stopOpacity={0.95} />
+                  <stop offset="100%" stopColor="#86EFAC" stopOpacity={0.7} />
+                </linearGradient>
+                <linearGradient id="perfBarGood" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={T_PALETTE.B1} stopOpacity={0.95} />
+                  <stop offset="100%" stopColor="#A5B4FC" stopOpacity={0.7} />
+                </linearGradient>
+                <linearGradient id="perfBarAmber" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#d97706" stopOpacity={0.95} />
+                  <stop offset="100%" stopColor="#FCD34D" stopOpacity={0.7} />
+                </linearGradient>
+                <linearGradient id="perfBarRed" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#dc2626" stopOpacity={0.95} />
+                  <stop offset="100%" stopColor="#FCA5A5" stopOpacity={0.7} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 5" vertical={false} stroke="rgba(0,85,255,0.10)" />
+              <XAxis
+                dataKey="month"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: isMobile ? 11 : 13, fill: T_PALETTE.T2, fontWeight: 700 }}
+                tickMargin={10}
+                padding={{ left: 12, right: 12 }}
+              />
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: isMobile ? 10 : 12, fill: T_PALETTE.T4, fontWeight: 600 }}
+                domain={[yMin, 100]}
+                ticks={yTicks}
+                width={isMobile ? 32 : 40}
+                tickFormatter={(v) => `${v}`}
+              />
+              <Tooltip
+                cursor={{ fill: "rgba(0,85,255,0.05)" }}
+                contentStyle={{
+                  borderRadius: 12,
+                  border: "0.5px solid rgba(0,85,255,0.15)",
+                  boxShadow: "0 8px 28px rgba(0,16,64,0.12)",
+                  fontSize: isMobile ? 11 : 12,
+                  padding: isMobile ? "6px 10px" : "8px 12px",
+                }}
+                formatter={(val: unknown) =>
+                  typeof val === "number" ? [`${val}%`, "Score"] : ["—", "Score"]
+                }
+              />
+              <Bar
+                dataKey="score"
+                radius={[12, 12, 4, 4]}
+                maxBarSize={isMobile ? 70 : 110}
+              >
+                {points.map((p, i) => (
+                  <Cell key={i} fill={barColor(p.score as number)} />
+                ))}
+                <LabelList dataKey="score" content={<PillLabel />} />
+              </Bar>
+            </BarChart>
+          ) : (
+            <AreaChart data={points} margin={{ top: 36, right: 24, left: isMobile ? 4 : 12, bottom: 4 }}>
+              <defs>
+                <linearGradient id={areaGradId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={T_PALETTE.B1} stopOpacity={isMobile ? 0.26 : 0.28} />
+                  <stop offset="100%" stopColor={T_PALETTE.B1} stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id={lineGradId} x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor={T_PALETTE.B1} />
+                  <stop offset="100%" stopColor="#3B82F6" />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 5" vertical={false} stroke="rgba(0,85,255,0.10)" />
+              <XAxis
+                dataKey="month"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: isMobile ? 11 : 13, fill: T_PALETTE.T2, fontWeight: 700 }}
+                tickMargin={10}
+                padding={{ left: 12, right: 12 }}
+              />
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: isMobile ? 10 : 12, fill: T_PALETTE.T4, fontWeight: 600 }}
+                domain={[yMin, 100]}
+                ticks={yTicks}
+                width={isMobile ? 32 : 40}
+                tickFormatter={(v) => `${v}`}
+              />
+              <Tooltip
+                cursor={{ stroke: "rgba(0,85,255,0.25)", strokeWidth: 1, strokeDasharray: "4 4" }}
+                contentStyle={{
+                  borderRadius: 12,
+                  border: "0.5px solid rgba(0,85,255,0.15)",
+                  boxShadow: "0 8px 28px rgba(0,16,64,0.12)",
+                  fontSize: isMobile ? 11 : 12,
+                  padding: isMobile ? "6px 10px" : "8px 12px",
+                }}
+                formatter={(val: unknown) =>
+                  typeof val === "number" ? [`${val}%`, "Score"] : ["—", "Score"]
+                }
+              />
+              <Area
+                type="monotone"
+                dataKey="score"
+                stroke={`url(#${lineGradId})`}
+                strokeWidth={isMobile ? 3 : 3.5}
+                fill={`url(#${areaGradId})`}
+                dot={{ r: isMobile ? 5 : 6, strokeWidth: 2.5, stroke: "#fff", fill: T_PALETTE.B1 }}
+                activeDot={{
+                  r: isMobile ? 7 : 8,
+                  strokeWidth: 3,
+                  stroke: "#fff",
+                  fill: T_PALETTE.B1,
+                  style: { filter: "drop-shadow(0 4px 10px rgba(0,85,255,0.35))" },
+                }}
+                connectNulls
+              >
+                <LabelList dataKey="score" content={<PillLabel />} />
+              </Area>
+            </AreaChart>
+          )}
         </ResponsiveContainer>
       </div>
       <div className="flex items-center justify-center gap-[6px] mt-2">
@@ -1108,7 +1263,7 @@ interface BenchmarkInsightsProps {
 const BenchmarkInsightsCard = ({
   subjects, benchmark, studentName, isMobile, onSubjectClick,
 }: BenchmarkInsightsProps) => {
-  const { T1, T3, T4, B1, B3, B4, BG, BG2, GREEN, GREEN_S, GREEN_B, RED, ORANGE, SH_LG, SEP } = T_PALETTE;
+  const { T1, T3, T4, B1, B2, B3, B4, BG, BG2, GREEN, GREEN_S, GREEN_B, RED, ORANGE, SH_LG, SEP } = T_PALETTE;
   return (
     <div
       className={isMobile ? "mx-5 mt-3 mb-2 bg-white rounded-[24px] p-5" : "bg-white rounded-[24px] p-6"}
@@ -1205,28 +1360,99 @@ const BenchmarkInsightsCard = ({
                     )}
                   </div>
                 </div>
-                {recent.length >= 2 ? (
-                  <div className="flex flex-col items-end gap-[6px]">
-                    <div className={isMobile ? "flex items-end gap-[3px] h-8" : "flex items-end gap-[3px] h-10"}>
-                      {recent.map((val, k) => (
+                {recent.length >= 2 ? (() => {
+                  // Harmonious blue palette — each bar picks a shade from the
+                  // product's blue family based on its score, so the sparkline
+                  // varies visually (4 related blues) instead of looking like
+                  // a wall of identical bars. All shades are deep + saturated;
+                  // none of them is "amber" or "red" — staying on-brand.
+                  //   ≥ 90 → Royal Navy   (richest, deepest)
+                  //   ≥ 75 → Deep Brand   (dark navy → brand blue)
+                  //   ≥ 60 → Brand Blue   (brand blue mid-tone)
+                  //   <  60 → Sky Blue    (brand → lighter, but still blue)
+                  const miniGrad = (v: number) =>
+                    v >= 90 ? "linear-gradient(180deg, #000B33 0%, #001A66 50%, #0033AA 100%)" :
+                    v >= 75 ? "linear-gradient(180deg, #001A66 0%, #003BB3 50%, #0055FF 100%)" :
+                    v >= 60 ? "linear-gradient(180deg, #002080 0%, #0055FF 50%, #1166FF 100%)" :
+                              "linear-gradient(180deg, #0044CC 0%, #1166FF 50%, #4499FF 100%)";
+                  // Pixels per percent — keeps bars proportional to actual %, not
+                  // to whichever value happens to be the max in this row.
+                  const ppp = isMobile ? 0.32 : 0.40;
+                  const trackH = isMobile ? 40 : 52;
+                  // Benchmark guideline inside the mini chart — visual cue for
+                  // "did this score clear the bar?" without extra copy.
+                  const benchTop = trackH - benchmark * ppp;
+                  return (
+                    <div className="flex flex-col items-end gap-[6px]">
+                      <div
+                        className="relative flex items-end gap-[4px] px-[8px] py-[4px] rounded-[10px]"
+                        style={{
+                          height: trackH,
+                          background: "rgba(255,255,255,0.55)",
+                          border: "0.5px solid rgba(0,85,255,0.10)",
+                          boxShadow: "inset 0 0 0 0.5px rgba(255,255,255,0.6)",
+                        }}
+                      >
                         <div
-                          key={k}
+                          className="absolute left-[8px] right-[8px] pointer-events-none"
                           style={{
-                            width: isMobile ? 8 : 9,
-                            borderRadius: "3px 3px 0 0",
-                            background: `linear-gradient(180deg, ${B1}, ${B3})`,
-                            height: `${Math.max(Math.min(val, 100), 10) * (isMobile ? 0.32 : 0.4)}px`,
+                            top: benchTop,
+                            height: 1,
+                            backgroundImage: `linear-gradient(to right, ${ORANGE} 0 4px, transparent 4px 8px)`,
+                            backgroundSize: "8px 1px",
+                            backgroundRepeat: "repeat-x",
+                            opacity: 0.55,
                           }}
                         />
-                      ))}
-                    </div>
-                    {isMobile && (
-                      <div className="text-[9px] font-bold uppercase tracking-[0.08em]" style={{ color: T4 }}>
-                        Recent
+                        {recent.map((val, k) => (
+                          <div
+                            key={k}
+                            title={`${val}%`}
+                            style={{
+                              width: isMobile ? 8 : 10,
+                              borderRadius: "4px 4px 1px 1px",
+                              background: miniGrad(val),
+                              height: `${Math.max(Math.min(val, 100), 6) * ppp}px`,
+                              boxShadow:
+                                "0 2px 5px rgba(0,16,64,0.28), inset 0 1px 0 rgba(255,255,255,0.18)",
+                            }}
+                          />
+                        ))}
                       </div>
-                    )}
-                  </div>
-                ) : null}
+                      <div className="text-[9px] font-bold uppercase tracking-[0.08em]" style={{ color: T4 }}>
+                        Last {recent.length}
+                      </div>
+                    </div>
+                  );
+                })() : recent.length === 1 ? (() => {
+                  // Single-score state — same blue-family palette as the
+                  // multi-bar variant, so a 1-score subject visually rhymes
+                  // with the rest of the surface.
+                  const v = recent[0];
+                  const chipGrad =
+                    v >= 90 ? "linear-gradient(135deg, #000B33 0%, #0033AA 100%)" :
+                    v >= 75 ? "linear-gradient(135deg, #001A66 0%, #0055FF 100%)" :
+                    v >= 60 ? "linear-gradient(135deg, #002080 0%, #1166FF 100%)" :
+                              "linear-gradient(135deg, #0044CC 0%, #4499FF 100%)";
+                  return (
+                    <div className="flex flex-col items-end gap-[6px]">
+                      <div
+                        className="px-[12px] py-[6px] rounded-[10px] text-[11px] font-bold text-white"
+                        style={{
+                          background: chipGrad,
+                          boxShadow:
+                            "0 3px 10px rgba(0,85,255,0.30), inset 0 1px 0 rgba(255,255,255,0.18)",
+                          letterSpacing: "-0.1px",
+                        }}
+                      >
+                        {v}%
+                      </div>
+                      <div className="text-[9px] font-bold uppercase tracking-[0.08em]" style={{ color: T4 }}>
+                        Latest
+                      </div>
+                    </div>
+                  );
+                })() : null}
               </div>
 
               <div className={isMobile ? "mt-[10px] px-1" : "mt-2 px-1"}>
@@ -1483,9 +1709,9 @@ const TESTS_PAGE_SIZE = 8;
 
 const TestsAndExamsCard = ({ rows, isMobile, navigate }: TestsCardProps) => {
   const [page, setPage] = useState(0);
-  if (rows.length === 0) return null;
 
-  // Newest-first; rows without a date sink to the bottom.
+  // Hooks MUST run unconditionally — the early-return for empty rows lives
+  // after this block. Same hook-order trap as AIPracticeCard.
   const sorted = useMemo(
     () =>
       [...rows].sort((a, b) => {
@@ -1495,13 +1721,6 @@ const TestsAndExamsCard = ({ rows, isMobile, navigate }: TestsCardProps) => {
       }),
     [rows],
   );
-  const top = Math.max(...rows.map((r) => r.pct));
-  const avg = Math.round(rows.reduce((a, r) => a + r.pct, 0) / rows.length);
-
-  const totalPages = Math.max(1, Math.ceil(sorted.length / TESTS_PAGE_SIZE));
-  const safePage = Math.min(page, totalPages - 1);
-  const start = safePage * TESTS_PAGE_SIZE;
-  const visible = sorted.slice(start, start + TESTS_PAGE_SIZE);
 
   // Tier mix summary — parent-friendly glance at how the child is doing overall.
   const tierCounts = useMemo(() => {
@@ -1509,6 +1728,16 @@ const TestsAndExamsCard = ({ rows, isMobile, navigate }: TestsCardProps) => {
     rows.forEach((r) => { counts[tierForPct(r.pct).label as keyof typeof counts]++; });
     return counts;
   }, [rows]);
+
+  if (rows.length === 0) return null;
+
+  const top = Math.max(...rows.map((r) => r.pct));
+  const avg = Math.round(rows.reduce((a, r) => a + r.pct, 0) / rows.length);
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / TESTS_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const start = safePage * TESTS_PAGE_SIZE;
+  const visible = sorted.slice(start, start + TESTS_PAGE_SIZE);
 
   return (
     <div
@@ -1858,9 +2087,11 @@ const AI_PRACTICE_PAGE_SIZE = 8;
 
 const AIPracticeCard = ({ rows, isMobile, navigate }: AIPracticeCardProps) => {
   const [page, setPage] = useState(0);
-  if (rows.length === 0) return null;
 
   // Convert + sort newest-first by submittedAt.
+  // Hooks MUST run unconditionally — the early-return for empty rows lives
+  // after this block. Returning before useMemo flipped the hook count between
+  // renders and tripped React's Rules of Hooks check.
   const enriched = useMemo(
     () =>
       rows
@@ -1877,19 +2108,21 @@ const AIPracticeCard = ({ rows, isMobile, navigate }: AIPracticeCardProps) => {
     [rows],
   );
 
+  // Tier mix summary — hoisted above the early return for the same reason.
+  const tierCounts = useMemo(() => {
+    const counts = { Strong: 0, Good: 0, Developing: 0, Weak: 0 };
+    enriched.forEach((r) => { counts[tierForPct(r.pct).label as keyof typeof counts]++; });
+    return counts;
+  }, [enriched]);
+
+  if (rows.length === 0) return null;
+
   const avg = Math.round(enriched.reduce((a, r) => a + r.pct, 0) / enriched.length);
   const top = Math.max(...enriched.map((r) => r.pct));
   const totalPages = Math.max(1, Math.ceil(enriched.length / AI_PRACTICE_PAGE_SIZE));
   const safePage = Math.min(page, totalPages - 1);
   const start = safePage * AI_PRACTICE_PAGE_SIZE;
   const visible = enriched.slice(start, start + AI_PRACTICE_PAGE_SIZE);
-
-  // Tier mix summary
-  const tierCounts = useMemo(() => {
-    const counts = { Strong: 0, Good: 0, Developing: 0, Weak: 0 };
-    enriched.forEach((r) => { counts[tierForPct(r.pct).label as keyof typeof counts]++; });
-    return counts;
-  }, [enriched]);
 
   // Aggregate weak topics across all attempts — small, dedup, capped at 6.
   const weakTopicsSet = new Set<string>();

@@ -372,26 +372,32 @@ const ReportsPage = () => {
                 </div>
 
                 {/* Top */}
-                <div className="flex items-start gap-[14px] mb-[14px] relative z-10">
-                  <div className="w-[52px] h-[52px] rounded-[17px] flex items-center justify-center shrink-0"
+                <div className="flex items-start gap-[12px] mb-[14px] relative z-10">
+                  <div className="w-[44px] h-[44px] rounded-[14px] flex items-center justify-center shrink-0"
                     style={{ background: theme.icoBg, boxShadow: theme.icoShadow }}>
                     {type === "excel"
-                      ? <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2.2} strokeLinecap="round">
+                      ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2.2} strokeLinecap="round">
                           <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
                           <polyline points="14 2 14 8 20 8" />
                           <line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="16" y2="17" />
                           <line x1="12" y1="9" x2="12" y2="21" />
                         </svg>
-                      : <FileText className="w-6 h-6 text-white" strokeWidth={2.2} />}
+                      : <FileText className="w-5 h-5 text-white" strokeWidth={2.2} />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-[16px] font-bold uppercase mb-[7px] leading-[1.25]" style={{ color: T1, letterSpacing: "-0.3px" }}>
-                      {r.title || "Academic Report"}
+                    <div className="flex items-start justify-between gap-2 mb-[7px]">
+                      <div className="text-[15px] font-bold uppercase leading-[1.25] flex-1 min-w-0" style={{ color: T1, letterSpacing: "-0.3px" }}>
+                        {r.title || "Academic Report"}
+                      </div>
+                      <span className="text-[9px] font-bold uppercase tracking-[0.10em] px-[7px] py-[3px] rounded-[6px] shrink-0"
+                        style={{ background: "rgba(0,16,64,0.06)", color: T2, border: "0.5px solid rgba(0,16,64,0.10)" }}>
+                        {theme.ext}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.04em]" style={{ color: T3 }}>
                         <GraduationCap className="w-[11px] h-[11px]" strokeWidth={2.5} />
-                        {r.teacherName || "Faculty"}
+                        <span className="truncate max-w-[120px]">{r.teacherName || "Faculty"}</span>
                       </div>
                       <div className="w-[3px] h-[3px] rounded-full" style={{ background: T4 }} />
                       <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.04em]" style={{ color: T3 }}>
@@ -415,14 +421,10 @@ const ReportsPage = () => {
 
                 {/* Actions */}
                 <div className="flex items-center gap-[10px] relative z-10">
-                  <div className="flex items-center gap-[5px] px-[13px] py-[7px] rounded-full text-[10px] font-bold uppercase tracking-[0.06em] text-white shrink-0"
+                  <div className="flex items-center gap-[5px] px-[12px] py-[8px] rounded-full text-[10px] font-bold uppercase tracking-[0.06em] text-white shrink-0"
                     style={{ background: `linear-gradient(135deg, ${B1}, ${B2})`, boxShadow: "0 3px 10px rgba(0,85,255,0.28)" }}>
                     <CheckCircle2 className="w-[10px] h-[10px]" strokeWidth={2.5} />
                     Verified
-                  </div>
-                  <div className="shrink-0">
-                    <div className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: T4 }}>Format</div>
-                    <div className="text-[11px] font-bold uppercase tracking-[0.04em]" style={{ color: T2 }}>{theme.ext}</div>
                   </div>
                   <button
                     onClick={e => { e.stopPropagation(); handleDownload(r); }}

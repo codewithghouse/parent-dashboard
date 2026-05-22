@@ -31,6 +31,39 @@ const PrincipalNotesPage = () => {
   // Track docs we've already marked-read so the snapshot callback doesn't fire
   // a redundant updateDoc on every listener tick.
   const markedReadRef = useRef<Set<string>>(new Set());
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const emojiButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Common emoji list for the picker
+  const EMOJIS = ["😊","😂","❤️","👍","🙏","😍","🎉","🔥","✅","👏","😭","🤔","💯","🙌","😅","🥰","😁","👋","💪","🎓","📚","✏️","⭐","🌟","💡","📝","🤝","😇","🙂","👌"];
+  const insertEmoji = (emoji: string) => {
+    setMessageContent(prev => prev + emoji);
+    setShowEmojiPicker(false);
+  };
+
+  // Close emoji picker on outside click / Escape
+  useEffect(() => {
+    if (!showEmojiPicker) return;
+    const handlePointer = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+      if (emojiPickerRef.current?.contains(target)) return;
+      if (emojiButtonRef.current?.contains(target)) return;
+      setShowEmojiPicker(false);
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowEmojiPicker(false);
+    };
+    document.addEventListener("mousedown", handlePointer);
+    document.addEventListener("touchstart", handlePointer);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handlePointer);
+      document.removeEventListener("touchstart", handlePointer);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [showEmojiPicker]);
 
   useEffect(() => {
     if (!studentData?.id) return;
@@ -151,6 +184,9 @@ const PrincipalNotesPage = () => {
   const groupedMessages = useMemo(() => {
     const groups: { date: string; messages: any[] }[] = [];
     allMessages.forEach(msg => {
+      // Skip empty/whitespace-only messages — they would otherwise render as
+      // tiny timestamp-only bubbles (legacy/whitespace docs).
+      if (typeof msg?.message !== "string" || msg.message.trim() === "") return;
       // Bucket undated messages under "Sending…" so they're visibly distinct
       // from a real "Today" group.
       const label = fmtDate(msg.timestamp) || "Sending…";
@@ -278,17 +314,54 @@ const PrincipalNotesPage = () => {
         </div>
 
         {/* WA reply bar */}
-        <div className="px-2 py-[7px] flex items-end gap-[6px] shrink-0" style={{ background: WA_HEADER_BG }}>
+        <div className="px-2 py-[7px] flex items-end gap-[6px] shrink-0 relative" style={{ background: WA_HEADER_BG }}>
+          {/* Emoji picker panel — mobile (full-width drawer above input) */}
+          {showEmojiPicker && (
+            <div
+              ref={emojiPickerRef}
+              className="absolute left-0 right-0 bottom-[100%] z-30 px-2 pb-2 animate-in slide-in-from-bottom-2 fade-in duration-150"
+            >
+              <div
+                className="rounded-t-[20px] rounded-b-[14px] px-3 pt-2 pb-3"
+                style={{
+                  background: "#fff",
+                  boxShadow: "0 -8px 32px rgba(11,20,26,0.14), 0 -1px 4px rgba(11,20,26,0.06)",
+                  border: "0.5px solid rgba(11,20,26,0.08)",
+                }}
+              >
+                {/* Drag handle */}
+                <div className="flex justify-center mb-2">
+                  <div className="w-10 h-[4px] rounded-full" style={{ background: "rgba(11,20,26,0.18)" }} />
+                </div>
+                <div className="grid gap-1" style={{ gridTemplateColumns: "repeat(8, 1fr)" }}>
+                  {EMOJIS.map(e => (
+                    <button
+                      key={e}
+                      onClick={() => insertEmoji(e)}
+                      className="h-10 flex items-center justify-center rounded-[10px] text-[22px] active:scale-90 transition-transform hover:bg-gray-100"
+                    >{e}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
           <div className="flex-1 flex items-center gap-1 px-3 py-[8px] rounded-[24px] bg-white"
             style={{ opacity: canReply ? 1 : 0.6 }}>
-            <button className="w-7 h-7 flex items-center justify-center active:scale-90 shrink-0" aria-label="Emoji" disabled={!canReply}>
-              <Smile className="w-[22px] h-[22px]" style={{ color: WA_T3 }} strokeWidth={1.8} />
+            <button
+              ref={emojiButtonRef}
+              className="w-7 h-7 flex items-center justify-center active:scale-90 shrink-0"
+              aria-label="Emoji"
+              disabled={!canReply}
+              onClick={() => setShowEmojiPicker(v => !v)}
+            >
+              <Smile className="w-[22px] h-[22px]" style={{ color: showEmojiPicker ? WA_GREEN : WA_T3 }} strokeWidth={1.8} />
             </button>
             <input
               type="text"
               value={messageContent}
               onChange={e => setMessageContent(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+              onFocus={() => setShowEmojiPicker(false)}
               placeholder={canReply ? "Reply to principal" : "Waiting for first principal message"}
               disabled={!canReply}
               className="flex-1 min-w-0 px-2 text-[15px] outline-none bg-transparent disabled:cursor-not-allowed"
@@ -465,16 +538,42 @@ const PrincipalNotesPage = () => {
           </div>
 
           {/* WA reply bar */}
-          <div className="flex items-end gap-2 px-4 py-[10px] shrink-0" style={{ background: WA_HEADER_BG }}>
-            <button disabled={!canReply}
+          <div className="flex items-end gap-2 px-4 py-[10px] shrink-0 relative" style={{ background: WA_HEADER_BG }}>
+            {/* Emoji picker panel — desktop */}
+            {showEmojiPicker && (
+              <div
+                ref={emojiPickerRef}
+                className="absolute bottom-[62px] left-4 z-30 rounded-[18px] p-3 grid gap-1"
+                style={{
+                  background: "#fff",
+                  boxShadow: "0 8px 32px rgba(11,20,26,0.16), 0 2px 8px rgba(11,20,26,0.10)",
+                  gridTemplateColumns: "repeat(6, 1fr)",
+                  width: 260,
+                }}
+              >
+                {EMOJIS.map(e => (
+                  <button
+                    key={e}
+                    onClick={() => insertEmoji(e)}
+                    className="w-9 h-9 flex items-center justify-center rounded-[10px] text-[20px] transition-colors hover:bg-gray-100"
+                  >{e}</button>
+                ))}
+              </div>
+            )}
+            <button
+              ref={emojiButtonRef}
+              disabled={!canReply}
+              onClick={() => setShowEmojiPicker(v => !v)}
+              aria-label="Emoji picker"
               className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-[rgba(11,20,26,0.06)] disabled:opacity-40 disabled:cursor-not-allowed">
-              <Smile className="w-[22px] h-[22px]" style={{ color: WA_T3 }} strokeWidth={1.8} />
+              <Smile className="w-[22px] h-[22px]" style={{ color: showEmojiPicker ? WA_GREEN : WA_T3 }} strokeWidth={1.8} />
             </button>
             <div className="flex-1 rounded-[8px] flex items-center min-h-[42px] px-4 py-2 bg-white"
               style={{ opacity: canReply ? 1 : 0.6 }}>
               <textarea rows={1} value={messageContent}
                 onChange={e => setMessageContent(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                onFocus={() => setShowEmojiPicker(false)}
                 placeholder={canReply ? "Reply to principal" : "Waiting for first principal message"}
                 disabled={!canReply}
                 className="flex-1 bg-transparent border-none focus:ring-0 text-[14px] resize-none outline-none leading-relaxed disabled:cursor-not-allowed"

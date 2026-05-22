@@ -9,7 +9,8 @@ import {
   Trophy, Activity, X as XIcon, BookOpen, User,
 } from "lucide-react";
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, LabelList,
 } from "recharts";
 import { useAuth } from "@/lib/AuthContext";
 import { useSchoolSettings } from "@/hooks/useSchoolSettings";
@@ -801,42 +802,130 @@ const WeeklyBarsCard = ({ bars, isMobile, navigate }: { bars: WeekBar[]; isMobil
     }
     style={{ boxShadow: T.SH, border: "0.5px solid rgba(0,85,255,0.10)" }}
   >
-    <div
-      className={isMobile ? "text-[14px] font-bold mb-[14px]" : "text-[15px] font-bold mb-4"}
-      style={{ color: T.T1, letterSpacing: "-0.2px" }}
-    >
-      Weekly Attendance
+    {/* Header */}
+    <div className={`flex items-center justify-between ${isMobile ? "mb-[16px]" : "mb-5"}`}>
+      <div className="flex items-center gap-[10px]">
+        <div
+          className={isMobile ? "w-9 h-9 rounded-[11px] flex items-center justify-center shrink-0" : "w-10 h-10 rounded-[12px] flex items-center justify-center shrink-0"}
+          style={{
+            background: `linear-gradient(135deg, ${T.B1}, ${T.B3})`,
+            boxShadow: "0 3px 10px rgba(0,85,255,0.28)",
+          }}
+        >
+          <svg width={isMobile ? 15 : 17} height={isMobile ? 15 : 17} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+          </svg>
+        </div>
+        <div>
+          <div className={isMobile ? "text-[14px] font-bold" : "text-[15px] font-bold"} style={{ color: T.T1, letterSpacing: "-0.2px" }}>
+            Weekly Attendance
+          </div>
+          <div className={isMobile ? "text-[10px] mt-[1px]" : "text-[11px] mt-[1px]"} style={{ color: T.T3 }}>
+            This week's daily overview
+          </div>
+        </div>
+      </div>
+      <div
+        className={`text-[10px] font-bold px-[10px] py-[4px] rounded-full ${isMobile ? "" : ""}`}
+        style={{ background: T.BG, color: T.B1, border: "0.5px solid rgba(0,85,255,0.18)" }}
+      >
+        View All →
+      </div>
     </div>
-    <div className={isMobile ? "flex items-end justify-between gap-[6px] h-[52px] mb-2" : "flex items-end justify-between gap-[8px] h-[70px] mb-2"}>
+
+    {/* Bars */}
+    <div
+      className={isMobile ? "flex items-end justify-between gap-[6px]" : "flex items-end justify-between gap-[8px]"}
+      style={{ height: isMobile ? 72 : 90 }}
+    >
       {bars.map((b, i) => {
-        const heights = isMobile
-          ? { present: 44, late: 32, absent: 14, future: 18, none: 18 }
-          : { present: 60, late: 44, absent: 20, future: 26, none: 26 };
-        const h = heights[b.status];
+        const maxH = isMobile ? 64 : 80;
+        const heightMap: Record<string, number> = {
+          present: maxH,
+          late: Math.round(maxH * 0.68),
+          absent: Math.round(maxH * 0.28),
+          future: Math.round(maxH * 0.22),
+          none: Math.round(maxH * 0.22),
+        };
+        const h = heightMap[b.status] ?? Math.round(maxH * 0.22);
+
         const bg =
-          b.status === "present" ? `linear-gradient(180deg, ${T.B1}, ${T.B4})` :
-          b.status === "late"    ? `linear-gradient(180deg, ${T.ORANGE}, #FFB366)` :
-          b.status === "absent"  ? `linear-gradient(180deg, ${T.RED}, #FF8899)` :
-          T.BG2;
+          b.status === "present" ? `linear-gradient(180deg, ${T.B1} 0%, ${T.B3} 60%, ${T.B4} 100%)` :
+          b.status === "late"    ? `linear-gradient(180deg, #CC6A00 0%, ${T.ORANGE} 60%, #FFB366 100%)` :
+          b.status === "absent"  ? `linear-gradient(180deg, #AA2233 0%, ${T.RED} 60%, #FF8899 100%)` :
+          `linear-gradient(180deg, ${T.BG2} 0%, ${T.BG} 100%)`;
+
+        const isActive = b.status === "present" || b.status === "late" || b.status === "absent";
+
         return (
-          <div key={i} className="flex flex-col items-center gap-1 flex-1">
+          <div key={i} className="flex flex-col items-center gap-[6px] flex-1 h-full justify-end">
+            {/* Bar track */}
             <div
-              className={isMobile ? "w-full rounded-t-[5px] min-h-[4px] transition-all duration-300" : "w-full rounded-t-[6px] min-h-[5px] transition-all duration-300"}
+              className="relative w-full rounded-[6px] overflow-hidden"
               style={{
-                height: h,
-                background: bg,
-                boxShadow: b.isToday ? "0 0 0 3px rgba(0,85,255,0.20)" : "none",
+                height: isMobile ? 64 : 80,
+                background: T.BG2,
+                border: b.isToday ? `1px solid rgba(0,85,255,0.30)` : "0.5px solid rgba(0,85,255,0.08)",
               }}
-            />
+            >
+              {/* Filled portion — grows from bottom */}
+              <div
+                className="absolute bottom-0 left-0 right-0 rounded-[6px] transition-all duration-500"
+                style={{
+                  height: h,
+                  background: bg,
+                  boxShadow: b.isToday && isActive
+                    ? "0 -2px 12px rgba(0,85,255,0.22)"
+                    : isActive ? "0 -1px 6px rgba(0,85,255,0.10)" : "none",
+                }}
+              />
+              {/* Today ring overlay */}
+              {b.isToday && (
+                <div
+                  className="absolute inset-0 rounded-[6px] pointer-events-none"
+                  style={{ boxShadow: "inset 0 0 0 1.5px rgba(0,85,255,0.35)" }}
+                />
+              )}
+            </div>
+            {/* Day label */}
             <span
-              className={isMobile ? "text-[9px] font-bold uppercase tracking-[0.04em]" : "text-[10px] font-bold uppercase tracking-[0.04em]"}
-              style={{ color: b.isToday ? T.B1 : T.T4 }}
+              className={isMobile ? "text-[9px] font-bold uppercase tracking-[0.06em]" : "text-[10px] font-bold uppercase tracking-[0.06em]"}
+              style={{
+                color: b.isToday ? T.B1 : T.T4,
+                fontWeight: b.isToday ? 800 : 700,
+              }}
             >
               {b.label}
             </span>
           </div>
         );
       })}
+    </div>
+
+    {/* Legend */}
+    <div
+      className={`flex items-center gap-[14px] flex-wrap ${isMobile ? "mt-[14px] pt-[12px]" : "mt-4 pt-3"}`}
+      style={{ borderTop: `0.5px solid ${T.SEP}` }}
+    >
+      {[
+        { color: `linear-gradient(135deg, ${T.B1}, ${T.B4})`, label: "Present" },
+        { color: `linear-gradient(135deg, ${T.ORANGE}, #FFB366)`, label: "Late" },
+        { color: `linear-gradient(135deg, ${T.RED}, #FF8899)`, label: "Absent" },
+        { color: `linear-gradient(135deg, ${T.BG2}, ${T.BG})`, label: "No data", border: true },
+      ].map((item) => (
+        <div key={item.label} className="flex items-center gap-[5px]">
+          <div
+            className="w-[10px] h-[10px] rounded-[3px]"
+            style={{
+              background: item.color,
+              border: item.border ? `0.5px solid rgba(0,85,255,0.18)` : "none",
+            }}
+          />
+          <span className={isMobile ? "text-[9px] font-semibold" : "text-[10px] font-semibold"} style={{ color: T.T4 }}>
+            {item.label}
+          </span>
+        </div>
+      ))}
     </div>
   </div>
 );
@@ -1375,8 +1464,26 @@ interface MonthlyTrendProps {
 }
 
 const MonthlyTrendCard = ({ points, best, worst, isMobile, navigate }: MonthlyTrendProps) => {
+  // Drop months without data — a half-empty 6-bucket strip with a flat line
+  // at the very end is worse than a fuller 2-3 month view of what's real.
   const meaningful = points.filter((p) => p.percentage != null);
   if (meaningful.length < 2) return null;
+
+  // ≤ 2 months → bar comparison reads better than a flat 2-point line.
+  // 3+ months → area chart shows the trend.
+  const useBars = meaningful.length <= 2;
+
+  // Zoom Y-axis into the data range so small movements stay visible.
+  // For high-attendance students (≥90%) a 0-100 scale flattens everything.
+  const pcts = meaningful.map((p) => p.percentage as number);
+  const minPct = Math.min(...pcts);
+  const yMin = minPct >= 90 ? 70 : minPct >= 75 ? 50 : minPct >= 50 ? 25 : 0;
+
+  const subtitle =
+    meaningful.length === points.length
+      ? "Monthly attendance rate across recent months"
+      : `Across ${meaningful.length} month${meaningful.length === 1 ? "" : "s"} of recorded attendance`;
+
   return (
     <div
       role="button"
@@ -1397,10 +1504,10 @@ const MonthlyTrendCard = ({ points, best, worst, isMobile, navigate }: MonthlyTr
             className={isMobile ? "text-[16px] font-bold" : "text-[17px] font-bold"}
             style={{ color: T.T1, letterSpacing: "-0.3px" }}
           >
-            6-Month Trend
+            {useBars ? "Monthly Attendance" : "6-Month Trend"}
           </div>
           <div className={isMobile ? "text-[11px] mt-0.5" : "text-[12px] mt-0.5"} style={{ color: T.T3 }}>
-            Monthly attendance rate across recent months
+            {subtitle}
           </div>
         </div>
         {best && worst && best.monthKey !== worst.monthKey && (
@@ -1422,56 +1529,135 @@ const MonthlyTrendCard = ({ points, best, worst, isMobile, navigate }: MonthlyTr
           </div>
         )}
       </div>
-      <div className={isMobile ? "h-[160px] w-full" : "h-[220px] w-full"}>
+      <div className={isMobile ? "h-[180px] w-full" : "h-[240px] w-full"}>
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={points} margin={{ top: 6, right: 6, left: isMobile ? -18 : -10, bottom: 0 }}>
-            <defs>
-              <linearGradient id="attTrendArea" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={T.B1} stopOpacity={0.22} />
-                <stop offset="100%" stopColor={T.B1} stopOpacity={0} />
-              </linearGradient>
-              <linearGradient id="attTrendLine" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor={T.B1} />
-                <stop offset="100%" stopColor="#66BBFF" />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="0" vertical={false} stroke="rgba(0,85,255,0.07)" />
-            <XAxis
-              dataKey="monthLabel"
-              axisLine={false}
-              tickLine={false}
-              tick={{ fontSize: isMobile ? 10 : 12, fill: T.T4, fontWeight: 600 }}
-            />
-            <YAxis
-              axisLine={false}
-              tickLine={false}
-              tick={{ fontSize: isMobile ? 10 : 12, fill: T.T4, fontWeight: 600 }}
-              domain={[0, 100]}
-              width={isMobile ? 30 : 36}
-            />
-            <Tooltip
-              contentStyle={{
-                borderRadius: 12,
-                border: "0.5px solid rgba(0,85,255,0.15)",
-                boxShadow: "0 4px 20px rgba(0,85,255,0.12)",
-                fontSize: isMobile ? 11 : 12,
-                padding: "8px 12px",
-              }}
-              formatter={(val: unknown) =>
-                typeof val === "number" ? [`${val}%`, "Attendance"] : ["—", "Attendance"]
-              }
-            />
-            <Area
-              type="monotone"
-              dataKey="percentage"
-              stroke="url(#attTrendLine)"
-              strokeWidth={isMobile ? 2.5 : 3}
-              fill="url(#attTrendArea)"
-              dot={{ r: isMobile ? 4 : 5, strokeWidth: 2, stroke: "#fff", fill: T.B1 }}
-              activeDot={{ r: isMobile ? 6 : 7, strokeWidth: 2 }}
-              connectNulls={false}
-            />
-          </AreaChart>
+          {useBars ? (
+            <BarChart
+              data={meaningful}
+              margin={{ top: 24, right: 16, left: isMobile ? -18 : -10, bottom: 0 }}
+              barCategoryGap="30%"
+            >
+              <defs>
+                <linearGradient id="attTrendBar" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={T.B1} stopOpacity={0.95} />
+                  <stop offset="100%" stopColor="#66BBFF" stopOpacity={0.75} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="0" vertical={false} stroke="rgba(0,85,255,0.07)" />
+              <XAxis
+                dataKey="monthLabel"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: isMobile ? 11 : 13, fill: T.T2, fontWeight: 700 }}
+                tickMargin={8}
+              />
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: isMobile ? 10 : 12, fill: T.T4, fontWeight: 600 }}
+                domain={[yMin, 100]}
+                width={isMobile ? 30 : 36}
+                tickFormatter={(v) => `${v}`}
+              />
+              <Tooltip
+                cursor={{ fill: "rgba(0,85,255,0.04)" }}
+                contentStyle={{
+                  borderRadius: 12,
+                  border: "0.5px solid rgba(0,85,255,0.15)",
+                  boxShadow: "0 4px 20px rgba(0,85,255,0.12)",
+                  fontSize: isMobile ? 11 : 12,
+                  padding: "8px 12px",
+                }}
+                formatter={(val: unknown) =>
+                  typeof val === "number" ? [`${val}%`, "Attendance"] : ["—", "Attendance"]
+                }
+              />
+              <Bar
+                dataKey="percentage"
+                fill="url(#attTrendBar)"
+                radius={[12, 12, 4, 4]}
+                maxBarSize={isMobile ? 70 : 110}
+              >
+                <LabelList
+                  dataKey="percentage"
+                  position="top"
+                  formatter={(v: unknown) => (typeof v === "number" ? `${v}%` : "")}
+                  style={{
+                    fontSize: isMobile ? 12 : 14,
+                    fontWeight: 700,
+                    fill: T.T1,
+                    letterSpacing: "-0.2px",
+                  }}
+                />
+              </Bar>
+            </BarChart>
+          ) : (
+            <AreaChart
+              data={meaningful}
+              margin={{ top: 24, right: 16, left: isMobile ? -18 : -10, bottom: 0 }}
+            >
+              <defs>
+                <linearGradient id="attTrendArea" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={T.B1} stopOpacity={0.28} />
+                  <stop offset="100%" stopColor={T.B1} stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="attTrendLine" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor={T.B1} />
+                  <stop offset="100%" stopColor="#66BBFF" />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="0" vertical={false} stroke="rgba(0,85,255,0.07)" />
+              <XAxis
+                dataKey="monthLabel"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: isMobile ? 11 : 13, fill: T.T2, fontWeight: 700 }}
+                tickMargin={8}
+              />
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: isMobile ? 10 : 12, fill: T.T4, fontWeight: 600 }}
+                domain={[yMin, 100]}
+                width={isMobile ? 30 : 36}
+              />
+              <Tooltip
+                contentStyle={{
+                  borderRadius: 12,
+                  border: "0.5px solid rgba(0,85,255,0.15)",
+                  boxShadow: "0 4px 20px rgba(0,85,255,0.12)",
+                  fontSize: isMobile ? 11 : 12,
+                  padding: "8px 12px",
+                }}
+                formatter={(val: unknown) =>
+                  typeof val === "number" ? [`${val}%`, "Attendance"] : ["—", "Attendance"]
+                }
+              />
+              <Area
+                type="monotone"
+                dataKey="percentage"
+                stroke="url(#attTrendLine)"
+                strokeWidth={isMobile ? 3 : 3.5}
+                fill="url(#attTrendArea)"
+                dot={{ r: isMobile ? 5 : 6, strokeWidth: 2.5, stroke: "#fff", fill: T.B1 }}
+                activeDot={{ r: isMobile ? 7 : 8, strokeWidth: 2 }}
+                connectNulls
+              >
+                <LabelList
+                  dataKey="percentage"
+                  position="top"
+                  offset={12}
+                  formatter={(v: unknown) => (typeof v === "number" ? `${v}%` : "")}
+                  style={{
+                    fontSize: isMobile ? 11 : 12,
+                    fontWeight: 700,
+                    fill: T.T1,
+                    letterSpacing: "-0.2px",
+                  }}
+                />
+              </Area>
+            </AreaChart>
+          )}
         </ResponsiveContainer>
       </div>
     </div>

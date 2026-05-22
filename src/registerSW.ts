@@ -4,10 +4,45 @@
  *   'sw-update-available' — a new SW version is waiting
  *   'sw-registered'       — SW registered successfully
  *
- * Registered in ALL environments (prod + dev) so offline works during testing too.
+ * Registered in PRODUCTION ONLY. In development the SW aggressively cached the
+ * app shell (`index.html`) which made Vite HMR updates + CSP/code changes
+ * invisible until the SW was manually unregistered. We now skip registration
+ * in dev AND proactively unregister any previously installed worker so a
+ * stale dev SW from an earlier run can't keep serving an old `index.html`.
  */
 export function registerSW() {
   if (!('serviceWorker' in navigator)) return;
+
+  // Dev mode: tear down any existing SW + caches so Vite serves fresh files.
+  // If we actually find a stale SW, force a one-time reload so the user lands
+  // on the page with the fresh (uncached) HTML in a single visit instead of
+  // having to manually refresh twice.
+  if (import.meta.env.DEV) {
+    const RELOAD_FLAG = '__edu_sw_reloaded';
+    (async () => {
+      try {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        const hadAnySW = regs.length > 0;
+
+        await Promise.all(regs.map(r => r.unregister().catch(() => false)));
+
+        if ('caches' in self) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map(k => caches.delete(k).catch(() => false)));
+        }
+
+        // Auto-reload only the first time — guarded by sessionStorage so we
+        // don't loop if anything goes wrong with the reload itself.
+        if (hadAnySW && !sessionStorage.getItem(RELOAD_FLAG)) {
+          sessionStorage.setItem(RELOAD_FLAG, '1');
+          window.location.reload();
+        }
+      } catch {
+        /* ignore — dev cleanup is best-effort */
+      }
+    })();
+    return;
+  }
 
   window.addEventListener('load', async () => {
     try {
