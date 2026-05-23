@@ -557,13 +557,47 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // pp_incidents — append-only incident log written by Cloud Functions
-    // (e.g., onPickupMismatch) via Admin SDK. Client writes denied.
-    // Admin reads + can flip `handled: true` after responding.
+    // pp_incidents — append-only incident log.
+    //
+    // PHASE-1 (2026-05-23): Teachers can now LIST + GET incidents in their
+    // own school AND CREATE new incidents from the teacher dashboard
+    // (Injury / Behaviour / Medical / Safety / Other categories). Admin
+    // still owns UPDATE (used to flip `handled: true` after response) and
+    // delete remains denied — the log is intentionally append-only.
+    //
+    // Server-side writes by Cloud Functions (Admin SDK) bypass these rules.
     match /pp_incidents/{id} {
-      allow get:  if signedIn() && inSameSchool() && hasAdminRole();
-      allow list: if signedIn() && inSameSchool() && hasAdminRole();
-      allow create: if false;  // server-only via Admin SDK
+      allow get:  if signedIn() && inSameSchool();
+      allow list: if signedIn() && inSameSchool();
+      allow create: if signedIn()
+                    && hasSchoolId()
+                    && writingToOwnSchool()
+                    && hasStaffRole()
+                    && request.resource.data.keys().hasOnly([
+                         'schoolId','classId','studentId','studentName',
+                         'type','severity','title','description',
+                         'actionTaken','parentNotified','parentNotifiedAt',
+                         'witnessId','witnessName','photos',
+                         'createdBy','createdByName','createdAt','date',
+                         'handled','_createdServerAt',
+                         '_lastModifiedBy','_lastModifiedAt'
+                       ])
+                    && request.resource.data.keys().hasAll([
+                         'schoolId','classId','studentId','studentName',
+                         'type','severity','title','description',
+                         'createdBy','createdByName','createdAt','date','handled'
+                       ])
+                    && request.resource.data.type
+                         in ['injury','behaviour','medical','safety','other']
+                    && request.resource.data.severity
+                         in ['low','medium','high','critical']
+                    && request.resource.data.handled == false
+                    && request.resource.data.createdBy == uid()
+                    && request.resource.data.title is string
+                    && request.resource.data.title.size() > 0
+                    && request.resource.data.title.size() < 200
+                    && request.resource.data.description is string
+                    && request.resource.data.description.size() < 4000;
       allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && hasAdminRole();
       allow delete: if false;
     }
