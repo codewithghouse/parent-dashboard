@@ -705,7 +705,9 @@ service cloud.firestore {
     // ── pp_message_threads / messages — 1-on-1 teacher↔parent chats ────
     // ═══════════════════════════════════════════════════════════════════
     match /pp_message_threads/{threadId} {
-      allow get:  if signedIn() && inSameSchool();
+      // Get allows resource==null (non-existent doc) so the teacher's
+      // ensurePPThread() existence-check works on first-time threads.
+      allow get:  if signedIn() && (resource == null || inSameSchool());
       allow list: if signedIn() && inSameSchool();
 
       allow create: if signedIn()
