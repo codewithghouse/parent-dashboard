@@ -565,6 +565,13 @@ service cloud.firestore {
     // still owns UPDATE (used to flip `handled: true` after response) and
     // delete remains denied — the log is intentionally append-only.
     //
+    // 2026-05-25 hotfix: removed `createdBy == uid()` check. `createdBy`
+    // carries the teacher's FIRESTORE doc id (looked up by email at
+    // login), NOT request.auth.uid — different identifiers in this
+    // codebase (same gotcha documented on principal_to_teacher_notes).
+    // The previous check broke every write with "Missing or insufficient
+    // permissions". Trust model is hasStaffRole() + writingToOwnSchool().
+    //
     // Server-side writes by Cloud Functions (Admin SDK) bypass these rules.
     match /pp_incidents/{id} {
       allow get:  if signedIn() && inSameSchool();
@@ -592,7 +599,6 @@ service cloud.firestore {
                     && request.resource.data.severity
                          in ['low','medium','high','critical']
                     && request.resource.data.handled == false
-                    && request.resource.data.createdBy == uid()
                     && request.resource.data.title is string
                     && request.resource.data.title.size() > 0
                     && request.resource.data.title.size() < 200
