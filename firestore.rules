@@ -604,11 +604,13 @@ service cloud.firestore {
                     && request.resource.data.title.size() < 200
                     && request.resource.data.description is string
                     && request.resource.data.description.size() < 4000;
-      // Update paths (2026-05-25):
+      // Update paths (2026-05-25, iter 2):
       //   1) Admin (owner/principal) — full update
-      //   2) Staff (teacher) — close-only: flip handled true + handledBy/At
-      //   3) Matched parent (isParentOf) — same close-only whitelist
-      //   Append-only spirit preserved via narrow whitelist + handled==true.
+      //   2) Staff (teacher) — close-only: flip handled true
+      //   3) Matched parent (isParentOf) — same close-only gate
+      //   Whitelist via diff() was dropped — it was rejecting valid writes
+      //   under serverTimestamp(). Narrow scope kept via handled==true +
+      //   schoolId immutable + role gate.
       allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && (
         hasAdminRole()
         || (
@@ -617,10 +619,6 @@ service cloud.firestore {
             || isParentOf(resource.data.studentId)
           )
           && request.resource.data.handled == true
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'handled', 'handledBy', 'handledAt',
-            '_lastModifiedBy', '_lastModifiedAt'
-          ])
         )
       );
       allow delete: if false;
