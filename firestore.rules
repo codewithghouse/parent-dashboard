@@ -701,6 +701,120 @@ service cloud.firestore {
       allow delete: if signedIn() && inSameSchool() && hasAdminRole();
     }
 
+    // ═══════════════════════════════════════════════════════════════════
+    // ── pp_message_threads / messages — 1-on-1 teacher↔parent chats ────
+    // ═══════════════════════════════════════════════════════════════════
+    match /pp_message_threads/{threadId} {
+      allow get:  if signedIn() && inSameSchool();
+      allow list: if signedIn() && inSameSchool();
+
+      allow create: if signedIn()
+                    && hasSchoolId()
+                    && writingToOwnSchool()
+                    && hasStaffRole()
+                    && request.resource.data.keys().hasOnly([
+                         'schoolId','classId','className',
+                         'studentId','studentName',
+                         'parentEmail','parentName',
+                         'teacherId','teacherName','teacherEmail',
+                         'lastMessage',
+                         'unreadParent','unreadTeacher',
+                         'mutedParent','mutedTeacher',
+                         'archived','reportFlagCount',
+                         'createdAt','updatedAt',
+                         '_lastModifiedBy','_lastModifiedAt'
+                       ])
+                    && request.resource.data.keys().hasAll([
+                         'schoolId','classId','studentId','studentName',
+                         'parentEmail','teacherEmail','teacherId','teacherName',
+                         'createdAt','updatedAt'
+                       ])
+                    && request.resource.data.parentEmail is string
+                    && request.resource.data.parentEmail.size() > 0
+                    && request.resource.data.parentEmail.size() < 200
+                    && request.resource.data.teacherEmail is string
+                    && request.resource.data.teacherEmail.size() > 0
+                    && request.resource.data.teacherEmail.size() < 200;
+
+      allow update: if signedIn()
+                    && schoolIdImmutable()
+                    && request.resource.data.studentId == resource.data.studentId
+                    && request.resource.data.parentEmail == resource.data.parentEmail
+                    && (
+                      (hasStaffRole() && resource.data.schoolId == claimSchoolId())
+                      || ('parentEmail' in resource.data
+                          && resource.data.parentEmail is string
+                          && resource.data.parentEmail.lower() == email())
+                    );
+
+      allow delete: if signedIn() && inSameSchool() && hasAdminRole();
+
+      match /messages/{messageId} {
+        allow get:  if signedIn()
+                    && 'schoolId' in resource.data
+                    && resource.data.schoolId == claimSchoolId();
+        allow list: if signedIn()
+                    && exists(/databases/$(database)/documents/pp_message_threads/$(threadId))
+                    && get(/databases/$(database)/documents/pp_message_threads/$(threadId)).data.schoolId == claimSchoolId();
+
+        allow create: if signedIn()
+                      && request.resource.data.keys().hasOnly([
+                           'schoolId','classId','threadId','studentId',
+                           'senderUid','senderRole','senderName','text',
+                           'sentAt','readByParent','readByTeacher','deleted',
+                           '_createdServerAt','_lastModifiedBy','_lastModifiedAt'
+                         ])
+                      && request.resource.data.keys().hasAll([
+                           'schoolId','classId','threadId','studentId',
+                           'senderUid','senderRole','senderName','text','sentAt'
+                         ])
+                      && request.resource.data.senderUid == uid()
+                      && request.resource.data.senderRole in ['teacher','parent']
+                      && request.resource.data.text is string
+                      && request.resource.data.text.size() > 0
+                      && request.resource.data.text.size() <= 320
+                      && exists(/databases/$(database)/documents/pp_message_threads/$(threadId))
+                      && request.resource.data.schoolId == get(/databases/$(database)/documents/pp_message_threads/$(threadId)).data.schoolId
+                      && request.resource.data.threadId == threadId
+                      && (
+                        get(/databases/$(database)/documents/pp_message_threads/$(threadId)).data.teacherEmail.lower() == email()
+                        || get(/databases/$(database)/documents/pp_message_threads/$(threadId)).data.parentEmail.lower() == email()
+                      );
+
+        allow update: if signedIn()
+                      && resource.data.senderUid == uid()
+                      && request.resource.data.diff(resource.data).affectedKeys()
+                          .hasOnly(['deleted','text','_lastModifiedBy','_lastModifiedAt']);
+
+        allow delete: if false;
+      }
+    }
+
+    match /pp_message_reports/{reportId} {
+      allow get:  if signedIn() && inSameSchool();
+      allow list: if signedIn() && inSameSchool();
+      allow create: if signedIn()
+                    && hasSchoolId()
+                    && writingToOwnSchool()
+                    && request.resource.data.keys().hasOnly([
+                         'schoolId','classId','threadId','studentId',
+                         'messageId','messageText','messageSenderRole',
+                         'messageSenderName',
+                         'reportedBy','reportedByName','reportedByRole',
+                         'reason','status','reportedAt',
+                         'reviewedBy','reviewedByName','reviewedAt',
+                         '_lastModifiedBy','_lastModifiedAt'
+                       ])
+                    && request.resource.data.reportedBy == uid()
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.reportedByRole in ['teacher','parent'];
+      allow update: if signedIn() && inSameSchool() && hasAdminRole()
+                    && schoolIdImmutable()
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['status','reviewedBy','reviewedByName','reviewedAt','_lastModifiedBy','_lastModifiedAt']);
+      allow delete: if false;
+    }
+
     match /results/{id} {
       allow get:  if signedIn() && inSameSchool();
       allow list: if signedIn();  // TEMPORARY PHASE-1: relaxed while client queries migrate. Re-tighten to inSameSchool() once all pages filter by schoolId.
