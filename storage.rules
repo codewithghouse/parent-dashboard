@@ -48,6 +48,42 @@ service firebase.storage {
       return signedIn() && claimRole() in ['owner', 'principal'];
     }
 
+    // ── Platform-admin helpers (main-website /admin console) ─────────────
+    // Mirror the Firestore-side platform-admin model. Storage rules can
+    // call firestore.get / firestore.exists to read /admins/{uid}.
+    function isPermanentPlatformSuper() {
+      return signedIn()
+          && request.auth.token.email_verified == true
+          && request.auth.token.email != null
+          && request.auth.token.email.lower() == 'edullentofficial@gmail.com';
+    }
+
+    function platformAdminData() {
+      return firestore.get(/databases/(default)/documents/admins/$(uid())).data;
+    }
+
+    function hasPlatformAdminDoc() {
+      return signedIn()
+          && firestore.exists(/databases/(default)/documents/admins/$(uid()));
+    }
+
+    function isPlatformAdmin() {
+      return isPermanentPlatformSuper()
+          || (hasPlatformAdminDoc()
+              && (platformAdminData().role == 'admin'
+                  || platformAdminData().role == 'superadmin'));
+    }
+
+    function platformAdminHasSection(section) {
+      return isPermanentPlatformSuper()
+          || (hasPlatformAdminDoc()
+              && (platformAdminData().role == 'superadmin'
+                  || (platformAdminData().role == 'admin'
+                      && 'sections' in platformAdminData()
+                      && platformAdminData().sections is list
+                      && section in platformAdminData().sections)));
+    }
+
     // Caller's claimed school matches the {schoolId} segment of the path
     function sameSchool(schoolId) {
       return signedIn() && claimSchoolId() == schoolId;
@@ -253,6 +289,23 @@ service firebase.storage {
                     && request.resource.size < 10 * 1024 * 1024
                     && isImage();
       allow delete: if signedIn() && uid() == uploaderUid;
+    }
+
+
+    // ═════════════════════════════════════════════════════════════════════
+    // ── Main-website article images ─────────────────────────────────────
+    //   Path: articles/{articleId}/{fileName}
+    //   Read: public — articles are visitor-facing on the marketing site.
+    //   Write: platform admins with the 'articles' section grant (or
+    //          permanent superadmin / superadmin). Image MIME only, 10 MB cap.
+    //   Delete: same gate as write.
+    // ═════════════════════════════════════════════════════════════════════
+    match /articles/{articleId}/{fileName} {
+      allow read:   if true;
+      allow write:  if platformAdminHasSection('articles')
+                    && request.resource.size < 10 * 1024 * 1024
+                    && isImage();
+      allow delete: if platformAdminHasSection('articles');
     }
 
 

@@ -168,6 +168,20 @@ service cloud.firestore {
           || (hasPlatformAdminDoc() && platformAdminRole() == 'superadmin');
     }
 
+    // ── Section-based gating for platform admins ─────────────────────────
+    // /admins/{uid}.sections is an array of strings (e.g. ['articles']).
+    // Superadmins implicitly have every section; we only check the sections
+    // array for role='admin' accounts.
+    function platformAdminHasSection(section) {
+      return isPermanentSuperadmin()
+          || isPlatformSuper()
+          || (hasPlatformAdminDoc()
+              && get(platformAdminPath()).data.role == 'admin'
+              && 'sections' in get(platformAdminPath()).data
+              && get(platformAdminPath()).data.sections is list
+              && section in get(platformAdminPath()).data.sections);
+    }
+
     // ── Support agent — cross-tenant read+update on /support_tickets ─────
     // Email allowlist for the support-edullent-dashboard portal. The list is
     // tiny by design — Edullent's own support team. To add an agent, append
@@ -1495,6 +1509,59 @@ service cloud.firestore {
 
       // Delete: support agent only — preserves user history by default.
       allow delete: if isSupportAgent();
+    }
+
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ── 11.7. ARTICLES — main-website /admin → /articles publishing ──────
+    //     Public read of published docs; drafts visible only to authors +
+    //     platform admins. Write gate requires the 'articles' section.
+    // ═══════════════════════════════════════════════════════════════════════
+    match /articles/{articleId} {
+      allow get: if (resource.data.status == 'published')
+                 || isPlatformAdmin()
+                 || (signedIn()
+                     && 'authorUid' in resource.data
+                     && resource.data.authorUid == uid());
+
+      allow list: if true;
+
+      allow create: if platformAdminHasSection('articles')
+                    && request.resource.data.keys().hasOnly([
+                        'title','slug','excerpt','body',
+                        'coverImage','images','status',
+                        'authorUid','authorEmail','authorName',
+                        'createdAt','updatedAt','publishedAt'
+                      ])
+                    && (!('title' in request.resource.data)
+                        || (request.resource.data.title is string
+                            && request.resource.data.title.size() < 300))
+                    && (!('slug' in request.resource.data)
+                        || (request.resource.data.slug is string
+                            && request.resource.data.slug.size() < 200))
+                    && (!('excerpt' in request.resource.data)
+                        || (request.resource.data.excerpt is string
+                            && request.resource.data.excerpt.size() < 1000))
+                    && (!('body' in request.resource.data)
+                        || (request.resource.data.body is string
+                            && request.resource.data.body.size() < 200000))
+                    && (!('status' in request.resource.data)
+                        || request.resource.data.status in ['draft','published'])
+                    && (!('images' in request.resource.data)
+                        || (request.resource.data.images is list
+                            && request.resource.data.images.size() <= 50));
+
+      allow update: if platformAdminHasSection('articles')
+                    && (!('status' in request.resource.data)
+                        || request.resource.data.status in ['draft','published'])
+                    && (!('images' in request.resource.data)
+                        || (request.resource.data.images is list
+                            && request.resource.data.images.size() <= 50));
+
+      allow delete: if isPlatformSuper()
+                    || (platformAdminHasSection('articles')
+                        && 'authorUid' in resource.data
+                        && resource.data.authorUid == uid());
     }
 
 
