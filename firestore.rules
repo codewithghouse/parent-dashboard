@@ -604,7 +604,25 @@ service cloud.firestore {
                     && request.resource.data.title.size() < 200
                     && request.resource.data.description is string
                     && request.resource.data.description.size() < 4000;
-      allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && hasAdminRole();
+      // Update paths (2026-05-25):
+      //   1) Admin (owner/principal) — full update
+      //   2) Staff (teacher) — close-only: flip handled true + handledBy/At
+      //   3) Matched parent (isParentOf) — same close-only whitelist
+      //   Append-only spirit preserved via narrow whitelist + handled==true.
+      allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && (
+        hasAdminRole()
+        || (
+          (
+            hasStaffRole()
+            || isParentOf(resource.data.studentId)
+          )
+          && request.resource.data.handled == true
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'handled', 'handledBy', 'handledAt',
+            '_lastModifiedBy', '_lastModifiedAt'
+          ])
+        )
+      );
       allow delete: if false;
     }
 
