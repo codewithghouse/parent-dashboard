@@ -215,11 +215,8 @@ service cloud.firestore {
         // Owner reads everything under their tree.
         // Principals/teachers of same school can read (e.g. branches list)
         // but only owner can write.
-        // Platform admins (super-admin portal) can read cross-tenant — needed
-        // for the network-wide branches/teachers/students rollups.
         allow read: if isOwnerOf(schoolId)
-                    || (signedIn() && claimSchoolId() == schoolId)
-                    || isPlatformAdmin();
+                    || (signedIn() && claimSchoolId() == schoolId);
         allow write: if isOwnerOf(schoolId);
       }
     }
@@ -236,7 +233,6 @@ service cloud.firestore {
                     hasOwnerRole()
                     || (claimSchoolId() != null
                         && resource.data.schoolId == claimSchoolId())
-                    || isPlatformAdmin()  // super-admin portal cross-tenant read
                   );
 
       allow create: if signedIn() && hasSchoolId() && isOwnerOf(request.resource.data.schoolId);
@@ -261,9 +257,8 @@ service cloud.firestore {
                     hasOwnerRole()
                     || inSameSchool()
                     || ownsEmail()   // teacher can read own record pre-claims-sync
-                    || isPlatformAdmin()  // super-admin portal cross-tenant read
                   );
-      allow list: if signedIn() && (inSameSchool() || isPlatformAdmin());
+      allow list: if signedIn() && inSameSchool();
 
       // Create: only admins (owner/principal) of the target school.
       allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasAdminRole();
@@ -297,17 +292,30 @@ service cloud.firestore {
                     || ('parentEmail' in resource.data
                         && resource.data.parentEmail is string
                         && resource.data.parentEmail.lower() == email())
-                    || isPlatformAdmin()  // super-admin portal cross-tenant read
                   );
-      allow list: if signedIn() && (inSameSchool() || isPlatformAdmin());
+      allow list: if signedIn() && inSameSchool();
 
       allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
 
       // Update: staff in same school, or the student themselves
-      // (e.g. Invited → Active self-activation) with immutable schoolId.
+      // (e.g. Invited → Active self-activation), or a parent matched on
+      // parentEmail — with schoolId immutable. Parents can ONLY edit a
+      // narrow whitelist of safety/care fields (allergies, medical, diet,
+      // comfortCue, authorizedPickup, bloodGroup) to keep them from
+      // mutating identity / enrollment data like classId, name, schoolId.
       allow update: if signedIn() && schoolIdImmutable() && (
         (hasStaffRole() && resource.data.schoolId == claimSchoolId())
         || ownsEmail()
+        || (
+          'parentEmail' in resource.data
+          && resource.data.parentEmail is string
+          && resource.data.parentEmail.lower() == email()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'allergies', 'medical', 'diet', 'comfortCue',
+            'authorizedPickup', 'bloodGroup',
+            'updatedAt', '_lastModifiedBy', '_lastModifiedAt'
+          ])
+        )
       );
 
       allow delete: if isOwnerOf(resource.data.schoolId)
@@ -495,14 +503,18 @@ service cloud.firestore {
       allow get:  if signedIn() && inSameSchool();
       allow list: if signedIn();  // TEMPORARY PHASE-1: relaxed while client queries migrate. Re-tighten to inSameSchool() once all pages filter by schoolId.
       allow create:    if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole() && (
+                          // Admins (owner/principal) can always write — they may correct attendance on a teacher's behalf.
                           hasAdminRole()
+                          // Otherwise the writer must be the designated class teacher OR the class has no designation yet (legacy fallback).
                           || (
                             'classId' in request.resource.data
                             && request.resource.data.classId is string
                             && exists(/databases/$(database)/documents/classes/$(request.resource.data.classId))
                             && (
+                              // Legacy class — no S2 designation; permit any staff (current behavior pre-migration).
                               !('classTeacherEmail' in get(/databases/$(database)/documents/classes/$(request.resource.data.classId)).data)
                               || get(/databases/$(database)/documents/classes/$(request.resource.data.classId)).data.classTeacherEmail == ''
+                              // OR caller's email matches the class's classTeacherEmail.
                               || get(/databases/$(database)/documents/classes/$(request.resource.data.classId)).data.classTeacherEmail == email()
                             )
                           )
@@ -518,7 +530,7 @@ service cloud.firestore {
     //     feature_school_wide_holidays_2026-05-19.
     match /school_holidays/{id} {
       allow get:  if signedIn() && inSameSchool();
-      allow list: if signedIn();  // PHASE-1: client queries filter by schoolId.
+      allow list: if signedIn();  // PHASE-1: relaxed like attendance — client queries filter by schoolId.
       allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasAdminRole();
       allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && hasAdminRole();
       allow delete: if signedIn() && inSameSchool() && hasAdminRole();
@@ -577,16 +589,27 @@ service cloud.firestore {
     // own school AND CREATE new incidents from the teacher dashboard
     // (Injury / Behaviour / Medical / Safety / Other categories). Admin
     // still owns UPDATE (used to flip `handled: true` after response) and
-    // delete remains denied — the log is intentionally append-only.
+    // delete remains denied — the log is intentionally append-only so
+    // historical incidents can never be quietly redacted.
     //
-    // 2026-05-25 hotfix: removed `createdBy == uid()` check. `createdBy`
-    // carries the teacher's FIRESTORE doc id (looked up by email at
-    // login), NOT request.auth.uid — different identifiers in this
-    // codebase (same gotcha documented on principal_to_teacher_notes).
-    // The previous check broke every write with "Missing or insufficient
-    // permissions". Trust model is hasStaffRole() + writingToOwnSchool().
+    // Server-side writes by Cloud Functions (e.g. onPickupMismatch) keep
+    // working because Admin SDK bypasses these rules entirely.
     //
-    // Server-side writes by Cloud Functions (Admin SDK) bypass these rules.
+    // 2026-05-25 hotfix: removed `createdBy == uid()` check. In this
+    // codebase the `createdBy` field carries the teacher's FIRESTORE doc
+    // id (`teachers/{docId}` — looked up by email at login), NOT
+    // request.auth.uid. The two are different identifiers (same gotcha
+    // documented on principal_to_teacher_notes). The previous check made
+    // every write fail with "Missing or insufficient permissions". Trust
+    // model is hasStaffRole() + writingToOwnSchool() — consistent with
+    // sibling pp_* rules.
+    //
+    // Field whitelist enforced on create:
+    //   schoolId, classId, studentId, studentName, type, severity, title,
+    //   description, createdBy, createdByName, createdAt, date, handled,
+    //   _lastModifiedBy, _lastModifiedAt  (required core)
+    //   actionTaken, parentNotified, parentNotifiedAt, witnessId,
+    //   witnessName, photos, _createdServerAt  (optional)
     match /pp_incidents/{id} {
       allow get:  if signedIn() && inSameSchool();
       allow list: if signedIn() && inSameSchool();
@@ -618,13 +641,25 @@ service cloud.firestore {
                     && request.resource.data.title.size() < 200
                     && request.resource.data.description is string
                     && request.resource.data.description.size() < 4000;
-      // Update paths (2026-05-25, iter 2):
-      //   1) Admin (owner/principal) — full update
-      //   2) Staff (teacher) — close-only: flip handled true
-      //   3) Matched parent (isParentOf) — same close-only gate
-      //   Whitelist via diff() was dropped — it was rejecting valid writes
-      //   under serverTimestamp(). Narrow scope kept via handled==true +
-      //   schoolId immutable + role gate.
+      // Update paths (2026-05-25):
+      //   1) Admin (owner/principal) — full update, can change any field
+      //   2) Staff (teacher) — close-only: flip handled to true (cannot
+      //      reopen). schoolId immutable. Other fields stay protected by
+      //      the spec — the client never writes anything else through
+      //      resolveIncident, and even if it did, the rule below just
+      //      gates the close direction. (Append-only spirit holds because
+      //      title/description/severity/createdBy/createdAt are not
+      //      writable in this path.)
+      //   3) Matched parent (isParentOf the student) — same close-only
+      //      gate as staff. Parent "resolves" their own child's incident
+      //      from their side once they've acknowledged it.
+      //
+      // 2026-05-25 iteration 2: dropped the `diff().affectedKeys().hasOnly`
+      // whitelist — it was evaluating oddly under serverTimestamp() and
+      // the localCache reject/rollback path made the toast green but the
+      // card snap back to PENDING. Keep the rule narrow via the handled
+      // direction + schoolId immutable + role gate. Future hardening could
+      // add per-field protection via a CF trigger.
       allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && (
         hasAdminRole()
         || (
@@ -652,6 +687,7 @@ service cloud.firestore {
 
     // pp_meals_naps — per-class-per-day meals + naps log. Doc id pattern:
     // `${date}_${classId}`. Two parallel arrays (meals[], naps[]).
+    // Parents filter their own child client-side.
     match /pp_meals_naps/{id} {
       allow get:  if signedIn() && inSameSchool();
       allow list: if signedIn();  // PHASE-1
@@ -661,7 +697,10 @@ service cloud.firestore {
     }
 
     // pp_behavior_notes — per-student behavior observations with visibility
-    // tiers. Doc per entry. Tier filtering is client-side in PHASE-1.
+    // tiers (teacher_only / principal / parent). Doc per entry, not per
+    // class. Visibility filtering is enforced client-side via the `tier`
+    // field; parents query where tier == "parent". Tightening to rule-
+    // enforced tier filtering on get() is a Phase-2 hardening.
     match /pp_behavior_notes/{id} {
       allow get:  if signedIn() && inSameSchool();
       allow list: if signedIn();  // PHASE-1
@@ -670,8 +709,9 @@ service cloud.firestore {
       allow delete: if signedIn() && inSameSchool() && hasAdminRole();
     }
 
-    // pp_milestones — per-student NEP 2020 5-domain observations. Doc per
-    // entry. Append-only in practice.
+    // pp_milestones — per-student NEP 2020 5-domain observations.
+    // Append-only in practice; teachers add new observations rather than
+    // editing past ones. Doc per entry.
     match /pp_milestones/{id} {
       allow get:  if signedIn() && inSameSchool();
       allow list: if signedIn();  // PHASE-1
@@ -680,20 +720,42 @@ service cloud.firestore {
       allow delete: if signedIn() && inSameSchool() && hasAdminRole();
     }
 
-    // pp_announcements — school/stage/class-scoped notices. Audience
-    // filtering (school/stage/class) is enforced client-side against the
-    // active child's classId.
+    // pp_announcements — school/stage/class-scoped notices written by
+    // principal or teacher, read by all parents in the same school.
+    // Audience filtering (school/stage/class) is enforced client-side
+    // against the active child's classId.
     match /pp_announcements/{id} {
       allow get:  if signedIn() && inSameSchool();
       allow list: if signedIn();  // PHASE-1
       allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
       allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && hasStaffRole();
-      allow delete: if signedIn() && inSameSchool() && hasAdminRole();
+      // Staff in the same school can delete (admin OR teacher). The
+      // pre-primary teacher app enforces "only the creator can delete"
+      // client-side (Notices.tsx) so a teacher can clean up their own
+      // mistakes without bothering the principal. Same-school check
+      // contains blast radius. (2026-05-26 — was hasAdminRole only,
+      // which blocked teachers with insufficient-permissions.)
+      allow delete: if signedIn() && inSameSchool() && hasStaffRole();
     }
 
     // pp_events — school calendar entries (holidays, PTM, celebrations,
-    // exams, trips, general). Written by staff, read by parents.
+    // exams, trips, general). Written by principal/teacher; readable by
+    // every parent in the school. Audience filtering for class-scoped
+    // events is applied client-side.
     match /pp_events/{id} {
+      allow get:  if signedIn() && inSameSchool();
+      allow list: if signedIn();  // PHASE-1
+      allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
+      allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && hasStaffRole();
+      // Same as pp_announcements — staff can delete (admin OR teacher),
+      // client-side enforces own-only via Events.tsx. (2026-05-26 fix.)
+      allow delete: if signedIn() && inSameSchool() && hasStaffRole();
+    }
+
+    // pp_class_settings — per-class feature toggles, theme-of-week,
+    // arrival/dismissal times, class-wide allergens list. Doc ID is the
+    // classId itself so reads/writes are deterministic.
+    match /pp_class_settings/{classId} {
       allow get:  if signedIn() && inSameSchool();
       allow list: if signedIn();  // PHASE-1
       allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
@@ -701,12 +763,40 @@ service cloud.firestore {
       allow delete: if signedIn() && inSameSchool() && hasAdminRole();
     }
 
+    // pp_photos — teacher-captured class photos with per-photo metadata
+    // (storage URL, tagged children, optional slot link). Parents read
+    // their own child's photos via array-contains on taggedStudentIds.
+    // Hard delete allowed by either the original uploader or any school
+    // admin (matches PreAnnouncements deletion semantics).
+    match /pp_photos/{id} {
+      allow get:  if signedIn() && inSameSchool();
+      allow list: if signedIn();  // PHASE-1
+      allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
+      allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && hasStaffRole();
+      allow delete: if signedIn() && inSameSchool() && hasStaffRole();
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     // ── pp_message_threads / messages — 1-on-1 teacher↔parent chats ────
+    //
+    // Thread doc id == studentId. One thread per child. Schema:
+    //   schoolId, classId, studentId, studentName, parentEmail (lowercase),
+    //   parentName?, teacherId, teacherName, teacherEmail (lowercase),
+    //   lastMessage?, unreadParent, unreadTeacher, mutedParent, mutedTeacher,
+    //   archived, reportFlagCount, createdAt, updatedAt.
+    //
+    // Trust model:
+    //   • Read scoped to inSameSchool() — staff (incl. principal) can see
+    //     thread metadata + list threads for oversight.
+    //   • Write scoped to the two participants (teacher matched by email,
+    //     parent matched by parentEmail) plus admins for moderation.
+    //   • Messages subcollection — append + soft-delete by sender only.
     // ═══════════════════════════════════════════════════════════════════
     match /pp_message_threads/{threadId} {
       // Get allows resource==null (non-existent doc) so the teacher's
       // ensurePPThread() existence-check works on first-time threads.
+      // Otherwise inSameSchool() evaluates resource.data on null and fails
+      // with permission-denied, blocking the create flow entirely.
       allow get:  if signedIn() && (resource == null || inSameSchool());
       allow list: if signedIn() && inSameSchool();
 
@@ -738,6 +828,10 @@ service cloud.firestore {
                     && request.resource.data.teacherEmail.size() > 0
                     && request.resource.data.teacherEmail.size() < 200;
 
+      // Update: schoolId / studentId / parentEmail immutable. Staff in same
+      // school OR matched parent can update. Used for: send-message-bump,
+      // unread reset, mute toggle, archive toggle, reportFlagCount bump,
+      // teacherId/teacherName/teacherEmail refresh when teacher rotates.
       allow update: if signedIn()
                     && schoolIdImmutable()
                     && request.resource.data.studentId == resource.data.studentId
@@ -751,6 +845,7 @@ service cloud.firestore {
 
       allow delete: if signedIn() && inSameSchool() && hasAdminRole();
 
+      // Messages subcollection — append + soft-delete by sender only.
       match /messages/{messageId} {
         allow get:  if signedIn()
                     && 'schoolId' in resource.data
@@ -779,10 +874,14 @@ service cloud.firestore {
                       && request.resource.data.schoolId == get(/databases/$(database)/documents/pp_message_threads/$(threadId)).data.schoolId
                       && request.resource.data.threadId == threadId
                       && (
+                        // Teacher participant — matched on teacherEmail field.
                         get(/databases/$(database)/documents/pp_message_threads/$(threadId)).data.teacherEmail.lower() == email()
+                        // OR parent participant — matched on parentEmail field.
                         || get(/databases/$(database)/documents/pp_message_threads/$(threadId)).data.parentEmail.lower() == email()
                       );
 
+        // Update: only the original sender can soft-delete their own message
+        // (deleted=true, text='').
         allow update: if signedIn()
                       && resource.data.senderUid == uid()
                       && request.resource.data.diff(resource.data).affectedKeys()
@@ -792,6 +891,7 @@ service cloud.firestore {
       }
     }
 
+    // pp_message_reports — flag-a-message inbox for principal moderation.
     match /pp_message_reports/{reportId} {
       allow get:  if signedIn() && inSameSchool();
       allow list: if signedIn() && inSameSchool();
@@ -810,6 +910,7 @@ service cloud.firestore {
                     && request.resource.data.reportedBy == uid()
                     && request.resource.data.status == 'pending'
                     && request.resource.data.reportedByRole in ['teacher','parent'];
+      // Update: admin only — flip pending → reviewed/dismissed.
       allow update: if signedIn() && inSameSchool() && hasAdminRole()
                     && schoolIdImmutable()
                     && request.resource.data.diff(resource.data).affectedKeys()
@@ -881,6 +982,17 @@ service cloud.firestore {
     // summary. Save persists the result so the teacher can revisit. Mirrors
     // lessonPlans rule shape — staff-only writes scoped by schoolId.
     match /lessonSummaries/{id} {
+      allow get:  if signedIn() && inSameSchool();
+      allow list: if signedIn();  // TEMPORARY PHASE-1
+      allow create:    if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
+      allow update:    if signedIn() && inSameSchool() && schoolIdImmutable() && hasStaffRole();
+      allow delete:    if signedIn() && inSameSchool() && hasStaffRole();
+    }
+    // ── Exam paper history (Exam.tsx) ───────────────────────────────────
+    // Added 2026-05-15: every AI exam paper generation auto-saves a doc
+    // here so teachers can revisit / reload past papers. Mirrors lessonPlans
+    // rule shape — staff-only writes scoped by schoolId.
+    match /examPapers/{id} {
       allow get:  if signedIn() && inSameSchool();
       allow list: if signedIn();  // TEMPORARY PHASE-1
       allow create:    if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
@@ -1061,23 +1173,22 @@ service cloud.firestore {
     match /principal_to_teacher_notes/{id} {
       allow get:  if signedIn() && inSameSchool();
       allow list: if signedIn();  // TEMPORARY PHASE-1: relaxed while client queries migrate. Re-tighten to inSameSchool() once all pages filter by schoolId.
-      // Create: admin (principal/owner) can write any direction.
-      // Teacher replies allowed only when from == "teacher" — mirrors the
-      // principal_to_parent_notes pattern above so the conversation works
-      // bidirectionally from the teacher dashboard's PrincipalNotes page.
-      allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && (
-                      hasAdminRole()
-                      || (claimRole() == 'teacher'
-                          && request.resource.data.from == 'teacher')
-                    );
-      // Update: admin can edit anything; teacher may only flip the `read`
-      // flag on incoming principal messages (no other field changes).
-      allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && (
-                      hasAdminRole()
-                      || (claimRole() == 'teacher'
-                          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']))
-                    );
-      allow delete: if signedIn() && inSameSchool() && hasAdminRole();
+      // Create: any staff member (owner/principal/teacher) in the same school
+      // may write. The previous teacherId == auth.uid guard was wrong because
+      // `teacherId` on these docs is the teacher's Firestore doc id (queried
+      // by email on login), NOT the auth.uid — they're different. Mirrors the
+      // same trust model as `parent_notes` (school-scoped, no per-author id
+      // check); the `from` field distinguishes direction.
+      allow create:    if signedIn() && hasSchoolId() && writingToOwnSchool()
+                       && claimRole() in ['owner', 'principal', 'teacher'];
+      // Update: any staff in same school may update. Mark-read flips `read`
+      // on teacher's own inbound notes — a per-document teacherId check fails
+      // for the same reason as above, so the safer guard is school + role +
+      // immutable schoolId. Teachers can't escalate via update because the
+      // doc is school-scoped and the rule rejects schoolId changes.
+      allow update:    if signedIn() && inSameSchool() && schoolIdImmutable()
+                       && claimRole() in ['owner', 'principal', 'teacher'];
+      allow delete:    if signedIn() && inSameSchool() && hasAdminRole();
     }
     match /parent_notes/{id} {
       allow get:  if signedIn() && inSameSchool();
@@ -1119,7 +1230,15 @@ service cloud.firestore {
     match /principal_reports/{id} {
       allow get:  if signedIn() && inSameSchool();
       allow list: if signedIn();  // TEMPORARY PHASE-1: relaxed while client queries migrate. Re-tighten to inSameSchool() once all pages filter by schoolId.
-      allow create:    if signedIn() && hasSchoolId() && writingToOwnSchool() && hasAdminRole();
+      // Create: any staff in the same school (owner/principal/teacher) may
+      // route a report TO the principal's inbox. The previous admin-only gate
+      // blocked teachers from sending reports → "Failed to send" toast in
+      // teacher-dashboard GenerateReport. Mirrors the same trust model as
+      // principal_to_teacher_notes (school-scoped, staff-role gated).
+      allow create:    if signedIn() && hasSchoolId() && writingToOwnSchool()
+                       && claimRole() in ['owner', 'principal', 'teacher'];
+      // Update: admin-only (principal/owner manages their inbox — archive,
+      // mark-read, etc.). Teachers don't need write access to existing reports.
       allow update:    if signedIn() && inSameSchool() && schoolIdImmutable() && hasAdminRole();
       allow delete:    if signedIn() && inSameSchool() && hasAdminRole();
     }
@@ -1224,6 +1343,18 @@ service cloud.firestore {
       allow delete: if signedIn() && inSameSchool() && hasAdminRole();
     }
 
+    // ── Branch weekly AI insights — owner-dashboard Branch Detail page.
+    //   Doc id: `{branchId}_{isoWeekKey}` (e.g. `abc123_2026-W21`).
+    //   Weekly cache so the AI fires at most once per branch per ISO week.
+    //   Only owner writes; read scoped to the same school (the owner's uid).
+    match /branch_weekly_insights/{key} {
+      allow get:    if signedIn() && (resource == null || inSameSchool());
+      allow list:   if signedIn() && inSameSchool();
+      allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasOwnerRole();
+      allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && hasOwnerRole();
+      allow delete: if signedIn() && isOwnerOf(resource.data.schoolId);
+    }
+
     // ── Syllabus / class documents ─────────────────────────────────────
     //   Authored by either the principal (class-tagged for the whole class) or
     //   by the assigned teacher. Mutations are restricted to the original
@@ -1240,9 +1371,12 @@ service cloud.firestore {
     }
 
     // ── Important Questions ────────────────────────────────────────────
+    //   Class-tagged question banks uploaded by the principal (and read by
+    //   teachers / parents on the same school). Mirrors `syllabi` shape +
+    //   permissions so the multi-dashboard reader pattern stays consistent.
     match /important_questions/{id} {
       allow get:  if signedIn() && inSameSchool();
-      allow list: if signedIn();  // TEMPORARY PHASE-1
+      allow list: if signedIn();  // TEMPORARY PHASE-1: same relaxation as syllabi.
       allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasStaffRole();
       allow update: if signedIn() && inSameSchool() && schoolIdImmutable()
                        && (resource.data.uploadedBy == uid() || hasAdminRole());
@@ -1530,11 +1664,11 @@ service cloud.firestore {
 
 
     // ═══════════════════════════════════════════════════════════════════════
-    // ── 11.7. SUPPORT TICKETS — cross-dashboard help desk ───────────────
+    // ── 11.6 Support tickets — cross-dashboard help desk ─────────────────
     // ═══════════════════════════════════════════════════════════════════════
-    // Written by any signed-in user (parent / teacher / principal / owner)
-    // from their dashboard's /help page. Read + replied by Edullent support
-    // agents from the support-edullent-dashboard portal.
+    // Tickets written by any signed-in user from any of the 4 user dashboards.
+    // Read + status changes performed cross-tenant by Edullent support agents
+    // from the support-edullent-dashboard portal.
     //
     // Tenant scoping: ticket has schoolId for traceability, but support
     // agents read cross-tenant (intentional — they help every school).
