@@ -69,13 +69,21 @@ export default function ResultsPage() {
       orderBy("publishedAt", "desc"),
     );
     const unsub = onSnapshot(q, snap => {
+      /* Show doc if EITHER:
+         (a) parent's child is explicitly in studentResults[] (per-student PDF case)
+         (b) doc's classId matches parent's child's current class (class-PDF-only
+             case — without this branch, parent saw "No results published yet"
+             whenever the principal published a class-summary-only result with no
+             per-student PDFs, which is the common quick-publish flow). */
       const docs = snap.docs
         .map(d => ({ id: d.id, ...d.data() } as ResultDoc))
         .filter(r =>
           r.status === "published"
           && r.visibleToParents
-          && Array.isArray(r.studentResults)
-          && r.studentResults.some(sr => sr.studentId === studentId)
+          && (
+            r.classId === classId
+            || (Array.isArray(r.studentResults) && r.studentResults.some(sr => sr.studentId === studentId))
+          )
         );
       setResults(docs);
       setLoaded(true);
