@@ -293,6 +293,34 @@ service firebase.storage {
 
 
     // ═════════════════════════════════════════════════════════════════════
+    // ── Principal Results PDFs (K-12 + Pre-Primary) ─────────────────────
+    //   Paths:
+    //     principal_results/{schoolId}/{resultId}/class.pdf
+    //     principal_results/{schoolId}/{resultId}/{studentId}.pdf
+    //     pp_principal_results/{schoolId}/{resultId}/class.pdf
+    //     pp_principal_results/{schoolId}/{resultId}/{studentId}.pdf
+    //
+    //   Read: signed-in same-school. Per-student PDFs live at random
+    //   resultId+studentId paths that aren't enumerable without Firestore
+    //   access; the Firestore rule only returns the row to in-scope callers.
+    //
+    //   Write/Delete: principal or owner only (teachers cannot publish).
+    //   PDF only, 10 MB cap (matches client validator).
+    // ═════════════════════════════════════════════════════════════════════
+    match /principal_results/{schoolId}/{resultId}/{fileName} {
+      allow read:   if sameSchool(schoolId);
+      allow write:  if sameSchool(schoolId) && hasAdminRole() && isPdf();
+      allow delete: if sameSchool(schoolId) && hasAdminRole();
+    }
+
+    match /pp_principal_results/{schoolId}/{resultId}/{fileName} {
+      allow read:   if sameSchool(schoolId);
+      allow write:  if sameSchool(schoolId) && hasAdminRole() && isPdf();
+      allow delete: if sameSchool(schoolId) && hasAdminRole();
+    }
+
+
+    // ═════════════════════════════════════════════════════════════════════
     // ── Main-website article images ─────────────────────────────────────
     //   Path: articles/{articleId}/{fileName}
     //   Read: public — articles are visitor-facing on the marketing site.

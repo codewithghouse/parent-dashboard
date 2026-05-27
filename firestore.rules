@@ -776,6 +776,36 @@ service cloud.firestore {
       allow delete: if signedIn() && inSameSchool() && hasStaffRole();
     }
 
+    // principal_results — K-12 exam result PDFs uploaded by the principal.
+    // Each doc represents one (class, exam) pair and contains a class-wide PDF
+    // URL plus an array `studentResults[]` of per-student PDF URLs. Parents
+    // resolve their own child's row client-side from the array (only that
+    // PDF is rendered in the parent UI). PHASE-1: same-school read for any
+    // signed-in user — client UI enforces "only my child's PDF visible".
+    // Phase-2 hardening: rule-level array-contains scoping to parent's
+    // childrenIds claim.
+    //
+    // Write/delete: principal or owner only — teachers cannot publish results.
+    match /principal_results/{id} {
+      allow get:  if signedIn() && inSameSchool();
+      allow list: if signedIn();  // PHASE-1
+      allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasAdminRole();
+      allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && hasAdminRole();
+      allow delete: if signedIn() && inSameSchool() && hasAdminRole();
+    }
+
+    // pp_principal_results — Pre-Primary report card PDFs. Mirrors
+    // principal_results in shape (class PDF + studentResults[]). Separate
+    // collection so PP parent + teacher UIs never accidentally pull K-12
+    // docs. Same rule shape as principal_results.
+    match /pp_principal_results/{id} {
+      allow get:  if signedIn() && inSameSchool();
+      allow list: if signedIn();  // PHASE-1
+      allow create: if signedIn() && hasSchoolId() && writingToOwnSchool() && hasAdminRole();
+      allow update: if signedIn() && inSameSchool() && schoolIdImmutable() && hasAdminRole();
+      allow delete: if signedIn() && inSameSchool() && hasAdminRole();
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     // ── pp_message_threads / messages — 1-on-1 teacher↔parent chats ────
     //

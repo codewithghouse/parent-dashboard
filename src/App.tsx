@@ -27,6 +27,7 @@ const PrincipalNotesPage  = lazy(() => import("./pages/PrincipalNotesPage"));
 const AlertsPage          = lazy(() => import("./pages/AlertsPage"));
 const SettingsPage        = lazy(() => import("./pages/SettingsPage"));
 const ReportsPage         = lazy(() => import("./pages/ReportsPage"));
+const ResultsPage         = lazy(() => import("./pages/ResultsPage"));
 const ClassesPage         = lazy(() => import("./pages/ClassesPage"));
 const TimetablePage       = lazy(() => import("./pages/TimetablePage"));
 const AIPracticePage      = lazy(() => import("./pages/AIPracticePage"));
@@ -106,6 +107,7 @@ const AppRoutes = () => {
           <Route path="/teacher-notes" element={<TeacherNotesPage />} />
           <Route path="/principal-notes" element={<PrincipalNotesPage />} />
           <Route path="/reports"       element={<ReportsPage />} />
+          <Route path="/results"       element={<ResultsPage />} />
           <Route path="/alerts"        element={<AlertsPage />} />
           <Route path="/timetable"     element={<TimetablePage />} />
           <Route path="/ai-practice"   element={<AIPracticePage />} />

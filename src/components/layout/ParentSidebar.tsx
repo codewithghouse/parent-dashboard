@@ -21,6 +21,7 @@ const navItems: { title: string; path: string; icon: any; badge?: string | numbe
   { title: "Attendance", path: "/attendance", icon: CalendarCheck },
   { title: "Assignments", path: "/assignments", icon: ClipboardList },
   { title: "Tests & Exams", path: "/tests", icon: FileText },
+  { title: "My Results", path: "/results", icon: FileText },
   { title: "Exam Structure", path: "/exam-structure", icon: Award },
   { title: "Syllabus", path: "/syllabus", icon: Library },
   { title: "Concept Strengths", path: "/concepts", icon: Brain },
