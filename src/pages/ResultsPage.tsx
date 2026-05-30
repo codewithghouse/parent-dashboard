@@ -47,11 +47,17 @@ interface ResultDoc extends DocumentData {
   visibleToParents: boolean;
 }
 
+// Normalise a class label for tolerant matching — lowercase + strip every
+// non-alphanumeric char so "10-A", "10 A", "10a" all collapse to "10a".
+const norm = (s: any) => (s ?? "").toString().trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+
 export default function ResultsPage() {
   const { studentData } = useAuth();
   const schoolId  = studentData?.schoolId;
   const studentId = studentData?.id;
   const classId   = studentData?.classId;
+  const myClassName = norm(studentData?.className);
+  const mySection   = norm((studentData as any)?.section);
 
   const [results, setResults] = useState<ResultDoc[]>([]);
   const [loaded, setLoaded]   = useState(false);
@@ -77,14 +83,21 @@ export default function ResultsPage() {
              per-student PDFs, which is the common quick-publish flow). */
       const docs = snap.docs
         .map(d => ({ id: d.id, ...d.data() } as ResultDoc))
-        .filter(r =>
-          r.status === "published"
-          && r.visibleToParents
-          && (
-            r.classId === classId
-            || (Array.isArray(r.studentResults) && r.studentResults.some(sr => sr.studentId === studentId))
-          )
-        );
+        .filter(r => {
+          if (r.status !== "published" || !r.visibleToParents) return false;
+          // (a) child explicitly listed in per-student PDFs.
+          if (Array.isArray(r.studentResults) && r.studentResults.some(sr => sr.studentId === studentId)) return true;
+          // (b) class-id match (works when student.classId == result.classId).
+          if (classId && r.classId && r.classId === classId) return true;
+          // (c) className + section fallback — survives classId drift / a student
+          //     doc whose classId differs from the class the principal picked.
+          //     Require section match only when BOTH sides carry a section.
+          if (myClassName && norm(r.className) === myClassName) {
+            const rs = norm(r.section);
+            if (!rs || !mySection || rs === mySection) return true;
+          }
+          return false;
+        });
       setResults(docs);
       setLoaded(true);
     }, err => {
@@ -92,7 +105,7 @@ export default function ResultsPage() {
       setLoaded(true);
     });
     return () => unsub();
-  }, [schoolId, studentId, classId]);
+  }, [schoolId, studentId, classId, myClassName, mySection]);
 
   // Lookup helper: find this child's per-student PDF row in the doc.
   const childRowOf = (r: ResultDoc): StudentResult | undefined =>
