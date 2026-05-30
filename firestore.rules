@@ -313,6 +313,7 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'allergies', 'medical', 'diet', 'comfortCue',
             'authorizedPickup', 'bloodGroup',
+            'photoConsent', 'photoConsentBy', 'photoConsentAt',
             'updatedAt', '_lastModifiedBy', '_lastModifiedAt'
           ])
         )
